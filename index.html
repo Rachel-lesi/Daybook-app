@@ -1189,6 +1189,12 @@ button.tile.is-open{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--
 .od-dots{display:flex;gap:4px;padding-top:4px}
 .od-dots i{width:10px;height:10px;border-radius:50%;background:var(--line)}
 .od-dots i.on{background:var(--accent)}
+
+/* ===== Insights detail panel spacing ===== */
+.ov-detail{padding:14px 18px 10px}
+.ov-detail .sechead h2{font-size:1.05rem}
+.od-list{max-width:760px}
+#r-del.armed{background:var(--crit);color:#fff;border-color:var(--crit)}
 </style>
 </head>
 <body class="locked">
@@ -1549,7 +1555,7 @@ button.tile.is-open{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--
       <label class="f">Mistakes<textarea id="r-mistakes" placeholder="What went wrong, honestly"></textarea></label>
       <label class="f">How I'll improve<textarea id="r-improve" placeholder="One concrete change for tomorrow"></textarea></label>
       <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Energy today (1 low – 5 great)</span><div class="mood" id="r-mood"></div></div>
-      <div class="dlgfoot"><span class="saved" id="r-saved"></span>
+      <div class="dlgfoot"><span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="saved" id="r-saved"></span><button class="btn sm ghost danger" type="button" id="r-del" hidden>Delete</button></span>
         <div style="display:flex;gap:8px"><button class="btn" type="button" data-xopen="day:">Export</button><button class="btn" type="button" id="r-copy">Copy as report</button><button class="btn primary" type="button" id="r-save">Save</button></div></div>
     </div>
     <div data-part="archive" data-wide>
@@ -1653,6 +1659,6 @@ button.tile.is-open{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=29"></script>
+<script type="module" src="app.js?v=30"></script>
 </body>
 </html>

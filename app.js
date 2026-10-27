@@ -614,7 +614,8 @@ function renderOverview(){
     let d=0; due.forEach(r=>{ const ok=!!(dd.done||{})[r.id]; if(ok) d++; const kk=r.kind||"other"; perKind[kk]=perKind[kk]||{s:0,d:0}; perKind[kk].s++; if(ok) perKind[kk].d++; });
     schedTot+=due.length; doneTot+=d; return due.length? Math.round(d/due.length*100) : null; });
   // work activity per day
-  const wAct = keys.map(k=> k<st?null: S.tasks.reduce((a,t)=>a+(t.log||[]).filter(l=>isoDay(l.at)===k).length,0));
+  const isUpd = l => !/^Task added/.test(l.note||"");
+  const wAct = keys.map(k=> k<st?null: S.tasks.reduce((a,t)=>a+(t.log||[]).filter(l=>isoDay(l.at)===k&&isUpd(l)).length,0));
   const tasksDone=S.tasks.filter(t=>t.status==="done"&&inR(isoDay(t.doneAt)));
   const updates=wAct.reduce((a,b)=>a+(b||0),0);
   const todosDone=S.todos.filter(t=>t.done&&inR(isoDay(t.doneAt))).length;
@@ -636,9 +637,9 @@ function renderOverview(){
   const list = (rows, empty) => rows.length ? `<ul class="od-list">${rows.join("")}</ul>` : `<p class="small muted" style="margin:0">${empty}</p>`;
   const D = {
     tasks: () => ["Work tasks done", list(tasksDone.slice().sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||"")).map(t=>`<li data-task="${esc(t.id)}" role="button" tabindex="0">${day(isoDay(t.doneAt))}<span class="od-b"><b>${esc(t.title)}</b>${t.impact?`<span class="od-s">${esc(t.impact)}</span>`:""}</span>${catTag(t.category)}</li>`), "No work tasks finished in this period.")],
-    updates: () => { const L=[]; S.tasks.forEach(t=>(t.log||[]).forEach(l=>{ if(inR(isoDay(l.at))) L.push({t,l}); })); L.sort((a,b)=>(b.l.at||"").localeCompare(a.l.at||""));
+    updates: () => { const L=[]; S.tasks.forEach(t=>(t.log||[]).forEach(l=>{ if(inR(isoDay(l.at))&&isUpd(l)) L.push({t,l}); })); L.sort((a,b)=>(b.l.at||"").localeCompare(a.l.at||""));
       const G=new Map(); L.forEach(x=>{ if(!G.has(x.t.id)) G.set(x.t.id,{t:x.t,last:x.l.at,notes:[]}); G.get(x.t.id).notes.push(x.l.note||""); });
-      return ["Task updates logged", list([...G.values()].map(g=>`<li data-task="${esc(g.t.id)}" role="button" tabindex="0">${day(isoDay(g.last))}<span class="od-b"><b>${esc(g.t.title)}</b><span class="od-s">${g.notes.slice(0,3).map(esc).join(" · ")}${g.notes.length>3?` · +${g.notes.length-3} more`:""}</span></span><span class="od-n">${g.notes.length}</span></li>`), "No updates logged in this period.")]; },
+      return ["Task updates logged", list([...G.values()].map(g=>`<li data-task="${esc(g.t.id)}" role="button" tabindex="0">${day(isoDay(g.last))}<span class="od-b"><b>${esc(g.t.title)}</b><span class="od-s">${g.notes.slice(0,3).map(esc).join(" · ")}${g.notes.length>3?` · +${g.notes.length-3} more`:""}</span></span><span class="od-n">${g.notes.length} update${g.notes.length===1?"":"s"}</span></li>`), "No updates logged in this period.")]; },
     todos: () => ["To-dos done", list(S.todos.filter(t=>t.done&&inR(isoDay(t.doneAt))).sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||"")).map(t=>`<li>${day(isoDay(t.doneAt))}<span class="od-b">${esc(t.title)}</span></li>`), "No to-dos ticked off in this period.")],
     routine: () => ["Routine kept, day by day", list(keys.map((k,i)=>[k,rPct[i]]).filter(([,p])=>p!==null).reverse().map(([k,p])=>{ const dd=dayDoc(k), its=routineFor(k).filter(r=>!(dd.skip||{})[r.id]), miss=its.filter(r=>!(dd.done||{})[r.id]&&(k<tk||r.time<=pad(new Date().getHours())+":"+pad(new Date().getMinutes())));
       return `<li data-ovday="${k}" role="button" tabindex="0">${day(k)}<span class="od-b"><span class="bar od-bar"><i style="width:${p}%;background:${p>=80?"var(--ok)":p>=50?"var(--med)":"var(--crit)"}"></i></span>${miss.length?`<span class="od-s">Missed: ${miss.slice(0,4).map(r=>esc(r.label)).join(", ")}${miss.length>4?` +${miss.length-4}`:""}</span>`:`<span class="od-s">All done</span>`}</span><span class="od-n">${p}%</span></li>`; }), "No routine data yet.")],
@@ -2019,6 +2020,7 @@ function renderReflect(){
   if(!rDirty){ $("#r-did").value=r.did||""; $("#r-learned").value=r.learned||""; $("#r-mistakes").value=r.mistakes||""; $("#r-improve").value=r.improve||""; rMood=r.mood||0; }
   $("#r-mood").innerHTML=[1,2,3,4,5].map(n=>`<button type="button" data-mood="${n}" aria-pressed="${rMood===n}">${n}</button>`).join("");
   $("#r-saved").textContent = r.updatedAt?`Saved ${fmtTime(r.updatedAt)}`:"Not saved yet";
+  $("#r-del").hidden = !S.refl[rDate]; if(!rDelAsk){ $("#r-del").textContent="Delete"; $("#r-del").classList.remove("armed"); }
   const wl=workLogFor(rDate);
   const doneTodos=S.todos.filter(t=>t.done&&isoDay(t.doneAt)===rDate);
   $("#r-auto").innerHTML = `<b>Pulled from your tasks for ${esc(fmtDate(rDate))}</b>` + (wl.length||doneTodos.length ? `<ul>${wl.map(x=>`<li><b>${esc(x.t.title)}</b> <span class="muted">(${esc(catName(x.t.category))}, ${esc(STATUS_LABEL[x.t.status])} ${+x.t.progress||0}%)</span>${x.entries.length?": "+x.entries.map(e=>esc(e.note)).join("; "):" — added"}</li>`).join("")}${doneTodos.map(t=>`<li>${esc(t.title)} <span class="muted">(to-do done)</span></li>`).join("")}</ul>` : `<div class="muted small">No task updates logged on this day. Updates you log on work tasks appear here automatically.</div>`);
@@ -2026,9 +2028,21 @@ function renderReflect(){
 }
 ["#r-did","#r-learned","#r-mistakes","#r-improve"].forEach(s=>$(s).addEventListener("input",()=>{ rDirty=true; $("#r-saved").textContent="Unsaved changes"; }));
 ["#r-did","#r-learned","#r-mistakes","#r-improve"].forEach(s=>$(s).addEventListener("blur",()=>{ if(rDirty) saveRefl(true); }));
-$("#r-date").addEventListener("change",e=>{ S.arcMonth=(e.target.value||todayKey()).slice(0,7);  if(rDirty) saveRefl(true); rDate=e.target.value||todayKey(); rDirty=false; renderReflect(); });
+$("#r-date").addEventListener("change",e=>{ rDelAsk=false; S.arcMonth=(e.target.value||todayKey()).slice(0,7);  if(rDirty) saveRefl(true); rDate=e.target.value||todayKey(); rDirty=false; renderReflect(); });
 $("#r-mood").addEventListener("click",e=>{ const b=e.target.closest("[data-mood]"); if(!b) return; rMood=+b.dataset.mood; rDirty=true; saveRefl(true); });
 $("#r-save").onclick=()=>saveRefl(false);
+let rDelAsk=false;
+function deleteRefl(k){
+  const old=S.refl[k]; if(!old) return;
+  delete S.refl[k]; if(k===rDate){ rDirty=false; rDelAsk=false; }
+  if(db) write("reflections/"+k, ()=>db.doc("reflections/"+k).delete());
+  render(); toast("Reflection deleted", ()=>{ S.refl[k]=old; if(db) write("reflections/"+k, ()=>db.doc("reflections/"+k).set(old)); render(); toast("Reflection restored"); });
+}
+document.addEventListener("click", e=>{
+  const b=e.target.closest&&e.target.closest("#r-del"); if(!b) return;
+  if(!rDelAsk){ rDelAsk=true; b.textContent="Tap again to delete"; b.classList.add("armed"); setTimeout(()=>{ rDelAsk=false; if($("#r-del")){ $("#r-del").textContent="Delete"; $("#r-del").classList.remove("armed"); } },3000); return; }
+  deleteRefl(rDate);
+});
 function saveRefl(quiet){
   const data={date:rDate,did:$("#r-did").value,learned:$("#r-learned").value,mistakes:$("#r-mistakes").value,improve:$("#r-improve").value,mood:rMood,updatedAt:nowISO()};
   S.refl[rDate]=data; rDirty=false;
