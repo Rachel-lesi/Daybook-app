@@ -38,6 +38,7 @@ function write(path, fn){ // one write at a time per document
 }
 function toast(msg, undo){ const t=$("#toast"); t.textContent=msg; if(undo){ const b=document.createElement("button"); b.type="button"; b.className="t-undo"; b.textContent="Undo"; b.onclick=()=>{ t.hidden=true; undo(); }; t.append(b); } t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,undo?5000:2200); }
 
+document.addEventListener("click", e => { const x = e.target.closest && e.target.closest("[data-dlg-x]"); if (x) { e.preventDefault(); x.closest("dialog").close(); } });
 // ---------- swipe left on a task card to delete (phone)
 const SW = { card: null, x0: 0, y0: 0, base: 0, dx: 0, mode: "", open: null, swiped: 0 };
 const swSet = (c, x, anim) => { c.classList.toggle("sw-anim", !!anim); c.style.setProperty("--sx", x + "px"); c.classList.toggle("sw-on", x < 0); };
@@ -498,7 +499,7 @@ function autoProgress(){
 }
 function drawTask(){
   const t=editing, subs=t.subtasks, mins=taskMins(t.id);
-  $("#tf").innerHTML = `<h3>Work task</h3>
+  $("#tf").innerHTML = `<div class="dlg-top"><h3>Work task</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close without saving" title="Close">✕</button></div>
     <label class="f">Task<input id="t-title" value="${esc(t.title)}" required></label>
     <label class="f">Description<textarea id="t-desc" placeholder="What exactly was asked, expected output, where the data is">${esc(t.desc)}</textarea></label>
     <div class="f" style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Steps ${subs.length?`<span class="muted">· ${subs.filter(s=>s.done).length}/${subs.length} done · progress updates automatically</span>`:""}</span>
