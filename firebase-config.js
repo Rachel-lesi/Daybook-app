@@ -1,10 +1,6 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
+// Firebase settings for Daybook. These values are not secret; your data is
+// protected by your sign-in and the Firestore rules.
+export const firebaseConfig = {
   apiKey: "AIzaSyBtnOuRkmHXsR-z_PhbiWVw5gNpw_dJSf0",
   authDomain: "daybook-caaf9.firebaseapp.com",
   projectId: "daybook-caaf9",
@@ -12,6 +8,3 @@ const firebaseConfig = {
   messagingSenderId: "342860625835",
   appId: "1:342860625835:web:c757da6a153dc296f904ee"
 };
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
