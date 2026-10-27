@@ -88,6 +88,7 @@ const ICON = {
   search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>',
   flame: '<path d="M12 22c4 0 7-2.7 7-6.8 0-3.6-2.3-5.6-3.6-7.6-.4 1.7-1.3 2.9-2.4 3.4.3-3.1-1-6.6-3.9-9-.3 3.6-2.5 5.6-4 7.7C3.9 11.6 5 13.2 5 15.2 5 19.3 8 22 12 22z"/>',
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
+  calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>'
@@ -145,38 +146,79 @@ function parseQuick(text){
   out.work = !!(out.cat||out.newCat||out.urg);
   return out;
 }
-function updateHint(){
-  const v=$("#q").value; const p=parseQuick(v);
-  const mode = (p.work ? "work" : S.mode);
-  if(p.work && S.mode!=="work"){ setMode("work", true); S.autoWork=true; }
-  else if(!p.work && S.autoWork){ setMode("todo", true); S.autoWork=false; }
-  const h=$("#qhint");
-  if(!v.trim()){ h.innerHTML = mode==="work"
-    ? 'Tags: <code>#sql</code> <code>#excel</code> <code>#python</code> <code>#admin</code> · urgency <code>!critical</code> <code>!high</code> <code>!med</code> <code>!low</code> · due <code>@fri</code> <code>@tmr</code> <code>@3/11</code>'
-    : 'Type a to-do and press Enter. <code>@tmr</code> sets a date. Add <code>#tag</code> or <code>!high</code> to make it a work task.'; return; }
-  const bits=[];
-  bits.push('<span class="tag">'+(mode==="work"?"Work task":"To-do")+'</span>');
-  if(mode==="work"){ bits.push('<span class="tag">'+esc(p.cat?catName(p.cat):p.newCat?("New: "+p.newCat):"Uncategorised")+'</span>'); bits.push('<span class="urg '+(p.urg||"medium")+'">'+(p.urg||"medium")+'</span>'); }
-  if(p.due) bits.push('<span>due '+esc(fmtDate(p.due))+'</span>');
-  h.innerHTML=bits.join(" ");
+// ---------- quick add with tap chips (typing shortcuts still work)
+S.qa = { cat: "", urg: "medium", due: todayKey(), adding: false };
+function qaDefaults(){ S.qa = { cat: "", urg: "medium", due: S.mode === "work" ? "" : todayKey(), adding: false }; }
+const QA_URG = [["critical","Critical"],["high","High"],["medium","Medium"],["low","Low"]];
+function qaEffective(){
+  const p = parseQuick($("#q").value);
+  const work = S.mode === "work";
+  return { p, work, cat: p.cat || (p.newCat ? "__new" : S.qa.cat), urg: p.urg || S.qa.urg, due: p.due !== null && p.due !== undefined ? p.due : S.qa.due };
 }
-function setMode(m, auto){ if(!auto) S.autoWork=false; S.mode=m; $("#m-todo").setAttribute("aria-pressed",m==="todo"); $("#m-work").setAttribute("aria-pressed",m==="work"); if(!auto) updateHint(); }
-$("#m-todo").onclick=()=>setMode("todo"); $("#m-work").onclick=()=>setMode("work");
-$("#q").addEventListener("input", updateHint);
-$("#quick").addEventListener("submit", e => {
-  e.preventDefault(); const p=parseQuick($("#q").value); if(!p.title){ toast("Type a name first"); return; }
-  const work = p.work || S.mode==="work";
-  if(work){
-    let cat=p.cat;
-    if(p.newCat){ const tag=p.newCat.toLowerCase().replace(/[^a-z0-9-]/g,""); const name=p.newCat.charAt(0).toUpperCase()+p.newCat.slice(1); if(!S.cats.find(c=>c.tag===tag)){ S.cats.push({name,tag}); saveCats(); } cat=tag; }
-    const id=newId();
-    put("tasks", id, {title:p.title,desc:"",category:cat||"",urgency:p.urg||"medium",status:"todo",progress:0,bottleneck:"",assignedBy:"",due:p.due||"",createdAt:nowISO(),updatedAt:nowISO(),doneAt:"",log:[{at:nowISO(),note:"Task added"}]});
-    toast("Work task added");
-  } else {
-    put("todos", newId(), {title:p.title,date:p.due||todayKey(),done:false,doneAt:"",createdAt:nowISO()});
-    toast("To-do added");
+function dueChoices(){
+  const tk = todayKey(), out = [[tk, "Today"], [addDays(tk, 1), "Tomorrow"]];
+  for (let i = 2; out.length < 5 && i < 8; i++) { const k = addDays(tk, i); out.push([k, DAYS[keyDow(k)] + " " + (+k.slice(8))]); }
+  return out;
+}
+function renderQA(){
+  const box = $("#qa"); if (!box) return;
+  const E = qaEffective(), ch = (attr, val, label, on, extra = "") => `<button type="button" class="qc ${extra}" ${attr}="${esc(val)}" aria-pressed="${on}">${label}</button>`;
+  const dues = dueChoices(), customDue = E.due && !dues.some(d => d[0] === E.due);
+  let h = `<div class="qa-row"><span class="qa-lbl">Type</span><div class="qa-chips">${ch("data-qa-type", "todo", "To-do", !E.work)}${ch("data-qa-type", "work", "Work task", E.work)}</div></div>`;
+  if (E.work) {
+    h += `<div class="qa-row"><span class="qa-lbl">Category</span><div class="qa-chips">${S.cats.map((c, i) => ch("data-qa-cat", c.tag, esc(c.name.split(/\s*\/\s*/)[0]), E.cat === c.tag, "ci-" + (i % 6))).join("")}
+      ${E.cat === "__new" ? `<span class="qc on">${esc(E.p.newCat)} (new)</span>` : ""}
+      ${S.qa.adding ? `<span class="qc-new"><input id="qa-newcat" placeholder="New category" aria-label="New category name"><button type="button" class="qc" data-qa-newsave>Add</button></span>` : ch("data-qa-newcat", "1", "+ New", false, "ghost")}</div></div>`;
+    h += `<div class="qa-row"><span class="qa-lbl">Urgency</span><div class="qa-chips">${QA_URG.map(([v, l]) => ch("data-qa-urg", v, l, E.urg === v, "u-" + v)).join("")}</div></div>`;
   }
-  $("#q").value=""; updateHint();
+  h += `<div class="qa-row"><span class="qa-lbl">${E.work ? "Due" : "When"}</span><div class="qa-chips">${E.work ? ch("data-qa-due", "", "No date", !E.due) : ""}${dues.map(([k, l]) => ch("data-qa-due", k, l, E.due === k)).join("")}
+    <label class="qc pick ${customDue ? "on" : ""}" aria-pressed="${customDue}">${SVG(ICON.calendar)}${customDue ? esc(fmtDate(E.due)) : "Pick date"}<input type="date" id="qa-pick" value="${esc(E.due || "")}" aria-label="Pick a date"></label></div></div>`;
+  h += `<p class="qa-tip">Shortcut: you can also type <code>#excel</code> <code>!high</code> <code>@fri</code> in the box.</p>`;
+  box.innerHTML = h;
+}
+// remove typed tokens for a field when its chip is tapped, so the chip choice wins
+function stripTokens(re){ const q = $("#q"); q.value = q.value.split(/\s+/).filter(w => !re.test(w)).join(" ").replace(/\s+$/, q.value.endsWith(" ") ? " " : ""); }
+function setMode(m, auto){ if (!auto) S.autoWork = false; const changed = S.mode !== m; S.mode = m; if (changed && !$("#q").value.trim()) qaDefaults(); renderQA(); }
+function updateHint(){ const p = parseQuick($("#q").value); if (p.work && S.mode !== "work") { S.mode = "work"; S.autoWork = true; } else if (!p.work && S.autoWork) { S.mode = "todo"; S.autoWork = false; } renderQA(); }
+$("#q").addEventListener("input", updateHint);
+// keep the keyboard open and the focus in the box while tapping chips
+$("#qa").addEventListener("pointerdown", e => { if (e.target.closest("button.qc")) e.preventDefault(); });
+$("#qa").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.qaType) { if (b.dataset.qaType === "todo") stripTokens(/^[#!]\S+/); S.mode = b.dataset.qaType; S.autoWork = false; if (S.mode === "todo" && !S.qa.due) S.qa.due = todayKey(); }
+  else if (b.dataset.qaCat !== undefined) { stripTokens(/^#\S+/); S.qa.cat = S.qa.cat === b.dataset.qaCat ? "" : b.dataset.qaCat; }
+  else if (b.dataset.qaUrg) { stripTokens(/^!\S+/); S.qa.urg = b.dataset.qaUrg; }
+  else if (b.dataset.qaDue !== undefined) { stripTokens(/^@\S+/); S.qa.due = b.dataset.qaDue; }
+  else if (b.dataset.qaNewcat) { S.qa.adding = true; renderQA(); $("#qa-newcat").focus(); return; }
+  else if (b.dataset.qaNewsave !== undefined) { qaSaveNewCat(); return; }
+  renderQA(); $("#q").focus({ preventScroll: true });
+});
+function qaSaveNewCat(){
+  const n = ($("#qa-newcat").value || "").trim(); S.qa.adding = false;
+  if (n) { let tag = n.split(/[\s\/]+/)[0].toLowerCase().replace(/[^a-z0-9-]/g, "") || "cat"; while (S.cats.find(c => c.tag === tag)) tag += "2"; S.cats.push({ name: n, tag }); saveCats(); S.qa.cat = tag; toast("Category added"); }
+  renderQA(); $("#q").focus({ preventScroll: true });
+}
+$("#qa").addEventListener("keydown", e => { if (e.target.id === "qa-newcat" && e.key === "Enter") { e.preventDefault(); qaSaveNewCat(); } if (e.target.id === "qa-newcat" && e.key === "Escape") { S.qa.adding = false; renderQA(); } });
+$("#qa").addEventListener("change", e => { if (e.target.id === "qa-pick" && e.target.value) { stripTokens(/^@\S+/); S.qa.due = e.target.value; renderQA(); } });
+// show the chips while adding, hide them when you're done
+const qaShow = on => { $("#qa").hidden = !on; $("#quick").classList.toggle("open", on); };
+$("#quick").addEventListener("focusin", () => qaShow(true));
+$("#quick").addEventListener("focusout", () => setTimeout(() => { if (!$("#quick").contains(document.activeElement) && !$("#q").value.trim() && !S.qa.adding) qaShow(false); }, 150));
+$("#q").addEventListener("keydown", e => { if (e.key === "Escape") { $("#q").value = ""; updateHint(); $("#q").blur(); qaShow(false); } });
+$("#quick").addEventListener("submit", e => {
+  e.preventDefault();
+  const E = qaEffective(), p = E.p;
+  if (!p.title) { toast("Type a name first"); $("#q").focus(); return; }
+  if (E.work) {
+    let cat = E.cat === "__new" ? "" : E.cat;
+    if (p.newCat) { const tag = p.newCat.toLowerCase().replace(/[^a-z0-9-]/g, ""); const name = p.newCat.charAt(0).toUpperCase() + p.newCat.slice(1); if (!S.cats.find(c => c.tag === tag)) { S.cats.push({ name, tag }); saveCats(); } cat = tag; }
+    put("tasks", newId(), { title: p.title, desc: "", category: cat || "", urgency: E.urg || "medium", status: "todo", progress: 0, bottleneck: "", assignedBy: "", due: E.due || "", createdAt: nowISO(), updatedAt: nowISO(), doneAt: "", log: [{ at: nowISO(), note: "Task added" }] });
+    toast(`Work task added${cat ? " · " + catName(cat).split(/\s*\/\s*/)[0] : ""}${E.due ? " · due " + fmtDate(E.due) : ""}`);
+  } else {
+    put("todos", newId(), { title: p.title, date: E.due || todayKey(), done: false, doneAt: "", createdAt: nowISO() });
+    toast(`To-do added${E.due && E.due !== todayKey() ? " for " + fmtDate(E.due) : ""}`);
+  }
+  $("#q").value = ""; S.autoWork = false; qaDefaults(); renderQA(); $("#q").focus({ preventScroll: true });
 });
 
 // ---------- routing

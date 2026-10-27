@@ -790,6 +790,34 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
   body.printing-export #print-area{display:block!important;position:absolute;left:0;top:0;width:100%;background:#fff;color:#1e2a1f}
   body.printing-export header.top,body.printing-export::before,body.printing-export .splash{display:none!important}
 }
+
+/* ===== Quick add chips ===== */
+.quick{padding-block:10px 12px}
+.qa{display:grid;gap:7px;padding-top:4px}
+.qa-row{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;gap:8px}
+.qa-lbl{font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.qa-chips{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 1px;min-width:0}
+.qa-chips::-webkit-scrollbar{display:none}
+.qc{flex:none;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:5px 12px;font-size:.82rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .12s,border-color .12s,color .12s}
+.qc:hover{border-color:var(--accent)}
+.qc[aria-pressed="true"],.qc.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.qc.ghost{border-style:dashed;color:var(--muted)}
+.qc.ci-0[aria-pressed="true"]{background:var(--c0);border-color:var(--c0)} .qc.ci-1[aria-pressed="true"]{background:var(--c1);border-color:var(--c1)}
+.qc.ci-2[aria-pressed="true"]{background:var(--c2);border-color:var(--c2)} .qc.ci-3[aria-pressed="true"]{background:var(--c3);border-color:var(--c3)}
+.qc.ci-4[aria-pressed="true"]{background:var(--c4);border-color:var(--c4)} .qc.ci-5[aria-pressed="true"]{background:var(--c5);border-color:var(--c5)}
+.qc[class*="ci-"][aria-pressed="true"]{color:var(--surface)}
+.qc.u-critical[aria-pressed="true"]{background:var(--crit);border-color:var(--crit);color:#fff}
+.qc.u-high[aria-pressed="true"]{background:var(--high);border-color:var(--high);color:#fff}
+.qc.u-medium[aria-pressed="true"]{background:var(--med);border-color:var(--med);color:#fff}
+.qc.u-low[aria-pressed="true"]{background:var(--low);border-color:var(--low);color:#fff}
+.qc.pick{position:relative;overflow:hidden}
+.qc.pick svg{width:13px;height:13px}
+.qc.pick input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;border:0;padding:0}
+.qc-new{display:inline-flex;gap:4px;flex:none}
+.qc-new input{border:1px solid var(--accent);background:var(--surface);border-radius:99px;padding:4px 10px;font-size:.82rem;width:150px}
+.qa-tip{margin:0;font-size:.74rem;color:var(--muted)}
+.qa-tip code{font-family:var(--f-mono);font-size:.72rem;background:var(--sunk);padding:1px 5px;border-radius:5px}
+@media (max-width:560px){ .qa-row{grid-template-columns:62px minmax(0,1fr)} .qa-tip{display:none} .qc{padding:5px 11px} }
 </style>
 </head>
 <body class="locked">
@@ -860,14 +888,10 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </nav>
     <form class="quick" id="quick" autocomplete="off">
       <div class="qrow">
-        <div class="qmode" role="group" aria-label="Add as">
-          <button type="button" id="m-todo" aria-pressed="true">To-do</button>
-          <button type="button" id="m-work" aria-pressed="false">Work</button>
-        </div>
-        <input id="q" placeholder="Add… e.g. Fix stock report #excel !high @fri" aria-label="Quick add">
+        <input id="q" placeholder="Add a to-do or work task…" aria-label="Quick add" enterkeyhint="done">
         <button class="btn primary" type="submit">Add</button>
       </div>
-      <div class="qhint" id="qhint"></div>
+      <div class="qa" id="qa" hidden></div>
     </form>
   </div>
 </header>
@@ -1082,6 +1106,6 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=14"></script>
+<script type="module" src="app.js?v=15"></script>
 </body>
 </html>
