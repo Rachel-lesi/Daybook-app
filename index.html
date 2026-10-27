@@ -986,6 +986,34 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 .mini b{font-family:var(--f-mono);font-weight:500;font-size:1.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mini small{font-size:.72rem;color:var(--muted)}
 @media (max-width:560px){ .minis{grid-template-columns:repeat(2,minmax(0,1fr))} .mood-b span{font-size:.66rem} }
+
+/* ===== Navigation: main tabs, subtabs, phone bottom bar ===== */
+.maintabs a{display:inline-flex;align-items:center;gap:6px}
+.maintabs .count[hidden]{display:none}
+.subtabs{display:flex;align-items:center;gap:6px;overflow-x:auto;scrollbar-width:none;padding-block:4px 2px}
+.subtabs::-webkit-scrollbar{display:none}
+.subtabs a{flex:none;padding:5px 13px;border-radius:99px;font-size:.84rem;font-weight:600;color:var(--muted);text-decoration:none;border:1px solid var(--line);background:var(--surface);white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+.subtabs a:hover{color:var(--ink);border-color:var(--accent)}
+.subtabs a[aria-current="page"]{background:var(--pink-soft);color:var(--pink-ink);border-color:var(--pink)}
+.st-title{font-family:var(--f-display);font-weight:700;margin-right:6px}
+#settings-btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.bottomnav{display:none}
+/* subtab pages: show only the chosen parts, laid out in a simple grid */
+#v-growth.sub,#v-health.sub,#v-money.sub,#v-reflect.sub,#v-routine.sub{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr));gap:22px 28px;align-items:start}
+.view.sub .g-col,.view.sub .rt-side{display:contents}
+.view.sub [data-wide]{grid-column:1 / -1}
+@media (max-width:700px){
+  nav.tabs.maintabs{display:none}
+  .bottomnav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-top:1px solid var(--line);padding:6px max(6px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px))}
+  .bottomnav a{position:relative;display:grid;justify-items:center;gap:2px;padding:5px 0 3px;border-radius:12px;font-size:.64rem;font-weight:600;color:var(--muted);text-decoration:none}
+  .bottomnav a svg{width:22px;height:22px}
+  .bottomnav a[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
+  .bottomnav .count{position:absolute;top:1px;right:calc(50% - 22px);min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--pink);color:#4a2622;font-family:var(--f-mono);font-size:.6rem;line-height:16px;margin:0}
+  .bottomnav .count[hidden]{display:none}
+  main{padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+  .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+  .subtabs{padding-block:2px 4px}
+}
 </style>
 </head>
 <body class="locked">
@@ -1129,18 +1157,9 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 
 <header class="top">
   <div class="wrap">
-    <div class="brand"><h1><img src="icon-192.png" alt="" width="26" height="26">Daybook</h1><span class="brand-r"><span class="tpill" id="timerpill" hidden><button type="button" class="tp-label" id="tp-label"></button><b id="tp-time">0:00</b><button type="button" class="tp-stop" id="tp-stop" aria-label="Stop timer"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg></button></span><span class="date" id="today-label"></span><button type="button" class="iconbtn" id="search-btn" aria-label="Search" title="Search (press /)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></button><button type="button" class="iconbtn" id="theme" aria-label="Theme"></button></span></div>
-    <nav class="tabs" id="tabs">
-      <a href="#today" data-v="today">Today</a>
-      <a href="#work" data-v="work">Work <span class="count" id="c-work">0</span></a>
-      <a href="#calendar" data-v="calendar">Calendar</a>
-      <a href="#overview" data-v="overview">Overview</a>
-      <a href="#growth" data-v="growth">Growth</a>
-      <a href="#health" data-v="health">Health</a>
-      <a href="#money" data-v="money">Money</a>
-      <a href="#reflect" data-v="reflect">Reflection</a>
-      <a href="#routine" data-v="routine">Routine</a>
-    </nav>
+    <div class="brand"><h1><img src="icon-192.png" alt="" width="26" height="26">Daybook</h1><span class="brand-r"><span class="tpill" id="timerpill" hidden><button type="button" class="tp-label" id="tp-label"></button><b id="tp-time">0:00</b><button type="button" class="tp-stop" id="tp-stop" aria-label="Stop timer"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg></button></span><span class="date" id="today-label"></span><button type="button" class="iconbtn" id="settings-btn" aria-label="Settings" title="Settings"></button><button type="button" class="iconbtn" id="search-btn" aria-label="Search" title="Search (press /)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></button><button type="button" class="iconbtn" id="theme" aria-label="Theme"></button></span></div>
+    <nav class="tabs maintabs" id="tabs" aria-label="Main"></nav>
+    <nav class="subtabs" id="subtabs" aria-label="Section" hidden></nav>
     <form class="quick" id="quick" autocomplete="off">
       <div class="qrow">
         <input id="q" placeholder="Add a to-do or work task…" aria-label="Quick add" enterkeyhint="done">
@@ -1230,22 +1249,22 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 
   <section class="view" id="v-growth" hidden>
     <div class="g-col">
-      <div>
+      <div data-part="skills">
         <div class="sechead"><h2>Courses</h2><span class="meta">Google certificate and other study</span></div>
         <form id="course-form" class="panel course-form" autocomplete="off"><input id="course-name" class="inp" placeholder="Course name, e.g. Google Data Analytics Certificate"><label class="small muted cf-date">Target<input type="date" id="course-target" class="inp"></label><button class="btn sm primary" type="submit">Add course</button></form>
         <div id="courses" class="g-stack"></div>
       </div>
-      <div>
+      <div data-part="streaks" data-wide>
         <div class="sechead"><h2>Habit streaks</h2><span class="meta">From your routine ticks · skipped days don't break a streak</span></div>
         <div id="habits" class="habits"></div>
       </div>
     </div>
     <div class="g-col">
-      <div>
+      <div data-part="skills">
         <div class="sechead"><h2>Skills & achievements</h2><span class="meta">Built from completed work tasks</span></div>
         <div id="skills" class="g-stack"></div>
       </div>
-      <div>
+      <div data-part="skills">
         <div class="sechead"><h2>Resume bullet points</h2><button class="btn sm" type="button" id="bullets-copy">Copy</button></div>
         <pre class="panel bullets" id="bullets"></pre>
         <p class="small muted" style="margin:6px 0 0">Tip: when you mark a task Done, fill in <b>Result / impact</b>, e.g. "Cut report time from 2 hours to 20 minutes". Those become your strongest bullets.</p>
@@ -1255,54 +1274,54 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 
   <section class="view" id="v-health" hidden>
     <div class="g-col">
-      <div class="pager h-pager" id="h-day"></div>
-      <div>
+      <div data-part="body mind cycle" data-wide class="pager h-pager" id="h-day"></div>
+      <div data-part="body">
         <div class="sechead"><h2>Water</h2><span class="meta">1 cup = 250 ml</span></div>
         <div class="panel hcard" id="h-water"></div>
       </div>
-      <div>
+      <div data-part="body">
         <div class="sechead"><h2>Meals</h2><span class="meta">What you ate and drank</span></div>
         <div class="panel hcard" id="h-meals"></div>
       </div>
-      <div>
+      <div data-part="body">
         <div class="sechead"><h2>Bowel movements</h2><span class="meta">Tap a type, then Log</span></div>
         <div class="panel hcard" id="h-bowel"></div>
       </div>
     </div>
     <div class="g-col">
-      <div>
+      <div data-part="mind" data-wide>
         <div class="sechead"><h2>Mind & mood</h2><span class="meta">Check in once or a few times a day</span></div>
         <div class="panel hcard" id="h-mood"></div>
       </div>
-      <div id="h-cycle-wrap">
+      <div data-part="cycle" data-wide id="h-cycle-wrap">
         <div class="sechead"><h2>Menstrual cycle</h2><span class="meta">Tap a day, then choose the flow</span></div>
         <div class="panel hcard" id="h-cycle"></div>
       </div>
-      <div>
+      <div data-part="log" data-wide>
         <div class="sechead"><h2>Health log</h2><span class="meta">Illness, symptoms, medicine, doctor visits</span></div>
         <div class="panel hcard" id="h-cond"></div>
       </div>
-      <div>
+      <div data-part="body">
         <div class="sechead"><h2>Height & weight</h2></div>
         <div class="panel hcard" id="h-body"></div>
       </div>
-      <label class="small muted cyc-toggle"><input type="checkbox" id="h-cyc-toggle"> Show menstrual cycle tracking</label>
+      <label data-part="cycle" data-wide class="small muted cyc-toggle"><input type="checkbox" id="h-cyc-toggle"> Show menstrual cycle tracking</label>
     </div>
   </section>
 
   <section class="view" id="v-money" hidden>
     <div class="g-col">
-      <div>
+      <div data-part="expenses">
         <div class="sechead"><h2>Expenses</h2><span class="meta">Amount → what → category</span></div>
         <div class="panel hcard" id="m-day"></div>
       </div>
-      <div>
+      <div data-part="shopping">
         <div class="sechead"><h2>Shopping list</h2><span class="meta">Tick items as they go in the basket</span></div>
         <div class="panel hcard" id="m-shop"></div>
       </div>
     </div>
     <div class="g-col">
-      <div>
+      <div data-part="expenses">
         <div class="sechead"><h2>Monthly summary</h2></div>
         <div class="panel hcard" id="m-month"></div>
       </div>
@@ -1310,7 +1329,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
   </section>
 
   <section class="view" id="v-reflect" hidden>
-    <div class="panel refl">
+    <div data-part="reflection" class="panel refl">
       <div class="sechead" style="margin:0"><h2>Daily reflection</h2>
         <input type="date" id="r-date" aria-label="Reflection date" style="border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:5px 8px"></div>
       <div class="auto" id="r-auto"></div>
@@ -1322,11 +1341,11 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
       <div class="dlgfoot"><span class="saved" id="r-saved"></span>
         <div style="display:flex;gap:8px"><button class="btn" type="button" data-xopen="day:">Export</button><button class="btn" type="button" id="r-copy">Copy as report</button><button class="btn primary" type="button" id="r-save">Save</button></div></div>
     </div>
-    <div>
+    <div data-part="archive" data-wide>
       <div class="sechead"><h2>Reflection archive</h2><button class="btn sm" type="button" data-xopen="month:">Export…</button></div>
       <div class="panel arc" id="arc"></div>
     </div>
-    <div class="panel weekly">
+    <div data-part="weekly" data-wide class="panel weekly">
       <div class="wk-head"><div><h2>Weekly report</h2><p class="small muted" style="margin:0">For your supervisor or internship logbook. Built from your tasks, time and reflections.</p></div>
         <div class="wk-nav"><button class="btn sm" type="button" data-wk="-1" aria-label="Previous week">‹</button><span id="wk-label" class="small"></span><button class="btn sm" type="button" data-wk="1" id="wk-next" aria-label="Next week">›</button></div></div>
       <div class="wk-actions"><button class="btn sm" type="button" id="wk-copy">Copy text</button><button class="btn sm" type="button" id="wk-word">Download Word</button><button class="btn sm" type="button" id="wk-print">Print / Save PDF</button></div>
@@ -1335,7 +1354,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
   </section>
 
   <section class="view" id="v-routine" hidden>
-    <div>
+    <div data-part="routine" data-wide>
       <div class="sechead"><h2>Daily routine</h2><span class="meta">Changes save automatically</span></div>
       <div class="panel alarmbox">
         <div class="ab-head"><h3>Alarms</h3><p class="small muted">Switch on <b>Alarm</b> for any routine item below, then choose how it reaches you.</p></div>
@@ -1364,18 +1383,18 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
       <div class="panel" id="rt-edit"></div>
     </div>
     <div class="rt-side">
-    <div>
+    <div data-part="categories">
       <div class="sechead"><h2>Work categories</h2><span class="meta">Use the short tag after # in quick add</span></div>
       <div class="panel" style="padding:12px;display:grid;gap:10px">
         <div class="chips" id="cat-edit"></div>
         <form id="cat-form" class="qrow"><input id="cat-new" placeholder="New category, e.g. Power BI / Dashboards" style="flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px"><button class="btn sm" type="submit">Add</button></form>
       </div>
     </div>
-    <div class="panel" style="padding:14px" >
+    <div data-part="account" class="panel" style="padding:14px" >
       <h2 style="margin-bottom:6px">Claude reminders</h2>
       <p class="small muted" style="margin:0">Separate from the alarms above, Claude can also send push reminders through the Claude app. Ask Claude to change or turn them off.</p>
     </div>
-    <div class="panel" style="padding:14px;display:grid;gap:10px">
+    <div data-part="account" class="panel" style="padding:14px;display:grid;gap:10px">
       <h2>Account &amp; backup</h2>
       <p class="small muted" style="margin:0">Signed in as <b id="acct-email"></b>. Your data syncs across every device you sign in on.</p>
       <label class="f">Your name (for the greeting)<input id="uname" placeholder="e.g. Rachel" autocomplete="given-name"></label>
@@ -1390,6 +1409,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
   </section>
 </main>
 
+<nav class="bottomnav" id="bottomnav" aria-label="Main"></nav>
 <dialog id="dlg"><form class="dlg" id="tf" method="dialog"></form></dialog>
 <dialog id="sdlg" class="sdlg"><div class="s-wrap"><div class="s-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="s-q" type="search" placeholder="Search everything… e.g. VLOOKUP, scrap report" autocomplete="off" aria-label="Search"><button type="button" class="btn sm ghost" id="s-close">Close</button></div><div id="s-res" class="s-res"></div></div></dialog>
 <dialog id="xdlg" class="xdlg"><form class="dlg" method="dialog" onsubmit="return false">
@@ -1422,6 +1442,6 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=22"></script>
+<script type="module" src="app.js?v=23"></script>
 </body>
 </html>

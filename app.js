@@ -89,6 +89,9 @@ const ICON = {
   flame: '<path d="M12 22c4 0 7-2.7 7-6.8 0-3.6-2.3-5.6-3.6-7.6-.4 1.7-1.3 2.9-2.4 3.4.3-3.1-1-6.6-3.9-9-.3 3.6-2.5 5.6-4 7.7C3.9 11.6 5 13.2 5 15.2 5 19.3 8 22 12 22z"/>',
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
   calendar: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/>',
+  wallet: '<path d="M3 7a2 2 0 0 1 2-2h12v4"/><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 13.5h2"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>'
@@ -223,17 +226,63 @@ $("#quick").addEventListener("submit", e => {
 
 // ---------- routing
 const VIEWS=["today","work","calendar","overview","growth","health","money","reflect","routine"];
-function route(){ const h=location.hash.slice(1); S.view=VIEWS.includes(h)?h:"today";
-  if(S.view==="work") setMode("work"); else if(S.view==="today") setMode("todo");
-  render(); }
+// Main tabs → subtabs. Each subtab shows one page (view) and, where a page has several parts, only that part.
+const NAV = {
+  today:    { label: "Today", icon: "sun", subs: [["today", "Today", "today"]] },
+  work:     { label: "Work", icon: "work", subs: [["tasks", "Tasks", "work"], ["calendar", "Calendar", "calendar"], ["skills", "Courses & skills", "growth"]] },
+  health:   { label: "Health", icon: "health", subs: [["body", "Body", "health"], ["mind", "Mind", "health"], ["cycle", "Cycle", "health"], ["log", "Health log", "health"]] },
+  money:    { label: "Money", icon: "wallet", subs: [["expenses", "Expenses", "money"], ["shopping", "Shopping", "money"]] },
+  journal:  { label: "Journal", icon: "book", subs: [["reflection", "Reflection", "reflect"], ["archive", "Archive", "reflect"], ["weekly", "Weekly report", "reflect"]] },
+  insights: { label: "Insights", icon: "chart", subs: [["overview", "Overview", "overview"], ["streaks", "Streaks", "growth"]] },
+  settings: { label: "Settings", icon: "gear", subs: [["routine", "Routine & alarms", "routine"], ["categories", "Categories", "routine"], ["account", "Account", "routine"]] }
+};
+const MAIN_TABS = ["today", "work", "health", "money", "journal", "insights"];
+const ALIAS = { calendar: "work-calendar", overview: "insights", growth: "work-skills", reflect: "journal", routine: "settings" };
+function parseRoute(){
+  let h = location.hash.slice(1) || "today"; h = ALIAS[h] || h;
+  let [m, sub] = h.split("-"); if (!NAV[m]) m = "today";
+  const s = NAV[m].subs.find(x => x[0] === sub) || NAV[m].subs[0];
+  return { main: m, sub: s[0], view: s[2] };
+}
+const subHref = (m, i, sub) => "#" + (i === 0 ? m : m + "-" + sub);
+function buildNav(){
+  const tab = (m, cls) => `<a href="#${m}" data-m="${m}" class="${cls}">${cls === "bn" ? SVG(ICON[NAV[m].icon]) : ""}<span>${NAV[m].label}</span>${m === "work" ? `<span class="count" data-cwork>0</span>` : ""}</a>`;
+  $("#tabs").innerHTML = MAIN_TABS.map(m => tab(m, "")).join("");
+  $("#bottomnav").innerHTML = MAIN_TABS.map(m => tab(m, "bn")).join("");
+  $("#settings-btn").innerHTML = SVG(ICON.gear);
+}
+function renderNav(){
+  document.querySelectorAll("[data-m]").forEach(a => { if (a.dataset.m === S.main) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
+  $("#settings-btn").classList.toggle("on", S.main === "settings");
+  const subs = NAV[S.main].subs;
+  $("#subtabs").hidden = subs.length < 2;
+  $("#subtabs").innerHTML = (S.main === "settings" ? `<span class="st-title">Settings</span>` : "") + (subs.length < 2 ? "" : subs.map(([k, l], i) => `<a href="${subHref(S.main, i, k)}" ${k === S.sub ? 'aria-current="page"' : ""}>${l}</a>`).join(""));
+  const open = S.tasks.filter(t => t.status !== "done").length;
+  document.querySelectorAll("[data-cwork]").forEach(c => { c.textContent = open; c.hidden = !open; });
+}
+function applyParts(){
+  document.querySelectorAll("section.view").forEach(sec => {
+    const parts = sec.querySelectorAll("[data-part]");
+    sec.classList.toggle("sub", parts.length > 0);
+    parts.forEach(el => { el.hidden = !el.dataset.part.split(" ").includes(S.sub); });
+  });
+}
+function route(){
+  const R = parseRoute(), changed = R.main !== S.main || R.sub !== S.sub;
+  S.main = R.main; S.sub = R.sub; S.view = R.view;
+  if (S.view === "work") setMode("work"); else if (S.view === "today") setMode("todo");
+  renderNav(); applyParts(); render();
+  if (changed) window.scrollTo(0, 0);
+}
+buildNav();
+$("#settings-btn").addEventListener("click", () => { location.hash = S.main === "settings" ? "#today" : "#settings"; });
 window.addEventListener("hashchange", route);
 
 // ---------- render
 function render(){
   $("#today-label").textContent = fmtDate(todayKey())+" "+new Date().getFullYear();
   for(const v of VIEWS){ $("#v-"+v).hidden = v!==S.view; }
-  document.querySelectorAll("#tabs a").forEach(a=>{ if(a.dataset.v===S.view) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current"); });
-  $("#c-work").textContent = S.tasks.filter(t=>t.status!=="done").length;
+  renderNav();
   if(S.view==="today") renderToday();
   if(S.view==="work") renderWork();
   if(S.view==="calendar") renderCalendar();
@@ -873,10 +922,10 @@ function runSearch(){
   for (const t of S.todos) if (match(t.title)) R.push({ g: "To-dos", title: t.title, sub: (t.done ? "Done · " : "") + (t.date ? fmtDate(t.date) : ""), act: `data-sr-date="${esc(t.date || todayKey())}"` });
   for (const r of Object.values(S.refl)) { const hay = [r.did, r.learned, r.mistakes, r.improve].join(" \n "); if (match(hay)) R.push({ g: "Reflections", title: fmtDate(r.date) + " " + r.date.slice(0, 4), sub: "", snip: snippet(hay, q), act: `data-sr-refl="${esc(r.date)}"` }); }
   for (const c of S.courses) { const hay = [c.name, ...(c.modules || []).map(m => m.title)].join(" \n "); if (match(hay)) R.push({ g: "Courses", title: c.name, sub: `${(c.modules || []).filter(m => m.done).length}/${(c.modules || []).length} modules`, snip: match(c.name) ? "" : snippet(hay, q), act: `data-sr-view="growth"` }); }
-  for (const hd of Object.values(S.health)) (hd.moods || []).forEach(m => { const hay = [m.note, ...(m.feel || []), ...(m.why || [])].join(" "); if (m.note && match(hay)) R.push({ g: "Mood notes", title: fmtDate(hd.date) + " · " + MOODS[m.m - 1][1], sub: (m.feel || []).join(", "), snip: snippet(m.note, q), act: `data-sr-view="health"` }); });
-  for (const c of S.conds) { const hay = [c.title, c.notes].join(" \n "); if (match(hay)) R.push({ g: "Health", title: c.title, sub: `${fmtDate(c.start)} · ${c.status === "resolved" ? "recovered" : "ongoing"}`, snip: match(c.title) ? "" : snippet(hay, q), act: `data-sr-view="health"` }); }
+  for (const hd of Object.values(S.health)) (hd.moods || []).forEach(m => { const hay = [m.note, ...(m.feel || []), ...(m.why || [])].join(" "); if (m.note && match(hay)) R.push({ g: "Mood notes", title: fmtDate(hd.date) + " · " + MOODS[m.m - 1][1], sub: (m.feel || []).join(", "), snip: snippet(m.note, q), act: `data-sr-view="health-mind"` }); });
+  for (const c of S.conds) { const hay = [c.title, c.notes].join(" \n "); if (match(hay)) R.push({ g: "Health", title: c.title, sub: `${fmtDate(c.start)} · ${c.status === "resolved" ? "recovered" : "ongoing"}`, snip: match(c.title) ? "" : snippet(hay, q), act: `data-sr-view="health-log"` }); }
   for (const x of S.exp) { const hay = [x.note, expCat(x.cat)[1]].join(" "); if (match(hay)) R.push({ g: "Expenses", title: (x.note || expCat(x.cat)[1]) + " · " + money(x.amount), sub: fmtDate(x.date) + " · " + expCat(x.cat)[1], act: `data-sr-view="money"` }); }
-  for (const i of S.shop) if (match(i.name)) R.push({ g: "Shopping list", title: i.name + (i.qty ? " × " + i.qty : ""), sub: i.done ? "In the basket" : "To buy", act: `data-sr-view="money"` });
+  for (const i of S.shop) if (match(i.name)) R.push({ g: "Shopping list", title: i.name + (i.qty ? " × " + i.qty : ""), sub: i.done ? "In the basket" : "To buy", act: `data-sr-view="money-shopping"` });
   for (const r of S.routine) if (match(r.label)) R.push({ g: "Routine", title: r.label, sub: r.time + " · " + (daysLabel(r.days) || "Custom days"), act: `data-sr-view="routine"` });
   if (!R.length) { out.innerHTML = `<p class="small muted" style="padding:8px 4px;margin:0">Nothing found for “${esc(q)}”.</p>`; return; }
   const groups = [...new Set(R.map(r => r.g))];
@@ -1181,7 +1230,7 @@ function renderHealth(){
     ${ongoing.length ? `<ul class="conds">${ongoing.map(condRow).join("")}</ul>` : `<p class="small muted" style="margin:0">Nothing ongoing. Hope you're feeling well.</p>`}
     ${past.length ? `<details><summary class="small">History (${past.length})</summary><ul class="conds">${past.map(condRow).join("")}</ul></details>` : ""}`;
   // cycle
-  $("#h-cycle-wrap").hidden = !S.showCycle;
+  if (!S.showCycle) $("#h-cycle").innerHTML = `<p class="small muted" style="margin:0">Cycle tracking is turned off. Switch it on below to log periods and see predictions.</p>`;
   if (S.showCycle) {
     const C = cycleInfo(), strip = [];
     for (let i = -20; i <= 20; i++) { const x = addDays(tk, i), dd = hDoc(x), per = dd.flow && dd.flow !== "spotting";
@@ -1726,7 +1775,7 @@ document.addEventListener("click", e=>{
   const ov=e.target.closest("[data-ovr]"); if(ov){ S.ovRange=+ov.dataset.ovr; renderOverview(); return; }
   const rf=e.target.closest("[data-rtf]"); if(rf){ S.rtFilter=rf.dataset.rtf; renderRoutine(); return; }
   const ps=e.target.closest("[data-preset]"); if(ps){ const r=S.routine.find(y=>y.id===ps.closest("[data-rid]").dataset.rid); const days={all:[0,1,2,3,4,5,6],wd:[1,2,3,4,5],we:[0,6]}[ps.dataset.preset]; if(r) saveRt({...r,days}); return; }
-  const rd=e.target.closest("[data-rdate]"); if(rd){ rDate=rd.dataset.rdate; rDirty=false; renderReflect(); window.scrollTo({top:0}); }
+  const rd=e.target.closest("[data-rdate]"); if(rd){ rDate=rd.dataset.rdate; rDirty=false; if(S.main==="journal"&&S.sub!=="reflection"){ location.hash="#journal"; } else { renderReflect(); window.scrollTo({top:0}); } }
 });
 document.addEventListener("change", e=>{
   const ck=e.target.closest("[data-check]");

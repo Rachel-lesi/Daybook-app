@@ -16,7 +16,7 @@
   ],
   "shortcuts": [
     { "name": "Work tasks", "url": "./#work", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
-    { "name": "Overview", "url": "./#overview", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
-    { "name": "Daily reflection", "url": "./#reflect", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
+    { "name": "Overview", "url": "./#insights", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] },
+    { "name": "Journal", "url": "./#journal", "icons": [{ "src": "icon-192.png", "sizes": "192x192" }] }
   ]
 }
