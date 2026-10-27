@@ -2,7 +2,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, onSnapshot, query, orderBy, limit, where, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
+import { getMessaging, getToken, isSupported as messagingSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+import * as CFG from "./firebase-config.js";
+const firebaseConfig = CFG.firebaseConfig;
 import { SEED } from "./seed.js";
 
 const $ = s => document.querySelector(s);
@@ -72,6 +75,17 @@ const ICON = {
   chores: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
   plan: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="m9 15 2 2 4-4"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  play: '<path d="M7 4.5v15l12.5-7.5z"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2.5"/>',
+  repeat: '<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+  steps: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.5 1.5L7.5 5"/><path d="m3.5 12 1.5 1.5 2.5-2.5"/><circle cx="5" cy="18" r="1.5"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+  note: '<path d="M4 4h16v11l-5 5H4z"/><path d="M15 20v-5h5"/><path d="M8 9h8M8 13h4"/>',
+  star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',
+  timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2h5"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>',
+  flame: '<path d="M12 22c4 0 7-2.7 7-6.8 0-3.6-2.3-5.6-3.6-7.6-.4 1.7-1.3 2.9-2.4 3.4.3-3.1-1-6.6-3.9-9-.3 3.6-2.5 5.6-4 7.7C3.9 11.6 5 13.2 5 15.2 5 19.3 8 22 12 22z"/>',
+  book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>'
@@ -164,7 +178,7 @@ $("#quick").addEventListener("submit", e => {
 });
 
 // ---------- routing
-const VIEWS=["today","work","calendar","overview","reflect","routine"];
+const VIEWS=["today","work","calendar","overview","growth","reflect","routine"];
 function route(){ const h=location.hash.slice(1); S.view=VIEWS.includes(h)?h:"today";
   if(S.view==="work") setMode("work"); else if(S.view==="today") setMode("todo");
   render(); }
@@ -180,22 +194,40 @@ function render(){
   if(S.view==="work") renderWork();
   if(S.view==="calendar") renderCalendar();
   if(S.view==="overview") renderOverview();
+  if(S.view==="growth") renderGrowth();
+  if(S.view==="reflect") renderReport();
+  if(S.view==="today") renderFocus();
+  tickTimer();
   if(S.view==="reflect") renderReflect();
   if(S.view==="routine") renderRoutine();
 }
 const sortTasks = arr => arr.slice().sort((a,b)=> (a.status==="done")-(b.status==="done") || (b.status==="blocked")-(a.status==="blocked") || URG_RANK[a.urgency]-URG_RANK[b.urgency] || (a.due||"9999").localeCompare(b.due||"9999"));
+const REPEAT = [["none","Doesn't repeat"],["daily","Every day"],["weekdays","Every weekday"],["weekly","Every week"],["monthly","Every month"]];
+const REPEAT_SHORT = {daily:"Daily",weekdays:"Weekdays",weekly:"Weekly",monthly:"Monthly"};
+function fmtMins(m){ m=Math.round(m||0); if(m<60) return m+"m"; const h=Math.floor(m/60), r=m%60; return h+"h"+(r?" "+r+"m":""); }
+function clock(sec){ sec=Math.max(0,Math.round(sec)); const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=sec%60; return (h?h+":"+pad(m):m)+":"+pad(s); }
+const timerElapsed = () => S.timer ? (Date.now() - new Date(S.timer.start).getTime())/1000 : 0;
+function taskMins(id){ return S.time.filter(x=>x.ref===id).reduce((a,x)=>a+(+x.mins||0),0); }
 function taskCard(t){
   const over = t.due && t.status!=="done" && t.due < todayKey();
-  return `<button type="button" class="task ${t.status==="done"?"isdone":""}" data-u="${esc(t.urgency)}" data-task="${esc(t.id)}">
+  const subs=t.subtasks||[], sd=subs.filter(s=>s.done).length;
+  const running = S.timer && S.timer.type==="task" && S.timer.ref===t.id;
+  const mins = taskMins(t.id);
+  return `<div class="task ${t.status==="done"?"isdone":""}" data-u="${esc(t.urgency)}" data-task="${esc(t.id)}" role="button" tabindex="0">
     <span class="stripe"></span><span class="body">
-      <span class="ttl">${esc(t.title)}</span>
+      <span class="ttl-row"><span class="ttl">${esc(t.title)}</span>${t.status!=="done"?`<button type="button" class="tbtn ${running?"on":""}" data-timer="${esc(t.id)}" aria-label="${running?"Stop timer":"Start timer"} for ${esc(t.title)}">${SVG(running?ICON.stop:ICON.play)}<span ${running?"data-live":""}>${running?clock(timerElapsed()):(mins?fmtMins(mins):"")}</span></button>`:(mins?`<span class="tdone-time">${SVG(ICON.timer)}${fmtMins(mins)}</span>`:"")}</span>
       <span class="line"><span class="urg ${esc(t.urgency)}">${esc(t.urgency)}</span>${catTag(t.category)}
         <span class="st ${esc(t.status)}">${esc(STATUS_LABEL[t.status]||t.status)}</span>
         ${t.due?`<span class="${over?"overdue":""}">${over?"Overdue · ":"Due "}${esc(fmtDate(t.due))}</span>`:""}
+        ${t.repeat&&t.repeat!=="none"?`<span class="meta-ic">${SVG(ICON.repeat)}${REPEAT_SHORT[t.repeat]||""}</span>`:""}
+        ${subs.length?`<span class="meta-ic">${SVG(ICON.steps)}${sd}/${subs.length} steps</span>`:""}
+        ${(t.links||[]).length?`<span class="meta-ic">${SVG(ICON.link)}${t.links.length}</span>`:""}
+        ${(t.notes||"").trim()?`<span class="meta-ic" title="Has notes">${SVG(ICON.note)}</span>`:""}
         ${t.assignedBy?`<span>from ${esc(t.assignedBy)}</span>`:""}</span>
       <span class="line" style="gap:10px"><span class="bar" style="flex:1"><i style="width:${Math.max(0,Math.min(100,+t.progress||0))}%"></i></span><span style="font-family:var(--f-mono)">${+t.progress||0}%</span></span>
       ${t.bottleneck && t.status!=="done"?`<span class="block"><b>Bottleneck:</b> ${esc(t.bottleneck)}</span>`:""}
-    </span></button>`;
+      ${t.status==="done"&&t.impact?`<span class="impact">${SVG(ICON.star)}${esc(t.impact)}</span>`:""}
+    </span></div>`;
 }
 function routineFor(k){ const wd=keyDow(k); const dd=dayDoc(k);
   return [...S.routine.filter(r=>!r.days||r.days.includes(wd)), ...(dd.extra||[]).map(x=>({...x,extra:true}))].sort((a,b)=>a.time.localeCompare(b.time)); }
@@ -264,53 +296,101 @@ function renderWork(){
 
 // ---------- task editor
 let editing=null, confirmDel=false;
+const newSubId = () => "s" + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
 function openTask(id){
-  const t=S.tasks.find(x=>x.id===id); if(!t) return; editing={...t,log:[...(t.log||[])]}; confirmDel=false; drawTask(); $("#dlg").showModal();
+  const t=S.tasks.find(x=>x.id===id); if(!t) return;
+  editing={...t,log:[...(t.log||[])],subtasks:(t.subtasks||[]).map(s=>({...s})),links:(t.links||[]).map(l=>({...l}))};
+  confirmDel=false; drawTask(); if(!$("#dlg").open) $("#dlg").showModal();
+}
+function autoProgress(){
+  const s=editing.subtasks; if(!s.length) return;
+  editing.progress=Math.round(s.filter(x=>x.done).length/s.length*100);
+  if(editing.progress>0 && editing.status==="todo") editing.status="doing";
 }
 function drawTask(){
-  const t=editing;
+  const t=editing, subs=t.subtasks, mins=taskMins(t.id);
   $("#tf").innerHTML = `<h3>Work task</h3>
     <label class="f">Task<input id="t-title" value="${esc(t.title)}" required></label>
     <label class="f">Description<textarea id="t-desc" placeholder="What exactly was asked, expected output, where the data is">${esc(t.desc)}</textarea></label>
+    <div class="f" style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Steps ${subs.length?`<span class="muted">· ${subs.filter(s=>s.done).length}/${subs.length} done · progress updates automatically</span>`:""}</span>
+      ${subs.length?`<ul class="subs">${subs.map((s,i)=>`<li class="${s.done?"done":""}"><input type="checkbox" data-subtog="${i}" ${s.done?"checked":""} aria-label="Step done: ${esc(s.text)}"><span>${esc(s.text)}</span><button type="button" class="x" data-subdel="${i}" aria-label="Remove step">✕</button></li>`).join("")}</ul>`:""}
+      <div class="qrow"><input id="t-subnew" placeholder="Add a step, e.g. Get read access to the database" class="inp"><button class="btn sm" type="button" id="t-subadd">Add step</button></div></div>
     <div class="grid2">
       <label class="f">Category<select id="t-cat"><option value="">Uncategorised</option>${S.cats.map(c=>`<option value="${esc(c.tag)}" ${c.tag===t.category?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
       <label class="f">Due date<input type="date" id="t-due" value="${esc(t.due)}"></label>
       <label class="f">Assigned by<input id="t-by" value="${esc(t.assignedBy)}" placeholder="Supervisor's name"></label>
-      <label class="f">Progress: <span id="t-pv">${+t.progress||0}%</span><input type="range" id="t-prog" min="0" max="100" step="5" value="${+t.progress||0}" style="padding:0;border:0;background:none"></label>
+      <label class="f">Repeats<select id="t-repeat">${REPEAT.map(([v,l])=>`<option value="${v}" ${(t.repeat||"none")===v?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label class="f">Progress: <span id="t-pv">${+t.progress||0}%</span><input type="range" id="t-prog" min="0" max="100" step="${subs.length?1:5}" value="${+t.progress||0}" ${subs.length?"disabled":""} style="padding:0;border:0;background:none"></label>
+      <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Time spent</span><span class="tspent">${SVG(ICON.timer)}${mins?fmtMins(mins):"None yet"}<span class="muted small"> · use ▶ on the task card</span></span></div>
     </div>
     <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Urgency</span><div class="seg" id="t-urg">${URG.map(u=>`<button type="button" data-v="${u}" aria-pressed="${t.urgency===u}">${u[0].toUpperCase()+u.slice(1)}</button>`).join("")}</div></div>
     <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Status</span><div class="seg" id="t-st">${STATUS.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${t.status===k}">${l}</button>`).join("")}</div></div>
     <label class="f">Bottleneck<textarea id="t-block" placeholder="What's slowing this down? Waiting for data, access, clarification…" style="min-height:52px">${esc(t.bottleneck)}</textarea></label>
+    <label class="f">Result / impact <span class="muted" style="font-weight:400">· shows on your resume bullets</span><input id="t-impact" value="${esc(t.impact||"")}" placeholder="e.g. Cut report time from 2 hours to 20 minutes"></label>
+    <label class="f">Notes <span class="muted" style="font-weight:400">· SQL queries, file paths, meeting notes</span><textarea id="t-notes" class="mono" placeholder="SELECT batch_id, COUNT(*) FROM production GROUP BY batch_id HAVING COUNT(*) > 1;">${esc(t.notes||"")}</textarea></label>
+    <div class="f" style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Links</span>
+      ${t.links.length?`<ul class="links">${t.links.map((l,i)=>`<li>${SVG(ICON.link)}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)}</a><button type="button" class="x" data-linkdel="${i}" aria-label="Remove link">✕</button></li>`).join("")}</ul>`:""}
+      <div class="qrow wrap"><input id="t-linkurl" type="url" placeholder="Paste a link (shared drive, sheet, ticket)" class="inp"><input id="t-linklabel" placeholder="Name (optional)" class="inp" style="max-width:180px"><button class="btn sm" type="button" id="t-linkadd">Add link</button></div></div>
     <div style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Progress log</span>
-      <div class="qrow"><input id="t-note" placeholder="Add an update, e.g. Finished joining the sales tables" style="flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px"><button class="btn sm" type="button" id="t-addnote">Log</button></div>
+      <div class="qrow"><input id="t-note" placeholder="Add an update, e.g. Finished joining the sales tables" class="inp"><button class="btn sm" type="button" id="t-addnote">Log</button></div>
       <ul class="log">${t.log.slice().reverse().map(l=>`<li><time>${esc(fmtDate(isoDay(l.at)))} ${fmtTime(l.at)}</time><span>${esc(l.note)}</span></li>`).join("")}</ul></div>
     <div class="dlgfoot">
       <button class="btn ghost danger sm" type="button" id="t-del">${confirmDel?"Tap again to delete":"Delete"}</button>
       <div style="display:flex;gap:8px"><button class="btn" type="button" id="t-cancel">Cancel</button><button class="btn primary" type="button" id="t-save">Save</button></div>
     </div>`;
 }
-function readTaskForm(){ const t=editing; t.title=$("#t-title").value.trim()||t.title; t.desc=$("#t-desc").value; t.category=$("#t-cat").value; t.due=$("#t-due").value; t.assignedBy=$("#t-by").value.trim(); t.progress=+$("#t-prog").value; t.bottleneck=$("#t-block").value.trim(); }
+function readTaskForm(){ const t=editing; t.title=$("#t-title").value.trim()||t.title; t.desc=$("#t-desc").value; t.category=$("#t-cat").value; t.due=$("#t-due").value; t.assignedBy=$("#t-by").value.trim(); if(!(t.subtasks||[]).length) t.progress=+$("#t-prog").value; t.bottleneck=$("#t-block").value.trim(); t.repeat=$("#t-repeat").value; t.impact=$("#t-impact").value.trim(); t.notes=$("#t-notes").value; }
+function redrawKeep(focusId){ const sc=$("#dlg").scrollTop; drawTask(); $("#dlg").scrollTop=sc; if(focusId) $("#"+focusId)?.focus(); }
 $("#tf").addEventListener("input", e=>{ if(e.target.id==="t-prog") $("#t-pv").textContent=e.target.value+"%"; });
+$("#tf").addEventListener("change", e=>{ const i=e.target.dataset.subtog; if(i===undefined) return; readTaskForm(); const s=editing.subtasks[+i]; s.done=e.target.checked; s.doneAt=s.done?nowISO():""; autoProgress(); redrawKeep(); });
 $("#tf").addEventListener("click", e=>{
   const b=e.target.closest("button"); if(!b) return;
-  if(b.parentElement.id==="t-urg"){ readTaskForm(); editing.urgency=b.dataset.v; drawTask(); }
-  else if(b.parentElement.id==="t-st"){ readTaskForm(); editing.status=b.dataset.v; if(b.dataset.v==="done") editing.progress=100; drawTask(); }
-  else if(b.id==="t-addnote"){ readTaskForm(); const n=$("#t-note").value.trim(); if(n){ editing.log.push({at:nowISO(),note:n}); drawTask(); $("#t-note").focus(); } }
+  if(b.parentElement.id==="t-urg"){ readTaskForm(); editing.urgency=b.dataset.v; redrawKeep(); }
+  else if(b.parentElement.id==="t-st"){ readTaskForm(); editing.status=b.dataset.v; if(b.dataset.v==="done") editing.progress=100; redrawKeep(b.dataset.v==="done"?"t-impact":null); }
+  else if(b.id==="t-addnote"){ readTaskForm(); const n=$("#t-note").value.trim(); if(n){ editing.log.push({at:nowISO(),note:n}); redrawKeep("t-note"); } }
+  else if(b.id==="t-subadd"){ readTaskForm(); const n=$("#t-subnew").value.trim(); if(n){ editing.subtasks.push({id:newSubId(),text:n,done:false}); autoProgress(); redrawKeep("t-subnew"); } }
+  else if(b.dataset.subdel!==undefined){ readTaskForm(); editing.subtasks.splice(+b.dataset.subdel,1); autoProgress(); redrawKeep(); }
+  else if(b.id==="t-linkadd"){ readTaskForm(); let u=$("#t-linkurl").value.trim(); if(!u) return; if(!/^https?:\/\//i.test(u)) u="https://"+u; editing.links.push({url:u,label:$("#t-linklabel").value.trim()}); redrawKeep("t-linkurl"); }
+  else if(b.dataset.linkdel!==undefined){ readTaskForm(); editing.links.splice(+b.dataset.linkdel,1); redrawKeep(); }
   else if(b.id==="t-cancel"){ $("#dlg").close(); }
-  else if(b.id==="t-del"){ if(!confirmDel){ readTaskForm(); confirmDel=true; drawTask(); } else { del("tasks",editing.id); $("#dlg").close(); toast("Task deleted"); } }
+  else if(b.id==="t-del"){ if(!confirmDel){ readTaskForm(); confirmDel=true; redrawKeep(); } else { if(S.timer&&S.timer.ref===editing.id) stopTimer(false); del("tasks",editing.id); $("#dlg").close(); toast("Task deleted"); } }
   else if(b.id==="t-save"){ readTaskForm(); saveTask(); }
 });
-$("#tf").addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.id==="t-note"){ e.preventDefault(); $("#t-addnote").click(); } });
+$("#tf").addEventListener("keydown", e=>{
+  if(e.key!=="Enter") return;
+  const map={"t-note":"t-addnote","t-subnew":"t-subadd","t-linkurl":"t-linkadd","t-linklabel":"t-linkadd"};
+  if(map[e.target.id]){ e.preventDefault(); $("#"+map[e.target.id]).click(); }
+});
+function nextDue(from, rep){
+  const [y,m,d]=from.split("-").map(Number); const dt=new Date(y,m-1,d);
+  if(rep==="daily") dt.setDate(dt.getDate()+1);
+  else if(rep==="weekdays"){ do { dt.setDate(dt.getDate()+1); } while(isWeekend(dt.getDay())); }
+  else if(rep==="weekly") dt.setDate(dt.getDate()+7);
+  else if(rep==="monthly"){ const target=new Date(y,m,1); const last=new Date(y,m+1,0).getDate(); target.setDate(Math.min(d,last)); return dkey(target); }
+  return dkey(dt);
+}
 function saveTask(){
   const t=editing, old=S.tasks.find(x=>x.id===t.id)||{};
   const pending=$("#t-note")&&$("#t-note").value.trim(); if(pending) t.log.push({at:nowISO(),note:pending});
+  const oldDone=new Set((old.subtasks||[]).filter(s=>s.done).map(s=>s.id));
+  t.subtasks.filter(s=>s.done&&!oldDone.has(s.id)).forEach(s=>t.log.push({at:nowISO(),note:`Step done: ${s.text}`}));
   if(old.status!==t.status) t.log.push({at:nowISO(),note:`Status: ${STATUS_LABEL[old.status]||"—"} → ${STATUS_LABEL[t.status]}`});
   if((+old.progress||0)!==t.progress) t.log.push({at:nowISO(),note:`Progress ${+old.progress||0}% → ${t.progress}%`});
   if(t.bottleneck && t.bottleneck!==old.bottleneck) t.log.push({at:nowISO(),note:`Bottleneck: ${t.bottleneck}`});
-  if(t.status==="done" && old.status!=="done") t.doneAt=nowISO();
+  if(t.impact && t.impact!==old.impact) t.log.push({at:nowISO(),note:`Result: ${t.impact}`});
+  const justDone = t.status==="done" && old.status!=="done";
+  if(justDone) t.doneAt=nowISO();
   if(t.status!=="done") t.doneAt="";
   t.updatedAt=nowISO(); if(t.log.length>200) t.log=t.log.slice(-200);
-  put("tasks", t.id, strip(t)); $("#dlg").close(); toast("Saved");
+  if(justDone && S.timer && S.timer.ref===t.id) stopTimer(false);
+  put("tasks", t.id, strip(t)); $("#dlg").close();
+  if(justDone && t.repeat && t.repeat!=="none"){
+    const due=nextDue(t.due||todayKey(), t.repeat), id=newId();
+    put("tasks", id, {title:t.title,desc:t.desc||"",category:t.category||"",urgency:t.urgency,status:"todo",progress:0,bottleneck:"",assignedBy:t.assignedBy||"",due,
+      repeat:t.repeat,notes:t.notes||"",links:t.links||[],subtasks:(t.subtasks||[]).map(s=>({id:newSubId(),text:s.text,done:false})),impact:"",
+      createdAt:nowISO(),updatedAt:nowISO(),doneAt:"",log:[{at:nowISO(),note:`Task added (repeats ${(REPEAT_SHORT[t.repeat]||"").toLowerCase()})`}]});
+    toast("Done. Next one added for "+fmtDate(due));
+  } else toast("Saved");
 }
 
 // ---------- overview
@@ -384,6 +464,314 @@ function renderOverview(){
   $("#ov-learn").innerHTML = ln.length ? ln.map(r=>`<li><span class="grow"><span>${esc(r.learned.slice(0,160))}</span><div class="sub">${esc(fmtDate(r.date))}</div></span></li>`).join("")
     : `<li class="empty">What you write under "What I learned" collects here.</li>`;
 }
+
+// ---------- timers (task stopwatch + focus sessions)
+S.time = []; S.timer = null; S.courses = [];
+let audioCtx = null;
+function chime(){
+  try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    [0, .22, .44].forEach((t, i) => { const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.type = "sine"; o.frequency.value = [660, 880, 990][i];
+      g.gain.setValueAtTime(.0001, audioCtx.currentTime + t); g.gain.exponentialRampToValueAtTime(.25, audioCtx.currentTime + t + .02); g.gain.exponentialRampToValueAtTime(.0001, audioCtx.currentTime + t + .35);
+      o.connect(g).connect(audioCtx.destination); o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + .4); });
+  } catch {}
+}
+function unlockAudio(){ try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); } catch {} }
+function timerTargetLabel(type, ref){
+  if (type === "task") { const t = S.tasks.find(x => x.id === ref); return t ? t.title : "Task"; }
+  if (type === "course") { const c = S.courses.find(x => x.id === ref); return c ? c.name : "Study"; }
+  return ref || "Focus";
+}
+function startTimer({ type, ref, label, mode = "stopwatch", dur = 0 }){
+  unlockAudio();
+  if (S.timer) stopTimer(false);
+  S.timer = { type, ref: ref || "", label: label || timerTargetLabel(type, ref), mode, dur, start: nowISO() };
+  if (db) write("settings/timer", () => db.doc("settings/timer").set(S.timer));
+  render(); tickTimer();
+}
+function stopTimer(finishedFocus){
+  const T = S.timer; if (!T) return;
+  const startMs = new Date(T.start).getTime();
+  let mins = (Date.now() - startMs) / 60000;
+  if (T.mode === "focus") mins = Math.min(mins, T.dur);
+  S.timer = null;
+  if (db) write("settings/timer", () => db.doc("settings/timer").delete());
+  if (mins >= 1) {
+    const id = "t" + startMs.toString(36);   // same id on every device, so a session is never logged twice
+    const rec = { start: T.start, end: nowISO(), mins: Math.round(mins), date: isoDay(T.start), type: T.type, ref: T.ref || "", label: T.label || "", via: T.mode };
+    if (!S.time.some(x => x.id === id)) S.time.unshift({ ...rec, id });
+    if (db) write("time/" + id, () => db.doc("time/" + id).set(rec));
+    if (T.type === "task") { const t = S.tasks.find(x => x.id === T.ref); if (t) put("tasks", t.id, { ...strip(t), log: [...(t.log || []), { at: nowISO(), note: `Worked ${fmtMins(rec.mins)}${T.mode === "focus" ? " (focus session)" : ""}` }].slice(-200), updatedAt: nowISO() }); }
+  }
+  if (finishedFocus) {
+    chime();
+    toast("Focus session done. Take a 5-minute break.");
+    try { if ("Notification" in window && Notification.permission === "granted") new Notification("Focus session done", { body: (T.label || "Nice work") + " · take a short break", icon: "icon-192.png", tag: "daybook-focus" }); } catch {}
+  } else if (mins >= 1) toast(`Logged ${fmtMins(Math.round(mins))}`);
+  else toast("Timer stopped (under a minute, not logged)");
+  render();
+}
+function tickTimer(){
+  const T = S.timer, pill = $("#timerpill");
+  if (!T) { pill.hidden = true; return; }
+  const el = timerElapsed();
+  if (T.mode === "focus" && el >= T.dur * 60) { stopTimer(true); return; }
+  const shown = T.mode === "focus" ? clock(T.dur * 60 - el) : clock(el);
+  pill.hidden = false;
+  $("#tp-label").textContent = T.label || "Timer";
+  $("#tp-time").textContent = shown;
+  pill.classList.toggle("focus", T.mode === "focus");
+  document.querySelectorAll("[data-live]").forEach(n => n.textContent = shown);
+  const fr = $("#focus-ring"); if (fr && T.mode === "focus") fr.style.setProperty("--p", Math.min(100, el / (T.dur * 60) * 100));
+}
+setInterval(tickTimer, 1000);
+$("#tp-stop").addEventListener("click", () => stopTimer(false));
+$("#tp-label").addEventListener("click", () => { if (S.timer && S.timer.type === "task") openTask(S.timer.ref); else if (S.timer && S.timer.type === "course") location.hash = "#growth"; });
+// task card timer buttons (captured first so the card itself doesn't open)
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-timer]"); if (!b) return;
+  e.stopPropagation(); e.preventDefault();
+  const id = b.dataset.timer;
+  if (S.timer && S.timer.type === "task" && S.timer.ref === id) stopTimer(false);
+  else { const t = S.tasks.find(x => x.id === id); startTimer({ type: "task", ref: id, label: t ? t.title : "Task" });
+    if (t && t.status === "todo") put("tasks", t.id, { ...strip(t), status: "doing", log: [...(t.log || []), { at: nowISO(), note: "Status: Not started → In progress" }], updatedAt: nowISO() }); }
+}, true);
+document.addEventListener("keydown", e => {
+  const c = e.target.closest && e.target.closest("div.task[data-task]");
+  if (c && (e.key === "Enter" || e.key === " ") && e.target === c) { e.preventDefault(); openTask(c.dataset.task); }
+});
+// focus panel on Today
+S.focusMins = 25;
+function renderFocus(){
+  const box = $("#focusbox"); if (!box) return;
+  const prevSel = $("#fx-what") ? $("#fx-what").value : null;
+  const T = S.timer;
+  if (T && T.mode === "focus") {
+    box.innerHTML = `<div class="fx-run"><div class="fx-ring" id="focus-ring" style="--p:${Math.min(100, timerElapsed() / (T.dur * 60) * 100)}"><span data-live>${clock(T.dur * 60 - timerElapsed())}</span></div>
+      <div class="fx-txt"><b>Focusing</b><span class="muted small">${esc(T.label)}</span><div style="display:flex;gap:6px;margin-top:6px"><button class="btn sm" type="button" id="fx-stop">Stop & log</button></div></div></div>`;
+    return;
+  }
+  const open = sortTasks(S.tasks.filter(t => t.status !== "done"));
+  const opts = [`<option value="other:">Just focus (no task)</option>`]
+    .concat(open.length ? [`<optgroup label="Work tasks">${open.map(t => `<option value="task:${esc(t.id)}">${esc(t.title)}</option>`).join("")}</optgroup>`] : [])
+    .concat(S.courses.length ? [`<optgroup label="Courses">${S.courses.map(c => `<option value="course:${esc(c.id)}">${esc(c.name)}</option>`).join("")}</optgroup>`] : []);
+  const today = S.time.filter(x => x.date === todayKey()).reduce((a, x) => a + (+x.mins || 0), 0);
+  box.innerHTML = `<div class="fx-set">
+    <label class="f" style="flex:1;min-width:0">Focus on<select id="fx-what">${opts.join("")}</select></label>
+    <div class="seg" id="fx-len">${[15, 25, 50].map(m => `<button type="button" data-m="${m}" aria-pressed="${S.focusMins === m}">${m}m</button>`).join("")}</div>
+    <button class="btn primary" type="button" id="fx-start">${SVG(ICON.play)}Start</button></div>
+    <p class="small muted" style="margin:0">${today ? `Tracked today: <b>${fmtMins(today)}</b>` : "A bell rings when the session ends. Time is logged to the task or course."}</p>`;
+  if (prevSel && [...$("#fx-what").options].some(o => o.value === prevSel)) $("#fx-what").value = prevSel;
+}
+document.addEventListener("click", e => {
+  const m = e.target.closest("#fx-len [data-m]"); if (m) { S.focusMins = +m.dataset.m; renderFocus(); return; }
+  if (e.target.closest("#fx-start")) { const [type, ref] = $("#fx-what").value.split(/:(.*)/s); startTimer({ type, ref, label: type === "other" ? "Focus session" : timerTargetLabel(type, ref), mode: "focus", dur: S.focusMins }); return; }
+  if (e.target.closest("#fx-stop")) { stopTimer(false); return; }
+});
+
+// ---------- Growth: courses, habit streaks, skills
+let courseDel = null; S.modOpen = {};
+document.addEventListener("toggle", e => { const d = e.target; if (d.matches && d.matches("details[data-cid]")) S.modOpen[d.dataset.cid] = d.open; }, true);
+function minsFor(pred){ return S.time.filter(pred).reduce((a, x) => a + (+x.mins || 0), 0); }
+function weekAgoKey(){ const d = new Date(); d.setDate(d.getDate() - 6); return dkey(d); }
+function courseStats(c){
+  const mods = c.modules || [], done = mods.filter(m => m.done).length;
+  const mins = minsFor(x => x.type === "course" && x.ref === c.id), week = minsFor(x => x.type === "course" && x.ref === c.id && x.date >= weekAgoKey());
+  const days = new Set([...S.time.filter(x => x.type === "course" && x.ref === c.id).map(x => x.date), ...mods.filter(m => m.done && m.doneAt).map(m => isoDay(m.doneAt))]);
+  let streak = 0; const d = new Date(); if (!days.has(dkey(d))) d.setDate(d.getDate() - 1);
+  while (days.has(dkey(d))) { streak++; d.setDate(d.getDate() - 1); }
+  let pace = "";
+  if (c.target && mods.length && done < mods.length) {
+    const daysLeft = Math.ceil((new Date(c.target + "T23:59") - new Date()) / 864e5), weeks = Math.max(daysLeft / 7, 1 / 7);
+    const need = (mods.length - done) / weeks;
+    const recent = mods.filter(m => m.done && m.doneAt && isoDay(m.doneAt) >= weekAgoKey()).length;
+    pace = daysLeft < 0 ? `<span class="warn-t">Target date has passed</span>` : `Need about <b>${need < 1 ? need.toFixed(1) : Math.ceil(need)}</b> module${need === 1 ? "" : "s"}/week to finish by ${esc(fmtDate(c.target))} · ${recent >= need ? `<span class="ok-t">on track</span>` : `<span class="warn-t">${recent} done this week</span>`}`;
+  } else if (mods.length && done === mods.length) pace = `<span class="ok-t">Completed. Well done!</span>`;
+  return { mods, done, pct: mods.length ? Math.round(done / mods.length * 100) : 0, mins, week, streak, pace };
+}
+function renderCourses(){
+  $("#courses").innerHTML = S.courses.length ? S.courses.slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")).map(c => { const st = courseStats(c);
+    return `<div class="panel course" data-course="${esc(c.id)}">
+      <div class="co-head"><span class="co-ic">${SVG(ICON.book)}</span><div class="co-title"><b>${esc(c.name)}</b><span class="muted small">${st.done}/${st.mods.length} modules${c.target ? ` · target ${esc(fmtDate(c.target))}` : ""}</span></div>
+        <button class="btn sm" type="button" data-cfocus="${esc(c.id)}">${SVG(ICON.play)}Study 25m</button></div>
+      <div class="co-bar"><span class="bar"><i style="width:${st.pct}%"></i></span><b class="mono-n">${st.pct}%</b></div>
+      <div class="co-stats"><span><b>${fmtMins(st.week)}</b> this week</span><span><b>${fmtMins(st.mins)}</b> total</span><span>${SVG(ICON.flame)}<b>${st.streak}</b> day streak</span></div>
+      ${st.pace ? `<p class="small" style="margin:0">${st.pace}</p>` : ""}
+      <details class="co-mods" data-cid="${esc(c.id)}" ${(S.modOpen[c.id] ?? st.mods.length <= 12) ? "open" : ""}><summary class="small">Modules</summary>
+        ${st.mods.length ? `<ul class="subs">${st.mods.map((m, i) => `<li class="${m.done ? "done" : ""}"><input type="checkbox" data-cmod="${i}" ${m.done ? "checked" : ""} aria-label="Module done: ${esc(m.title)}"><span>${esc(m.title)}</span><button type="button" class="x" data-cmoddel="${i}" aria-label="Remove module">✕</button></li>`).join("")}</ul>` : `<p class="small muted">No modules yet. Paste them below, one per line.</p>`}
+        <textarea class="inp" data-cmodnew rows="2" placeholder="Paste module names, one per line"></textarea>
+        <div class="co-foot"><button class="btn sm" type="button" data-cmodadd>Add modules</button><label class="small muted">Target date <input type="date" data-ctarget value="${esc(c.target || "")}"></label><button class="btn sm ghost danger" type="button" data-cdel>${courseDel === c.id ? "Tap again to delete" : "Delete course"}</button></div>
+      </details></div>`; }).join("")
+    : `<div class="panel empty">No courses yet. Add your Google certificate above to track modules, study hours and a streak.</div>`;
+}
+function saveCourse(c){ put("courses", c.id, strip(c)); }
+$("#course-form").addEventListener("submit", e => { e.preventDefault(); const n = $("#course-name").value.trim(); if (!n) return;
+  const c = { name: n, target: $("#course-target").value || "", modules: [], createdAt: nowISO() }; put("courses", newId(), c); $("#course-name").value = ""; $("#course-target").value = ""; toast("Course added. Paste its modules to track progress."); });
+document.addEventListener("click", e => {
+  const card = e.target.closest("[data-course]"); if (!card) return;
+  const c = S.courses.find(x => x.id === card.dataset.course); if (!c) return;
+  if (e.target.closest("[data-cfocus]")) { startTimer({ type: "course", ref: c.id, label: c.name, mode: "focus", dur: 25 }); return; }
+  if (e.target.closest("[data-cmodadd]")) { const ta = card.querySelector("[data-cmodnew]"); const lines = ta.value.split(/\n+/).map(x => x.replace(/^\s*[-*•\d.)]+\s*/, "").trim()).filter(Boolean);
+    if (!lines.length) return; saveCourse({ ...c, modules: [...(c.modules || []), ...lines.map(t => ({ id: newSubId(), title: t, done: false }))] }); toast(`${lines.length} module${lines.length > 1 ? "s" : ""} added`); return; }
+  const md = e.target.closest("[data-cmoddel]"); if (md) { const mods = [...c.modules]; mods.splice(+md.dataset.cmoddel, 1); saveCourse({ ...c, modules: mods }); return; }
+  if (e.target.closest("[data-cdel]")) { if (courseDel !== c.id) { courseDel = c.id; renderCourses(); } else { courseDel = null; del("courses", c.id); toast("Course deleted"); } }
+});
+document.addEventListener("change", e => {
+  const card = e.target.closest("[data-course]"); if (!card) return;
+  const c = S.courses.find(x => x.id === card.dataset.course); if (!c) return;
+  if (e.target.dataset.cmod !== undefined) { const mods = c.modules.map(m => ({ ...m })); const m = mods[+e.target.dataset.cmod]; m.done = e.target.checked; m.doneAt = m.done ? nowISO() : ""; saveCourse({ ...c, modules: mods }); if (m.done) toast("Module done"); }
+  if (e.target.matches("[data-ctarget]")) saveCourse({ ...c, target: e.target.value });
+});
+function habitStats(){
+  const tk = todayKey(), st = startKey(), nowHM = pad(new Date().getHours()) + ":" + pad(new Date().getMinutes());
+  const monthStart = tk.slice(0, 8) + "01";
+  return S.routine.filter(r => !r.extra).map(r => {
+    const days = r.days && r.days.length ? r.days : [0,1,2,3,4,5,6];
+    let cur = 0, best = 0, run = 0, counting = true, mDone = 0, mSched = 0;
+    const d = new Date();
+    for (let i = 0; i < 120; i++) {
+      const k = dkey(d); if (k < st) break;
+      if (days.includes(d.getDay())) {
+        const dd = S.day[k] || {}, done = !!(dd.done || {})[r.id], skip = !!(dd.skip || {})[r.id];
+        const pending = k === tk && !done && r.time > nowHM;
+        if (!skip && !pending) {
+          if (k >= monthStart) { mSched++; if (done) mDone++; }
+          if (done) { run++; if (counting) cur = run; best = Math.max(best, run); }
+          else { if (k !== tk) counting = false; run = 0; }
+        }
+      }
+      d.setDate(d.getDate() - 1);
+    }
+    return { r, cur, best, mDone, mSched };
+  }).filter(h => h.mSched || h.cur).sort((a, b) => b.cur - a.cur || b.mDone / (b.mSched || 1) - a.mDone / (a.mSched || 1));
+}
+function renderHabits(){
+  const hs = habitStats();
+  $("#habits").innerHTML = hs.length ? hs.map(h => `<div class="habit"><div class="hb-top">${routineIcon(h.r)}<span class="hb-name">${esc(h.r.label)}</span></div>
+    <div class="hb-streak ${h.cur ? "on" : ""}">${SVG(ICON.flame)}<b>${h.cur}</b><span>day${h.cur === 1 ? "" : "s"}</span></div>
+    <div class="hb-meta small muted">Best ${h.best} · This month ${h.mDone}/${h.mSched}</div></div>`).join("")
+    : `<div class="panel empty" style="grid-column:1/-1">Tick routine items on the Today page and your streaks build up here.</div>`;
+}
+function skillData(){
+  const cats = [...new Set([...S.cats.map(c => c.tag), ...S.tasks.map(t => t.category || "")])];
+  return cats.map(tag => {
+    const ts = S.tasks.filter(t => (t.category || "") === tag); if (!ts.length) return null;
+    const done = ts.filter(t => t.status === "done").sort((a, b) => (b.doneAt || "").localeCompare(a.doneAt || ""));
+    const mins = minsFor(x => x.type === "task" && ts.some(t => t.id === x.ref));
+    return { tag, name: tag ? catName(tag) : "Uncategorised", done, open: ts.length - done.length, mins };
+  }).filter(Boolean).sort((a, b) => b.done.length - a.done.length || b.mins - a.mins);
+}
+function resumeBullets(){
+  const sd = skillData().filter(s => s.done.length);
+  const L = [];
+  for (const s of sd) {
+    const ex = s.done.slice(0, 3).map(t => t.title.replace(/^\(Example\)\s*/i, "")).join("; ");
+    L.push(`• ${s.name}: completed ${s.done.length} task${s.done.length > 1 ? "s" : ""}${s.mins >= 60 ? ` (${Math.round(s.mins / 60)}+ hours)` : ""}, including ${ex}.`);
+  }
+  S.tasks.filter(t => t.status === "done" && t.impact).sort((a, b) => (b.doneAt || "").localeCompare(a.doneAt || "")).forEach(t => L.push(`• ${t.title}: ${t.impact}`));
+  return L;
+}
+function renderSkills(){
+  const sd = skillData();
+  $("#skills").innerHTML = sd.length ? sd.map(s => `<div class="panel skill"><div class="sk-head">${catTag(s.tag)}<span class="muted small">${s.done.length} done · ${s.open} open${s.mins ? " · " + fmtMins(s.mins) : ""}</span></div>
+      ${s.done.length ? `<ul class="sk-list">${s.done.slice(0, 5).map(t => `<li data-task="${esc(t.id)}"><span>${esc(t.title)}</span>${t.impact ? `<span class="impact">${SVG(ICON.star)}${esc(t.impact)}</span>` : ""}</li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Finish a task in this category to start building your record.</p>`}</div>`).join("")
+    : `<div class="panel empty">Your skills build up here as you complete work tasks.</div>`;
+  const b = resumeBullets();
+  $("#bullets").textContent = b.length ? b.join("\n") : "Complete a few work tasks (and add a Result / impact when you mark them done) to generate resume bullet points here.";
+  $("#bullets-copy").disabled = !b.length;
+}
+$("#bullets-copy").addEventListener("click", async () => { const txt = resumeBullets().join("\n"); try { await navigator.clipboard.writeText(txt); toast("Bullet points copied"); } catch { const r = document.createRange(); r.selectNodeContents($("#bullets")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); toast("Select and copy the highlighted text"); } });
+function renderGrowth(){ renderCourses(); renderHabits(); renderSkills(); }
+
+// ---------- weekly report / logbook
+S.wkOff = 0;
+function weekKeys(off){ const d = new Date(); d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + off * 7); const out = []; for (let i = 0; i < 7; i++) { out.push(dkey(d)); d.setDate(d.getDate() + 1); } return out; }
+function weekData(off){
+  const keys = weekKeys(off), a = keys[0], b = keys[6], inW = k => k && k >= a && k <= b;
+  const completed = S.tasks.filter(t => t.status === "done" && inW(isoDay(t.doneAt)));
+  const active = S.tasks.filter(t => t.status !== "done" && ((t.log || []).some(l => inW(isoDay(l.at))) || inW(isoDay(t.createdAt)) || (t.due && t.due <= b)));
+  const updates = S.tasks.reduce((n, t) => n + (t.log || []).filter(l => inW(isoDay(l.at)) && !/^Task added/.test(l.note)).length, 0);
+  const timeW = S.time.filter(x => inW(x.date));
+  const byCat = {}; timeW.forEach(x => { let k = "Other"; if (x.type === "task") { const t = S.tasks.find(y => y.id === x.ref); k = t ? catName(t.category) : "Work"; } else if (x.type === "course") k = "Study: " + timerTargetLabel("course", x.ref); else k = "Focus"; byCat[k] = (byCat[k] || 0) + (+x.mins || 0); });
+  const totalMins = timeW.reduce((s, x) => s + (+x.mins || 0), 0);
+  const todosDone = S.todos.filter(t => t.done && inW(isoDay(t.doneAt))).length;
+  let rs = 0, rd = 0; keys.filter(k => k <= todayKey() && S.day[k]).forEach(k => { const dd = dayDoc(k); routineFor(k).filter(r => !(dd.skip || {})[r.id]).forEach(r => { rs++; if ((dd.done || {})[r.id]) rd++; }); });
+  const days = keys.map(k => ({ k, refl: S.refl[k], upd: S.tasks.map(t => ({ t, e: (t.log || []).filter(l => isoDay(l.at) === k && !/^(Task added|Progress \d|Status:)/.test(l.note)) })).filter(x => x.e.length) })).filter(d => d.refl || d.upd.length);
+  const learned = keys.map(k => S.refl[k]).filter(r => r && (r.learned || "").trim());
+  const mistakes = keys.map(k => S.refl[k]).filter(r => r && ((r.mistakes || "").trim() || (r.improve || "").trim()));
+  const nk = weekKeys(off + 1), next = sortTasks(S.tasks.filter(t => t.status !== "done" && (!t.due || t.due <= nk[6])));
+  return { keys, a, b, completed, active, updates, totalMins, byCat, todosDone, routinePct: rs ? Math.round(rd / rs * 100) : null, days, learned, mistakes, next, reflN: keys.filter(k => S.refl[k]).length };
+}
+const shortDay = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }); };
+const longRange = (a, b) => `${shortDay(a).replace(/^\w+ /, "")} – ${shortDay(b).replace(/^\w+ /, "")} ${b.slice(0, 4)}`;
+function reportSections(W){
+  const cleanT = t => t.title.replace(/^\(Example\)\s*/i, "");
+  return [
+    ["Summary", [`${W.completed.length} task${W.completed.length === 1 ? "" : "s"} completed · ${W.updates} progress update${W.updates === 1 ? "" : "s"} · ${W.totalMins ? fmtMins(W.totalMins) + " tracked" : "no time tracked"} · ${W.todosDone} to-do${W.todosDone === 1 ? "" : "s"} done${W.routinePct !== null ? ` · routine kept ${W.routinePct}%` : ""} · ${W.reflN} reflection${W.reflN === 1 ? "" : "s"}`]],
+    ["Completed this week", W.completed.map(t => `[${catName(t.category)}] ${cleanT(t)}${t.impact ? ` — ${t.impact}` : ""}${taskMins(t.id) ? ` (${fmtMins(taskMins(t.id))})` : ""}`)],
+    ["In progress", W.active.map(t => `[${catName(t.category)}] ${cleanT(t)} — ${STATUS_LABEL[t.status]}, ${+t.progress || 0}%${t.due ? `, due ${fmtDate(t.due)}` : ""}${t.bottleneck ? `. Bottleneck: ${t.bottleneck}` : ""}`)],
+    ["Daily log", W.days.map(d => { const parts = []; if (d.refl && (d.refl.did || "").trim()) parts.push(d.refl.did.trim()); d.upd.forEach(x => parts.push(`${cleanT(x.t)}: ${x.e.map(e => e.note).join("; ")}`)); return `${shortDay(d.k)}: ${parts.join(" | ") || "—"}`; })],
+    ["Key learnings", W.learned.map(r => `${shortDay(r.date)}: ${r.learned.trim()}`)],
+    ["Mistakes & improvements", W.mistakes.map(r => `${shortDay(r.date)}: ${[(r.mistakes || "").trim().replace(/([^.!?])$/, "$1."), (r.improve || "").trim() ? "Next time: " + r.improve.trim() : ""].filter(Boolean).join(" ")}`)],
+    ["Time by area", Object.entries(W.byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}: ${fmtMins(v)}`)],
+    ["Plan for next week", W.next.slice(0, 8).map(t => `[${catName(t.category)}] ${cleanT(t)}${t.due ? ` — due ${fmtDate(t.due)}` : ""}`)]
+  ];
+}
+function reportTitle(W){ return `Weekly Report: ${longRange(W.a, W.b)}`; }
+function reportText(){
+  const W = weekData(S.wkOff), L = [reportTitle(W)];
+  if (S.name) L.push(S.name); if (S.org) L.push(S.org);
+  for (const [h, items] of reportSections(W)) { L.push("", h.toUpperCase()); L.push(...(items.length ? items.map(x => "- " + x) : ["- None"])); }
+  return L.join("\n");
+}
+function reportHTML(forFile){
+  const W = weekData(S.wkOff);
+  const body = reportSections(W).map(([h, items]) => `<h2>${esc(h)}</h2>${items.length ? `<ul>${items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="none">None</p>`}`).join("");
+  const head = `<h1>${esc(reportTitle(W))}</h1>${S.name || S.org ? `<p class="who">${esc([S.name, S.org].filter(Boolean).join(" · "))}</p>` : ""}`;
+  if (!forFile) return head + body;
+  return `<html><head><meta charset="utf-8"><title>${esc(reportTitle(W))}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#0f6f53;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
+}
+function renderReport(){
+  const W = weekData(S.wkOff);
+  $("#wk-label").textContent = (S.wkOff === 0 ? "This week · " : S.wkOff === -1 ? "Last week · " : "") + longRange(W.a, W.b);
+  $("#wk-next").disabled = S.wkOff >= 0;
+  $("#wk-doc").innerHTML = reportHTML(false);
+}
+document.addEventListener("click", async e => {
+  const w = e.target.closest("[data-wk]"); if (w) { S.wkOff += +w.dataset.wk; renderReport(); return; }
+  if (e.target.closest("#wk-copy")) { const t = reportText(); try { await navigator.clipboard.writeText(t); toast("Weekly report copied"); } catch { toast("Couldn't copy. Use Download instead."); } return; }
+  if (e.target.closest("#wk-word")) { const W = weekData(S.wkOff); const blob = new Blob(["﻿", reportHTML(true)], { type: "application/msword" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Weekly-report-${W.a}.doc`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000); toast("Word file downloaded"); return; }
+  if (e.target.closest("#wk-print")) { document.body.classList.add("printing-report"); setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("printing-report"), 500); }, 50); }
+});
+
+// ---------- search
+function openSearch(){ const d = $("#sdlg"); if (!d.open) d.showModal(); $("#s-q").value = ""; runSearch(); setTimeout(() => $("#s-q").focus(), 30); }
+function hl(text, q){ const t = esc(text); if (!q) return t; const words = q.split(/\s+/).filter(Boolean).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")); return words.length ? t.replace(new RegExp("(" + words.map(w => esc(w)).join("|") + ")", "gi"), "<mark>$1</mark>") : t; }
+function snippet(text, q){ const s = String(text || "").replace(/\s+/g, " "); const i = s.toLowerCase().indexOf(q.split(/\s+/)[0]); if (i < 0) return s.slice(0, 110); const a = Math.max(0, i - 40); return (a ? "…" : "") + s.slice(a, a + 120) + (a + 120 < s.length ? "…" : ""); }
+function runSearch(){
+  const q = $("#s-q").value.trim().toLowerCase(), out = $("#s-res");
+  if (q.length < 2) { out.innerHTML = `<p class="small muted" style="padding:8px 4px;margin:0">Search tasks, notes, steps, to-dos, reflections, courses and routine. Type at least 2 letters.</p>`; return; }
+  const words = q.split(/\s+/); const match = s => { const h = s.toLowerCase(); return words.every(w => h.includes(w)); };
+  const R = [];
+  for (const t of S.tasks) { const hay = [t.title, t.desc, t.notes, t.bottleneck, t.impact, catName(t.category), ...(t.subtasks || []).map(s => s.text), ...(t.links || []).map(l => l.label + " " + l.url), ...(t.log || []).map(l => l.note)].join(" \n "); if (match(hay)) R.push({ g: "Work tasks", title: t.title, sub: `${STATUS_LABEL[t.status]} · ${catName(t.category)}${t.due ? " · due " + fmtDate(t.due) : ""}`, snip: match(t.title) ? "" : snippet(hay.replace(t.title, ""), q), act: `data-sr-task="${esc(t.id)}"` }); }
+  for (const t of S.todos) if (match(t.title)) R.push({ g: "To-dos", title: t.title, sub: (t.done ? "Done · " : "") + (t.date ? fmtDate(t.date) : ""), act: `data-sr-date="${esc(t.date || todayKey())}"` });
+  for (const r of Object.values(S.refl)) { const hay = [r.did, r.learned, r.mistakes, r.improve].join(" \n "); if (match(hay)) R.push({ g: "Reflections", title: fmtDate(r.date) + " " + r.date.slice(0, 4), sub: "", snip: snippet(hay, q), act: `data-sr-refl="${esc(r.date)}"` }); }
+  for (const c of S.courses) { const hay = [c.name, ...(c.modules || []).map(m => m.title)].join(" \n "); if (match(hay)) R.push({ g: "Courses", title: c.name, sub: `${(c.modules || []).filter(m => m.done).length}/${(c.modules || []).length} modules`, snip: match(c.name) ? "" : snippet(hay, q), act: `data-sr-view="growth"` }); }
+  for (const r of S.routine) if (match(r.label)) R.push({ g: "Routine", title: r.label, sub: r.time + " · " + (daysLabel(r.days) || "Custom days"), act: `data-sr-view="routine"` });
+  if (!R.length) { out.innerHTML = `<p class="small muted" style="padding:8px 4px;margin:0">Nothing found for “${esc(q)}”.</p>`; return; }
+  const groups = [...new Set(R.map(r => r.g))];
+  out.innerHTML = groups.map(g => `<div class="s-group">${esc(g)}</div>` + R.filter(r => r.g === g).slice(0, 20).map(r => `<button type="button" class="s-item" ${r.act}><span class="s-title">${hl(r.title, q)}</span>${r.sub ? `<span class="s-sub">${esc(r.sub)}</span>` : ""}${r.snip ? `<span class="s-snip">${hl(r.snip, q)}</span>` : ""}</button>`).join("")).join("");
+}
+$("#search-btn").addEventListener("click", openSearch);
+$("#s-q").addEventListener("input", runSearch);
+$("#s-close").addEventListener("click", () => $("#sdlg").close());
+document.addEventListener("keydown", e => { if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && !document.querySelector("dialog[open]")) { e.preventDefault(); openSearch(); } });
+$("#s-res").addEventListener("click", e => {
+  const b = e.target.closest(".s-item"); if (!b) return; $("#sdlg").close();
+  if (b.dataset.srTask) openTask(b.dataset.srTask);
+  else if (b.dataset.srDate) { S.calSel = b.dataset.srDate; const [y, m] = b.dataset.srDate.split("-").map(Number); S.calY = y; S.calM = m - 1; location.hash = "#calendar"; render(); }
+  else if (b.dataset.srRefl) { rDate = b.dataset.srRefl; rDirty = false; location.hash = "#reflect"; render(); }
+  else if (b.dataset.srView) location.hash = "#" + b.dataset.srView;
+});
 
 // ---------- calendar
 S.calY = new Date().getFullYear(); S.calM = new Date().getMonth(); S.calSel = todayKey();
@@ -540,10 +928,69 @@ $("#cal-sync").addEventListener("click", async () => {
 });
 $("#cal-help-btn").addEventListener("click", () => { const h=$("#cal-help"); h.hidden=!h.hidden; $("#cal-help-btn").textContent=h.hidden?"How it works":"Hide steps"; });
 
+// ---------- push notifications
+const PUSH_KEY = "daybook-push";
+const vapidOK = () => !!(CFG.vapidKey && !/PASTE/i.test(CFG.vapidKey));
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = () => !!(navigator.standalone || (window.matchMedia && matchMedia("(display-mode: standalone)").matches));
+const tokenId = t => { let h = 0; for (const ch of t) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return "d" + h.toString(36) + t.length.toString(36); };
+async function pushState(){
+  if (!vapidOK()) return "nokey";
+  if (isIOS() && !isStandalone()) return "ios-browser";
+  if (!("Notification" in window) || !("serviceWorker" in navigator)) return "unsupported";
+  let ok = false; try { ok = await messagingSupported(); } catch {}
+  if (!ok) return "unsupported";
+  if (Notification.permission === "denied") return "denied";
+  let on = false; try { on = localStorage.getItem(PUSH_KEY) === "1"; } catch {}
+  return Notification.permission === "granted" && on ? "on" : "off";
+}
+async function registerDevice(){
+  const reg = await navigator.serviceWorker.ready;
+  const token = await getToken(getMessaging(APP), { vapidKey: CFG.vapidKey, serviceWorkerRegistration: reg });
+  if (!token) throw new Error("no token");
+  await db.doc("devices/" + tokenId(token)).set({ token, device: isIOS() ? "iPhone/iPad" : /Android/i.test(navigator.userAgent) ? "Android" : "Computer", agent: navigator.userAgent.slice(0, 160), updatedAt: nowISO() });
+  try { localStorage.setItem(PUSH_KEY, "1"); } catch {}
+}
+const PUSH_MSG = {
+  nokey: "Push notifications need one setup step on the Firebase side. Until then, use calendar alarms below.",
+  "ios-browser": "On iPhone, open Daybook from its <b>home-screen icon</b> to turn on notifications.",
+  unsupported: "This browser can't receive notifications. Use calendar alarms below instead.",
+  denied: "Notifications are blocked for Daybook. Allow them in your phone or browser settings, then reopen the app.",
+  off: "Get a notification on <b>this device</b> for every routine item with an alarm on.",
+  on: "<span class=\"ok-dot\"></span>Notifications are <b>on for this device</b>. Changes to your alarms apply straight away."
+};
+let pushBusy = false;
+async function refreshPush(silentRegister){
+  if (!APP || !db) return;
+  const st = await pushState();
+  $("#push-status").innerHTML = PUSH_MSG[st];
+  // Without the notification server, show calendar alarms as the main option.
+  const row = $("#push-status").closest(".ab-row"); if (row) row.hidden = st === "nokey";
+  if (st === "nokey") { const d = document.querySelector(".ab-cal"); if (d) d.open = true; }
+  $("#push-on").hidden = st !== "off";
+  $("#push-test").hidden = st !== "on";
+  if (st === "on" && silentRegister) registerDevice().catch(e => console.warn("token refresh", e));
+}
+$("#push-on").addEventListener("click", async () => {
+  if (pushBusy) return; pushBusy = true; $("#push-on").disabled = true;
+  try {
+    const p = await Notification.requestPermission();
+    if (p !== "granted") { toast("Notifications weren't allowed."); }
+    else { await registerDevice(); toast("Notifications are on for this device"); }
+  } catch (e) { console.error(e); toast("Couldn't turn on notifications. Check your connection and try again."); }
+  pushBusy = false; $("#push-on").disabled = false; refreshPush();
+});
+$("#push-test").addEventListener("click", async () => {
+  $("#push-test").disabled = true;
+  try { const r = await httpsCallable(getFunctions(APP, "asia-southeast1"), "sendTest")(); toast(r.data && r.data.sent ? `Test sent to ${r.data.sent} device${r.data.sent > 1 ? "s" : ""}` : "Test didn't reach any device"); }
+  catch (e) { console.error(e); toast(/not-found|internal|unavailable/.test(e.code || "") ? "The notification server isn't set up yet." : (e.message || "Test failed")); }
+  $("#push-test").disabled = false;
+});
+
 // ---------- routine editor
 const daysLabel = d => { const s=(d||[0,1,2,3,4,5,6]).slice().sort().join(""); return s==="0123456"?"Every day":s==="12345"?"Weekdays":s==="06"?"Weekend":null; };
 function renderRoutine(){
-  renderAlarmPanel();
+  renderAlarmPanel(); if (!renderRoutine._p) { renderRoutine._p = true; refreshPush(); }
   const all=S.routine.slice().sort((a,b)=>a.time.localeCompare(b.time));
   const has = (r,set) => (r.days||[0,1,2,3,4,5,6]).some(d=>set.includes(d));
   const rows = S.rtFilter==="wd" ? all.filter(r=>has(r,[1,2,3,4,5])) : S.rtFilter==="we" ? all.filter(r=>has(r,[0,6])) : all;
@@ -560,7 +1007,24 @@ function renderRoutine(){
   </div>`).join(""):`<div class="empty">${S.ready?"No routine items here yet.":"Loading…"}</div>`;
   $("#cat-edit").innerHTML = S.cats.map(c=>`<span class="chip">${esc(c.name)} <span class="muted" style="font-family:var(--f-mono)">#${esc(c.tag)}</span> <button class="x" type="button" data-delcat="${esc(c.tag)}" aria-label="Remove ${esc(c.name)}">✕</button></span>`).join("");
 }
-function saveRt(r){ put("routine", r.id, strip(r)); }
+// When an alarm should fire, in UTC, so the server can find due alarms with one small query.
+function fireFields(r){
+  const off = -new Date().getTimezoneOffset();
+  const [h, m] = String(r.time || "00:00").split(":").map(Number);
+  let t = h * 60 + m - (+r.before || 0) - off;
+  const shift = Math.floor(t / 1440); t = ((t % 1440) + 1440) % 1440;
+  const days = (r.days && r.days.length ? r.days : [0,1,2,3,4,5,6]);
+  return { fireUtc: pad(Math.floor(t / 60)) + ":" + pad(t % 60), fireDaysUtc: [...new Set(days.map(d => ((d + shift) % 7 + 7) % 7))].sort(), tzOffset: off };
+}
+function saveRt(r){ put("routine", r.id, { ...strip(r), ...fireFields(r) }); }
+// Keep stored alarm times right if they were saved before this feature or the device timezone changed.
+function syncFireFields(){
+  for (const r of S.routine) {
+    if (!r.alarm) continue;
+    const f = fireFields(r);
+    if (r.fireUtc !== f.fireUtc || r.tzOffset !== f.tzOffset || JSON.stringify(r.fireDaysUtc || []) !== JSON.stringify(f.fireDaysUtc)) saveRt(r);
+  }
+}
 $("#rt-edit").addEventListener("change", e=>{ const row=e.target.closest("[data-rid]"); if(!row||!e.target.dataset.f) return; const r=S.routine.find(x=>x.id===row.dataset.rid); if(!r) return; const f=e.target.dataset.f; const c={...r,[f]: f==="before" ? +e.target.value : e.target.value}; saveRt(c); });
 $("#rt-edit").addEventListener("click", e=>{
   const bl=e.target.closest("[data-alarm]"); if(bl){ const r=S.routine.find(y=>y.id===bl.dataset.alarm); if(r) saveRt({...r, alarm:!r.alarm, before: r.before ?? 5}); return; }
@@ -621,7 +1085,7 @@ function mkdb(fs, uid){
         add: async d => { const r = doc(c); await setDoc(r, d); return docRef(r); } }); }
   };
 }
-let FS = null, UID = null;
+let FS = null, UID = null, APP = null;
 async function seedIfEmpty(){
   const s = await getDoc(doc(FS, "users/" + UID + "/settings/main"));
   if (s.exists()) return;
@@ -641,7 +1105,11 @@ function startData(){
   const fail = dataProblem;
   let loaded = 0; const mark = () => { if (++loaded >= 5) { S.ready = true; leaveSplash(); } render(); };
   const sub = (coll, key) => { let first = true; db.collection(coll).onSnapshot(s => { S[key] = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); } else render(); }, fail); };
-  sub("tasks", "tasks"); sub("todos", "todos"); sub("routine", "routine");
+  sub("tasks", "tasks"); sub("todos", "todos");
+  { let first = true; db.collection("routine").onSnapshot(s => { S.routine = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); refreshPush(true); } else render(); clearTimeout(syncFireFields._t); syncFireFields._t = setTimeout(syncFireFields, 1500); }, fail); }
+  db.collection("courses").onSnapshot(s => { S.courses = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
+  db.collection("time").orderBy("start", "desc").limit(1500).onSnapshot(s => { S.time = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
+  db.doc("settings/timer").onSnapshot(s => { const t = s.exists ? s.data() : null; const changed = JSON.stringify(t) !== JSON.stringify(S.timer); S.timer = t && t.start ? t : null; if (changed) render(); }, fail);
   let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(90).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
@@ -724,7 +1192,7 @@ setTimeout(() => leaveSplash(), 8000); // never keep the opening screen longer t
 const notConfigured = !firebaseConfig || !firebaseConfig.apiKey || /PASTE/i.test(firebaseConfig.apiKey);
 if (notConfigured) { showAuth("setup"); leaveSplash(); }
 else {
-  const app = initializeApp(firebaseConfig);
+  const app = initializeApp(firebaseConfig); APP = app;
   const auth = getAuth(app);
   try { FS = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); }
   catch (e) { FS = getFirestore(app); }

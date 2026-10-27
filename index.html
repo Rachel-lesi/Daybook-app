@@ -405,6 +405,14 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
 
 /* ===== Alarms ===== */
 .alarmbox{padding:14px 16px;display:grid;gap:10px;margin-bottom:12px;background:linear-gradient(135deg,var(--hero-a),var(--hero-b))}
+.ab-head h3{font-family:var(--f-display);font-size:1rem;margin:0 0 2px}
+.ab-head p{margin:0}
+.ab-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.ab-row p{margin:2px 0 0}
+.ab-cal summary{cursor:pointer;font-size:.85rem;font-weight:600;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--line) 70%,transparent)}
+.ab-cal[open] summary{margin-bottom:6px}
+.ab-cal .ab-row{border-top:0;padding-top:4px}
+.ab-cal #cal-help{margin-top:8px}
 .ab-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
 .ab-txt{min-width:0}
 .ab-txt h3{font-family:var(--f-display);font-size:1rem;margin:0 0 2px}
@@ -423,6 +431,131 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
 .btn:disabled{opacity:.5;cursor:default}
 .tl-bell{display:inline-flex;color:var(--accent);margin-left:6px;vertical-align:-2px}
 .tl-bell svg{width:13px;height:13px}
+
+/* ===== Tasks: subtasks, links, notes, timers ===== */
+div.task{cursor:pointer}
+div.task:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ttl-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.tbtn{flex:none;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:99px;padding:3px 10px 3px 7px;font-size:.78rem;font-family:var(--f-mono);min-height:28px}
+.tbtn svg{width:13px;height:13px;fill:currentColor;stroke:none}
+.tbtn:hover{color:var(--accent);border-color:var(--accent)}
+.tbtn.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tdone-time,.meta-ic,.tspent{display:inline-flex;align-items:center;gap:4px}
+.tdone-time{font-size:.78rem;color:var(--muted);font-family:var(--f-mono)}
+.meta-ic svg,.tdone-time svg,.tspent svg{width:13px;height:13px}
+.tspent{font-size:.92rem}
+.impact{display:inline-flex;align-items:flex-start;gap:6px;font-size:.83rem;color:var(--ink);background:var(--c1s);border-radius:6px;padding:4px 9px}
+.impact svg{width:13px;height:13px;flex:none;margin-top:3px;color:var(--c1)}
+.subs{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.subs li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:4px 2px;font-size:.92rem}
+.subs li.done span{text-decoration:line-through;color:var(--muted)}
+.links{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.links li{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;font-size:.9rem}
+.links li svg{width:14px;height:14px;color:var(--muted)}
+.links a{color:var(--accent);word-break:break-all}
+.inp{flex:1;min-width:0;width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px;font-size:.92rem}
+.qrow.wrap{flex-wrap:wrap}
+textarea.mono{font-family:var(--f-mono)!important;font-size:.84rem!important;min-height:80px}
+/* header timer + search */
+.tpill{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:3px 4px 3px 12px;max-width:min(46vw,320px);box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}
+.tpill.focus{background:linear-gradient(135deg,var(--c2),var(--accent))}
+.tp-label{border:0;background:none;color:inherit;font-size:.8rem;font-weight:600;padding:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+#tp-time{font-family:var(--f-mono);font-weight:500;font-size:.85rem}
+.tp-stop{width:26px;height:26px;border-radius:99px;border:0;background:rgba(255,255,255,.22);color:inherit;display:grid;place-items:center;padding:0}
+.tp-stop svg{width:12px;height:12px}
+.brand > h1{flex:none}
+.brand-r{min-width:0;flex:1 1 auto;justify-content:flex-end}
+.tpill{min-width:0;flex:0 1 auto}
+@media (max-width:560px){.brand .date{display:none}.tpill{max-width:none}.brand{gap:8px}}
+/* focus panel */
+.focusbox{padding:14px 16px;display:grid;gap:10px}
+.fx-set{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px}
+.fx-set select{min-width:0}
+.fx-set .btn.primary{display:inline-flex;align-items:center;gap:6px}
+.fx-set .btn svg,.co-head .btn svg{width:13px;height:13px;fill:currentColor;stroke:none}
+.fx-run{display:flex;align-items:center;gap:16px}
+.fx-ring{--p:0;flex:none;width:96px;height:96px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--sunk) 0);position:relative}
+.fx-ring::before{content:"";position:absolute;inset:8px;border-radius:50%;background:var(--surface)}
+.fx-ring span{position:relative;font-family:var(--f-mono);font-size:1.15rem;font-weight:500}
+.fx-txt{display:grid;gap:2px;min-width:0}
+/* growth */
+#v-growth{align-items:start}
+.g-col,.g-stack{display:grid;gap:22px;align-content:start;min-width:0}
+.g-stack{gap:12px}
+.course-form{display:flex;flex-wrap:wrap;gap:8px;padding:12px;align-items:center;margin-bottom:12px}
+.course-form .cf-date{display:flex;align-items:center;gap:6px}
+.course-form .cf-date .inp{width:auto}
+.course{padding:14px 16px;display:grid;gap:10px}
+.co-head{display:flex;align-items:center;gap:10px}
+.co-head .btn{display:inline-flex;align-items:center;gap:6px;flex:none}
+.co-ic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--c1s);color:var(--c1)}
+.co-ic svg{width:18px;height:18px}
+.co-title{display:grid;min-width:0;flex:1}
+.mono-n{font-family:var(--f-mono);font-weight:500;font-size:.85rem}
+.co-bar{display:flex;align-items:center;gap:10px}
+.co-bar .bar{flex:1}
+.co-stats{display:flex;flex-wrap:wrap;gap:6px}
+.co-stats span{display:inline-flex;align-items:center;gap:4px;font-size:.78rem;color:var(--muted);background:var(--sunk);border-radius:99px;padding:2px 10px}
+.co-stats b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+.co-stats svg{width:12px;height:12px;color:var(--high)}
+.co-mods summary{cursor:pointer;font-weight:600}
+.co-mods{display:grid;gap:8px}
+.co-mods[open]{gap:8px}
+.co-mods textarea{margin-top:6px}
+.co-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px}
+.co-foot label{display:flex;align-items:center;gap:6px}
+.co-foot input[type=date]{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:4px 6px}
+.ok-t{color:var(--ok);font-weight:600} .warn-t{color:var(--high);font-weight:600}
+.habits{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.habit{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:12px;display:grid;gap:6px}
+.hb-top{display:flex;align-items:center;gap:8px;min-width:0}
+.hb-name{font-size:.86rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb-streak{display:flex;align-items:baseline;gap:4px;color:var(--muted)}
+.hb-streak svg{width:16px;height:16px;align-self:center}
+.hb-streak b{font-family:var(--f-mono);font-size:1.5rem;font-weight:500;color:var(--ink)}
+.hb-streak.on svg{color:var(--high)}
+.skill{padding:12px 14px;display:grid;gap:8px}
+.sk-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.sk-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.sk-list li{display:grid;gap:4px;font-size:.9rem;cursor:pointer}
+.sk-list li:hover > span:first-child{color:var(--accent)}
+.bullets{margin:0;padding:14px 16px;white-space:pre-wrap;font-family:var(--f-body);font-size:.9rem;line-height:1.55;max-height:340px;overflow:auto}
+/* weekly report */
+.weekly{padding:16px;display:grid;gap:12px}
+.wk-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.wk-nav{display:flex;align-items:center;gap:8px}
+.wk-nav span{min-width:11em;text-align:center;font-weight:600}
+.wk-actions{display:flex;flex-wrap:wrap;gap:6px}
+.wk-doc{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:16px 18px;max-height:520px;overflow:auto;font-size:.9rem}
+.wk-doc h1{font-family:var(--f-display);font-size:1.2rem;margin:0 0 2px}
+.wk-doc .who{color:var(--muted);margin:0 0 6px;font-size:.85rem}
+.wk-doc h2{font-size:.82rem;text-transform:uppercase;letter-spacing:.06em;color:var(--accent);margin:14px 0 4px}
+.wk-doc ul{margin:0;padding-left:18px;display:grid;gap:3px}
+.wk-doc .none{color:var(--muted);margin:0}
+/* search */
+.sdlg{width:min(640px,calc(100vw - 24px));max-height:min(80dvh,640px);padding:0;margin-top:max(8vh,env(safe-area-inset-top,0px))}
+.s-wrap{display:grid;grid-template-rows:auto 1fr;max-height:min(80dvh,640px)}
+.s-bar{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.s-bar svg{width:18px;height:18px;color:var(--muted);flex:none}
+.s-bar input{flex:1;min-width:0;border:0;background:transparent;font-size:1.05rem;outline:none;padding:6px 0}
+.s-res{overflow:auto;padding:6px 8px 10px}
+.s-group{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);padding:10px 8px 4px}
+.s-item{display:grid;gap:2px;width:100%;text-align:left;border:0;background:transparent;border-radius:9px;padding:8px 10px}
+.s-item:hover,.s-item:focus-visible{background:var(--sunk)}
+.s-title{font-weight:600}
+.s-sub{font-size:.78rem;color:var(--muted)}
+.s-snip{font-size:.84rem;color:var(--muted)}
+mark{background:color-mix(in srgb,var(--med) 35%,transparent);color:inherit;border-radius:3px;padding:0 1px}
+@media (min-width:1000px){
+  #v-growth{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px}
+  #v-reflect > .weekly{grid-column:1 / -1}
+}
+@media print{
+  body.printing-report *{visibility:hidden!important}
+  body.printing-report #wk-doc,body.printing-report #wk-doc *{visibility:visible!important}
+  body.printing-report #wk-doc{position:absolute;left:0;top:0;width:100%;max-height:none;overflow:visible;border:0;background:#fff;color:#111;font-size:11pt}
+  body.printing-report header.top,body.printing-report::before{display:none}
+}
 /* ===== Opening screen & sign-in background ===== */
 :root{--sp-base:#f3f7f6;--sp1:#bfead8;--sp2:#cfdcfb;--sp3:#f8dfcc;--sp-glow:rgba(15,138,102,.28)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sp-base:#0a0f11;--sp1:#0f4a3a;--sp2:#1b2b57;--sp3:#3b2a1d;--sp-glow:rgba(52,200,154,.25)}}
@@ -510,12 +643,13 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
 
 <header class="top">
   <div class="wrap">
-    <div class="brand"><h1><img src="icon-192.png" alt="" width="26" height="26">Daybook</h1><span class="brand-r"><span class="date" id="today-label"></span><button type="button" class="iconbtn" id="theme" aria-label="Theme"></button></span></div>
+    <div class="brand"><h1><img src="icon-192.png" alt="" width="26" height="26">Daybook</h1><span class="brand-r"><span class="tpill" id="timerpill" hidden><button type="button" class="tp-label" id="tp-label"></button><b id="tp-time">0:00</b><button type="button" class="tp-stop" id="tp-stop" aria-label="Stop timer"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg></button></span><span class="date" id="today-label"></span><button type="button" class="iconbtn" id="search-btn" aria-label="Search" title="Search (press /)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></button><button type="button" class="iconbtn" id="theme" aria-label="Theme"></button></span></div>
     <nav class="tabs" id="tabs">
       <a href="#today" data-v="today">Today</a>
       <a href="#work" data-v="work">Work <span class="count" id="c-work">0</span></a>
       <a href="#calendar" data-v="calendar">Calendar</a>
       <a href="#overview" data-v="overview">Overview</a>
+      <a href="#growth" data-v="growth">Growth</a>
       <a href="#reflect" data-v="reflect">Reflection</a>
       <a href="#routine" data-v="routine">Routine</a>
     </nav>
@@ -547,6 +681,10 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
       </div>
     </div>
     <div class="t-side">
+    <div>
+      <div class="sechead"><h2>Focus timer</h2><span class="meta">Pomodoro</span></div>
+      <div class="panel focusbox" id="focusbox"></div>
+    </div>
     <div>
       <div class="sechead"><h2>To-do</h2><span class="meta" id="todo-meta"></span></div>
       <div class="panel"><ul class="rows" id="todos"></ul></div>
@@ -599,6 +737,31 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
     </div>
   </section>
 
+  <section class="view" id="v-growth" hidden>
+    <div class="g-col">
+      <div>
+        <div class="sechead"><h2>Courses</h2><span class="meta">Google certificate and other study</span></div>
+        <form id="course-form" class="panel course-form" autocomplete="off"><input id="course-name" class="inp" placeholder="Course name, e.g. Google Data Analytics Certificate"><label class="small muted cf-date">Target<input type="date" id="course-target" class="inp"></label><button class="btn sm primary" type="submit">Add course</button></form>
+        <div id="courses" class="g-stack"></div>
+      </div>
+      <div>
+        <div class="sechead"><h2>Habit streaks</h2><span class="meta">From your routine ticks · skipped days don't break a streak</span></div>
+        <div id="habits" class="habits"></div>
+      </div>
+    </div>
+    <div class="g-col">
+      <div>
+        <div class="sechead"><h2>Skills & achievements</h2><span class="meta">Built from completed work tasks</span></div>
+        <div id="skills" class="g-stack"></div>
+      </div>
+      <div>
+        <div class="sechead"><h2>Resume bullet points</h2><button class="btn sm" type="button" id="bullets-copy">Copy</button></div>
+        <pre class="panel bullets" id="bullets"></pre>
+        <p class="small muted" style="margin:6px 0 0">Tip: when you mark a task Done, fill in <b>Result / impact</b>, e.g. "Cut report time from 2 hours to 20 minutes". Those become your strongest bullets.</p>
+      </div>
+    </div>
+  </section>
+
   <section class="view" id="v-reflect" hidden>
     <div class="panel refl">
       <div class="sechead" style="margin:0"><h2>Daily reflection</h2>
@@ -616,23 +779,37 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
       <div class="sechead"><h2>Past reflections</h2></div>
       <div class="panel"><ul class="rows" id="r-history"></ul></div>
     </div>
+    <div class="panel weekly">
+      <div class="wk-head"><div><h2>Weekly report</h2><p class="small muted" style="margin:0">For your supervisor or internship logbook. Built from your tasks, time and reflections.</p></div>
+        <div class="wk-nav"><button class="btn sm" type="button" data-wk="-1" aria-label="Previous week">‹</button><span id="wk-label" class="small"></span><button class="btn sm" type="button" data-wk="1" id="wk-next" aria-label="Next week">›</button></div></div>
+      <div class="wk-actions"><button class="btn sm" type="button" id="wk-copy">Copy text</button><button class="btn sm" type="button" id="wk-word">Download Word</button><button class="btn sm" type="button" id="wk-print">Print / Save PDF</button></div>
+      <article id="wk-doc" class="wk-doc"></article>
+    </div>
   </section>
 
   <section class="view" id="v-routine" hidden>
     <div>
       <div class="sechead"><h2>Daily routine</h2><span class="meta">Changes save automatically</span></div>
       <div class="panel alarmbox">
-        <div class="ab-top">
-          <div class="ab-txt"><h3>Phone alarms</h3><p id="cal-sync-status" class="small muted"></p></div>
-          <div class="ab-btns"><button class="btn sm ghost" type="button" id="cal-help-btn">How it works</button><button class="btn sm primary" type="button" id="cal-sync">Sync to calendar</button></div>
+        <div class="ab-head"><h3>Alarms</h3><p class="small muted">Switch on <b>Alarm</b> for any routine item below, then choose how it reaches you.</p></div>
+        <div class="ab-row">
+          <div class="ab-txt"><b class="small">Push notifications</b><p id="push-status" class="small muted">Checking this device…</p></div>
+          <div class="ab-btns"><button class="btn sm primary" type="button" id="push-on" hidden>Turn on notifications</button><button class="btn sm" type="button" id="push-test" hidden>Send test</button></div>
         </div>
-        <ol id="cal-help" class="small" hidden>
+        <details class="ab-cal">
+          <summary>Calendar alarms instead <span class="muted">(rings through your phone's Calendar app)</span></summary>
+          <div class="ab-row">
+            <div class="ab-txt"><p id="cal-sync-status" class="small muted"></p></div>
+            <div class="ab-btns"><button class="btn sm ghost" type="button" id="cal-help-btn">How it works</button><button class="btn sm" type="button" id="cal-sync">Sync to calendar</button></div>
+          </div>
+          <ol id="cal-help" class="small" hidden>
           <li>Tap <b>Alarm off</b> on any routine item below to switch its alarm on, then choose when to be alerted.</li>
           <li>In your iPhone's Calendar app, create a calendar called <b>Daybook</b> (Calendars → Add Calendar). This keeps your alarms in one place.</li>
           <li>Open Daybook on your iPhone and tap <b>Sync to calendar</b>. Choose <b>Save to Files</b>, open <b>daybook-alarms.ics</b> in Files, tap <b>Add All</b> and pick the <b>Daybook</b> calendar.</li>
           <li>After you change alarms, clear the old ones first so you don't get doubles: Calendar app → Calendars → ⓘ next to Daybook → <b>Delete Calendar</b>. Create it again, then sync.</li>
           <li>Alerts use Calendar's notification sound. Check Settings → Notifications → Calendar if they're silent.</li>
         </ol>
+        </details>
       </div>
       <div class="seg" id="rt-filter" style="margin-bottom:8px"></div>
       <div class="panel" id="rt-edit"></div>
@@ -666,6 +843,7 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
 </main>
 
 <dialog id="dlg"><form class="dlg" id="tf" method="dialog"></form></dialog>
+<dialog id="sdlg" class="sdlg"><div class="s-wrap"><div class="s-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="s-q" type="search" placeholder="Search everything… e.g. VLOOKUP, scrap report" autocomplete="off" aria-label="Search"><button type="button" class="btn sm ghost" id="s-close">Close</button></div><div id="s-res" class="s-res"></div></div></dialog>
 <div class="toast" id="toast" hidden></div>
 
 
@@ -686,6 +864,6 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=8"></script>
+<script type="module" src="app.js?v=10"></script>
 </body>
 </html>
