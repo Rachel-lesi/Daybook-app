@@ -41,7 +41,7 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; cle
 // ---------- data ops (db or in-memory fallback)
 function newId(){ return db ? db.collection("tasks").doc().id : Math.random().toString(36).slice(2,12); }
 function put(coll, id, data){
-  const list = coll==="tasks"?S.tasks:coll==="todos"?S.todos:coll==="routine"?S.routine:coll==="body"?S.body:coll==="conditions"?S.conds:coll==="courses"?S.courses:null;
+  const list = coll==="tasks"?S.tasks:coll==="todos"?S.todos:coll==="routine"?S.routine:coll==="body"?S.body:coll==="conditions"?S.conds:coll==="courses"?S.courses:coll==="shop"?S.shop:coll==="expenses"?S.exp:null;
   if(!db && list){ const i=list.findIndex(x=>x.id===id); const row={...data,id}; i>=0?list.splice(i,1,row):list.push(row); render(); return; }
   if(!db){ render(); return; }
   return write(coll+"/"+id, () => db.doc(coll+"/"+id).set(data));
@@ -55,7 +55,7 @@ const strip = o => { const c={...o}; delete c.id; return c; };
 
 // ---------- categories
 const DEFAULT_CATS = [{name:"SQL / Database",tag:"sql"},{name:"Excel / Reporting",tag:"excel"},{name:"Python / Automation",tag:"python"},{name:"Admin / Documentation",tag:"admin"}];
-function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false})); }
+function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false, cur:S.cur||"RM", budget:S.budget||0, shopHist:S.shopHist||[]})); }
 
 // ---------- look & feel helpers
 const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -222,7 +222,7 @@ $("#quick").addEventListener("submit", e => {
 });
 
 // ---------- routing
-const VIEWS=["today","work","calendar","overview","growth","health","reflect","routine"];
+const VIEWS=["today","work","calendar","overview","growth","health","money","reflect","routine"];
 function route(){ const h=location.hash.slice(1); S.view=VIEWS.includes(h)?h:"today";
   if(S.view==="work") setMode("work"); else if(S.view==="today") setMode("todo");
   render(); }
@@ -240,6 +240,7 @@ function render(){
   if(S.view==="overview") renderOverview();
   if(S.view==="growth") renderGrowth();
   if(S.view==="health") renderHealth();
+  if(S.view==="money") renderMoney();
   if(S.view==="reflect") renderReport();
   if(S.view==="today") renderFocus();
   tickTimer();
@@ -415,7 +416,7 @@ function drawTask(){
     <label class="f">Notes <span class="muted" style="font-weight:400">· SQL queries, file paths, meeting notes</span><textarea id="t-notes" class="mono" placeholder="SELECT batch_id, COUNT(*) FROM production GROUP BY batch_id HAVING COUNT(*) > 1;">${esc(t.notes||"")}</textarea></label>
     <div class="f" style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Links</span>
       ${t.links.length?`<ul class="links">${t.links.map((l,i)=>`<li>${SVG(ICON.link)}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)}</a><button type="button" class="x" data-linkdel="${i}" aria-label="Remove link">✕</button></li>`).join("")}</ul>`:""}
-      <div class="qrow wrap"><input id="t-linkurl" type="url" placeholder="Paste a link (shared drive, sheet, ticket)" class="inp"><input id="t-linklabel" placeholder="Name (optional)" class="inp" style="max-width:180px"><button class="btn sm" type="button" id="t-linkadd">Add link</button></div></div>
+      <div class="qrow rwrap"><input id="t-linkurl" type="url" placeholder="Paste a link (shared drive, sheet, ticket)" class="inp"><input id="t-linklabel" placeholder="Name (optional)" class="inp" style="max-width:180px"><button class="btn sm" type="button" id="t-linkadd">Add link</button></div></div>
     <div style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Progress log</span>
       <div class="qrow"><input id="t-note" placeholder="Add an update, e.g. Finished joining the sales tables" class="inp"><button class="btn sm" type="button" id="t-addnote">Log</button></div>
       <ul class="log">${t.log.slice().reverse().map(l=>`<li><time>${esc(fmtDate(isoDay(l.at)))} ${fmtTime(l.at)}</time><span>${esc(l.note)}</span></li>`).join("")}</ul></div>
@@ -482,7 +483,7 @@ function saveTask(){
 S.ovRange=7;
 function rangeKeys(n){ const out=[]; const d=new Date(); d.setDate(d.getDate()-(n-1)); for(let i=0;i<n;i++){ out.push(dkey(d)); d.setDate(d.getDate()+1); } return out; }
 function startKey(){
-  const c=[...S.tasks.map(t=>isoDay(t.createdAt)), ...S.todos.map(t=>isoDay(t.createdAt)), ...Object.keys(S.refl), ...Object.keys(S.day).filter(k=>k<=todayKey())].filter(Boolean).sort();
+  const c=[...S.tasks.map(t=>isoDay(t.createdAt)), ...S.todos.map(t=>isoDay(t.createdAt)), ...Object.keys(S.refl), ...Object.keys(S.day).filter(k=>k<=todayKey()), ...Object.keys(S.health||{}).filter(k=>k<=todayKey()), ...(S.exp||[]).map(e=>e.date)].filter(Boolean).sort();
   return c[0] || todayKey();
 }
 function barChart(vals, labels, max, fmt, color){
@@ -546,6 +547,37 @@ function renderOverview(){
   $("#ov-attn").innerHTML = att.length ? att.map(t=>`<li data-task="${esc(t.id)}" style="cursor:pointer"><span class="urg ${esc(t.urgency)}">${esc(t.urgency)}</span><span class="grow"><span>${esc(t.title)}</span><div class="sub">${t.status==="blocked"?`<b style="color:var(--crit)">Blocked</b>${t.bottleneck?": "+esc(t.bottleneck):""}`:t.due&&t.due<tk?`<span class="overdue">Overdue since ${esc(fmtDate(t.due))}</span>`:"Critical"}</div></span></li>`).join("")
     : `<li class="empty">Nothing blocked, overdue or critical.</li>`;
   const ln=Object.values(S.refl).filter(r=>(r.learned||"").trim()).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
+  // wellbeing
+  const inR2 = k => k >= keys[0] && k <= tk;
+  const moodVals = keys.map(k => k < st ? null : dayMood(k)), mv = moodVals.filter(v => v !== null);
+  const waterVals = keys.map(k => k < st || k > tk ? null : (hDoc(k).water || 0)), wv = waterVals.filter(v => v !== null);
+  const goalDays = wv.filter(v => v >= (S.waterGoal || 8)).length;
+  const bowelN = keys.reduce((a, k) => a + (hDoc(k).bowel || []).length, 0);
+  const wrec = S.body.filter(r => r.weight).sort((a, b) => a.date.localeCompare(b.date)), wIn = wrec.filter(r => inR2(r.date)), wBefore = wrec.filter(r => r.date < keys[0]).pop();
+  const wNow = wrec[wrec.length - 1], wStart = wBefore || wIn[0];
+  const ongoing = S.conds.filter(c => c.status !== "resolved").length;
+  const stressV = keys.flatMap(k => (hDoc(k).moods || []).map(m => m.stress).filter(Boolean));
+  const mini = (v, l, s) => `<div class="mini"><span>${l}</span><b>${v}</b>${s ? `<small>${s}</small>` : ""}</div>`;
+  $("#ov-well").innerHTML = `<div class="minis">
+      ${mini(mv.length ? MOODS[Math.round(mv.reduce((a, b) => a + b, 0) / mv.length) - 1][1] : "–", "Average mood", mv.length ? `${mv.length} day${mv.length > 1 ? "s" : ""} checked in` : "check in on the Health tab")}
+      ${mini(stressV.length ? (stressV.reduce((a, b) => a + b, 0) / stressV.length).toFixed(1) + "/5" : "–", "Average stress", "")}
+      ${mini(wv.length ? (wv.reduce((a, b) => a + b, 0) / wv.length).toFixed(1) : "–", "Cups of water/day", wv.length ? `goal met ${goalDays}/${wv.length} days` : "")}
+      ${mini(bowelN, "Bowel movements", `${(bowelN / Math.max(1, keys.filter(k => k >= st && k <= tk).length)).toFixed(1)}/day`)}
+      ${mini(wNow ? wNow.weight + " kg" : "–", "Weight", wNow && wStart && wStart !== wNow ? `${+wNow.weight >= +wStart.weight ? "+" : ""}${(wNow.weight - wStart.weight).toFixed(1)} kg in this period` : "")}
+      ${mini(ongoing, "Ongoing health issues", ongoing ? "see Health log" : "none")}</div>
+    ${mv.length ? `<div class="sechead" style="margin:6px 0 0"><h3 class="small">Mood by day</h3><span class="meta">1 awful · 5 great</span></div>${barChart(moodVals, labels, 5, v => Math.round(v), "var(--c1)")}` : ""}`;
+  // spending
+  const exR = S.exp.filter(e => inR2(e.date)), exTot = exR.reduce((a, e) => a + (+e.amount || 0), 0);
+  const exDaily = keys.map(k => k < st || k > tk ? null : S.exp.filter(e => e.date === k).reduce((a, e) => a + (+e.amount || 0), 0));
+  const exCat = {}; exR.forEach(e => exCat[e.cat] = (exCat[e.cat] || 0) + (+e.amount || 0));
+  const topC = Object.entries(exCat).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const exMax = Math.max(10, ...exDaily.map(v => v || 0));
+  $("#ov-spend").innerHTML = `<div class="minis">
+      ${mini(money(exTot), "Spent", `${exR.length} entr${exR.length === 1 ? "y" : "ies"}`)}
+      ${mini(money(exTot / Math.max(1, keys.filter(k => k >= st && k <= tk).length)), "Average per day", "")}
+      ${mini(S.shop.filter(i => !i.done).length, "On shopping list", "items to buy")}</div>
+    ${exTot ? `${barChart(exDaily, labels, Math.ceil(exMax / 10) * 10, v => v >= 1000 ? (v / 1000).toFixed(1) + "k" : Math.round(v), "var(--accent)")}
+      <div class="m-cats">${topC.map(([c, v]) => { const C = expCat(c); return `<div class="m-cat"><span class="hl-tag cat-${C[2]}">${esc(C[1])}</span><span class="bar"><i style="width:${(v / topC[0][1] * 100).toFixed(1)}%;background:var(--c${C[2]})"></i></span><b>${money(v)}</b><span class="small muted">${Math.round(v / exTot * 100)}%</span></div>`; }).join("")}</div>` : `<p class="small muted" style="margin:0">No spending logged in this period. Add expenses on the Money tab.</p>`}`;
   $("#ov-learn").innerHTML = ln.length ? ln.map(r=>`<li><span class="grow"><span>${esc(r.learned.slice(0,160))}</span><div class="sub">${esc(fmtDate(r.date))}</div></span></li>`).join("")
     : `<li class="empty">What you write under "What I learned" collects here.</li>`;
 }
@@ -841,7 +873,10 @@ function runSearch(){
   for (const t of S.todos) if (match(t.title)) R.push({ g: "To-dos", title: t.title, sub: (t.done ? "Done · " : "") + (t.date ? fmtDate(t.date) : ""), act: `data-sr-date="${esc(t.date || todayKey())}"` });
   for (const r of Object.values(S.refl)) { const hay = [r.did, r.learned, r.mistakes, r.improve].join(" \n "); if (match(hay)) R.push({ g: "Reflections", title: fmtDate(r.date) + " " + r.date.slice(0, 4), sub: "", snip: snippet(hay, q), act: `data-sr-refl="${esc(r.date)}"` }); }
   for (const c of S.courses) { const hay = [c.name, ...(c.modules || []).map(m => m.title)].join(" \n "); if (match(hay)) R.push({ g: "Courses", title: c.name, sub: `${(c.modules || []).filter(m => m.done).length}/${(c.modules || []).length} modules`, snip: match(c.name) ? "" : snippet(hay, q), act: `data-sr-view="growth"` }); }
+  for (const hd of Object.values(S.health)) (hd.moods || []).forEach(m => { const hay = [m.note, ...(m.feel || []), ...(m.why || [])].join(" "); if (m.note && match(hay)) R.push({ g: "Mood notes", title: fmtDate(hd.date) + " · " + MOODS[m.m - 1][1], sub: (m.feel || []).join(", "), snip: snippet(m.note, q), act: `data-sr-view="health"` }); });
   for (const c of S.conds) { const hay = [c.title, c.notes].join(" \n "); if (match(hay)) R.push({ g: "Health", title: c.title, sub: `${fmtDate(c.start)} · ${c.status === "resolved" ? "recovered" : "ongoing"}`, snip: match(c.title) ? "" : snippet(hay, q), act: `data-sr-view="health"` }); }
+  for (const x of S.exp) { const hay = [x.note, expCat(x.cat)[1]].join(" "); if (match(hay)) R.push({ g: "Expenses", title: (x.note || expCat(x.cat)[1]) + " · " + money(x.amount), sub: fmtDate(x.date) + " · " + expCat(x.cat)[1], act: `data-sr-view="money"` }); }
+  for (const i of S.shop) if (match(i.name)) R.push({ g: "Shopping list", title: i.name + (i.qty ? " × " + i.qty : ""), sub: i.done ? "In the basket" : "To buy", act: `data-sr-view="money"` });
   for (const r of S.routine) if (match(r.label)) R.push({ g: "Routine", title: r.label, sub: r.time + " · " + (daysLabel(r.days) || "Custom days"), act: `data-sr-view="routine"` });
   if (!R.length) { out.innerHTML = `<p class="small muted" style="padding:8px 4px;margin:0">Nothing found for “${esc(q)}”.</p>`; return; }
   const groups = [...new Set(R.map(r => r.g))];
@@ -1060,7 +1095,7 @@ document.addEventListener("click", e => { const x = e.target.closest("[data-xope
 // ---------- Health: water, meals, bowel, body, conditions, cycle
 S.health = {}; S.body = []; S.conds = []; S.hDay = null; S.waterGoal = 8; S.showCycle = true; S.condForm = false; S.condDel = null;
 const hk = () => S.hDay || todayKey();
-const hDoc = k => ({ date: k, water: 0, meals: [], bowel: [], flow: "", sym: [], ...(S.health[k] || {}) });
+const hDoc = k => ({ date: k, water: 0, meals: [], bowel: [], flow: "", sym: [], moods: [], ...(S.health[k] || {}) });
 function saveHealth(k, d){ S.health[k] = d; if (db) write("health/" + k, () => db.doc("health/" + k).set(d)); renderHealth(); }
 const hid = () => "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const nowHMs = () => pad(new Date().getHours()) + ":" + pad(new Date().getMinutes());
@@ -1099,6 +1134,7 @@ function renderHealth(){
   const k = hk(), tk = todayKey(), d = hDoc(k), isT = k === tk;
   // day pager
   $("#h-day").innerHTML = `<button class="btn sm" type="button" data-hday="-1" aria-label="Previous day">‹</button><span class="mid">${isT ? "Today" : esc(DAYS[keyDow(k)])}<small>${esc(fmtDate(k))}</small></span><button class="btn sm" type="button" data-hday="1" ${isT ? "disabled" : ""} aria-label="Next day">›</button>`;
+  renderMood();
   // water
   const goal = S.waterGoal || 8, cups = d.water || 0;
   const wk = rangeKeys(7).map(x => hDoc(x).water || 0), avgW = (wk.reduce((a, b) => a + b, 0) / 7).toFixed(1);
@@ -1109,13 +1145,13 @@ function renderHealth(){
   // meals
   const meals = (d.meals || []).slice().sort((a, b) => a.time.localeCompare(b.time));
   $("#h-meals").innerHTML = `${meals.length ? `<ul class="hlist">${meals.map(m => `<li><span class="hl-t">${esc(m.time)}</span><span class="hl-tag m-${esc(m.type)}">${esc((MEALS.find(x => x[0] === m.type) || ["", m.type])[1])}</span><span class="hl-b">${esc(m.text)}</span><button type="button" class="x" data-hdel="meals:${esc(m.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Nothing logged${isT ? " yet today" : ""}.</p>`}
-    <div class="qa-chips wrap">${MEALS.map(([v, l]) => `<button type="button" class="qc" data-meal="${v}" aria-pressed="${S.mealType === v}">${l}</button>`).join("")}</div>
+    <div class="qa-chips cwrap">${MEALS.map(([v, l]) => `<button type="button" class="qc" data-meal="${v}" aria-pressed="${S.mealType === v}">${l}</button>`).join("")}</div>
     <form class="qrow" id="h-meal-form" autocomplete="off"><input id="h-meal" class="inp" placeholder="What did you eat? e.g. Nasi lemak, teh o"><input type="time" id="h-meal-t" class="inp" value="${isT ? nowHMs() : "12:00"}" style="max-width:110px"><button class="btn sm" type="submit">Add</button></form>`;
   // bowel
   const bw = (d.bowel || []).slice().sort((a, b) => a.time.localeCompare(b.time));
   const wkB = rangeKeys(7).reduce((a, x) => a + (hDoc(x).bowel || []).length, 0);
   $("#h-bowel").innerHTML = `${bw.length ? `<ul class="hlist">${bw.map(b => `<li><span class="hl-t">${esc(b.time)}</span><span class="hl-tag b-${esc(b.type)}">${esc((BOWEL.find(x => x[0] === b.type) || ["", b.type])[1])}</span><span class="hl-b">${esc(b.note || "")}</span><button type="button" class="x" data-hdel="bowel:${esc(b.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">No entries${isT ? " today" : ""}.</p>`}
-    <div class="qa-chips wrap">${BOWEL.map(([v, l]) => `<button type="button" class="qc" data-bowel="${v}" aria-pressed="${S.bowelType === v}">${l}</button>`).join("")}</div>
+    <div class="qa-chips cwrap">${BOWEL.map(([v, l]) => `<button type="button" class="qc" data-bowel="${v}" aria-pressed="${S.bowelType === v}">${l}</button>`).join("")}</div>
     <form class="qrow" id="h-bowel-form" autocomplete="off"><input id="h-bowel-note" class="inp" placeholder="Note (optional), e.g. stomach ache, after spicy food"><button class="btn sm primary" type="submit">Log</button></form>
     <p class="small muted" style="margin:0">Last 7 days: <b>${wkB}</b> time${wkB === 1 ? "" : "s"}</p>`;
   // body
@@ -1137,8 +1173,8 @@ function renderHealth(){
       <div class="cd-act">${c.status !== "resolved" ? `<button type="button" class="btn sm" data-cres="${esc(c.id)}">Mark recovered</button>` : ""}<button type="button" class="btn sm ghost danger" data-cdelx="${esc(c.id)}">${S.condDel === c.id ? "Tap again to delete" : "Delete"}</button></div></li>`;
   $("#h-cond").innerHTML = `${S.condForm ? `<form class="cond-form" id="h-cond-form" autocomplete="off">
       <label class="f">What's wrong?<input id="hc-title" class="inp" placeholder="e.g. Sore throat, fever, gastric, took panadol" required></label>
-      <div class="qa-chips wrap">${COND_KIND.map(([v, l]) => `<button type="button" class="qc" data-ckind="${v}" aria-pressed="${S.condKind === v}">${l}</button>`).join("")}</div>
-      <div class="qa-chips wrap">${SEV.map(([v, l]) => `<button type="button" class="qc sv-${v}" data-csev="${v}" aria-pressed="${S.condSev === v}">${l}</button>`).join("")}</div>
+      <div class="qa-chips cwrap">${COND_KIND.map(([v, l]) => `<button type="button" class="qc" data-ckind="${v}" aria-pressed="${S.condKind === v}">${l}</button>`).join("")}</div>
+      <div class="qa-chips cwrap">${SEV.map(([v, l]) => `<button type="button" class="qc sv-${v}" data-csev="${v}" aria-pressed="${S.condSev === v}">${l}</button>`).join("")}</div>
       <div class="grid2"><label class="f">Started<input type="date" id="hc-start" value="${tk}"></label><label class="f">Notes<input id="hc-notes" class="inp" placeholder="Symptoms, medicine, clinic…"></label></div>
       <div class="row"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" data-cform="0">Cancel</button></div></form>`
       : `<button class="btn sm primary" type="button" data-cform="1">+ Log how you're feeling</button>`}
@@ -1157,9 +1193,9 @@ function renderHealth(){
       <div class="cy-strip" id="cy-strip">${strip.join("")}</div>
       <div class="tl-legend"><span><i class="lgc per"></i>Period</span><span><i class="lgc pred"></i>Predicted</span><span><i class="lgc fert"></i>Fertile window (estimate)</span><span><i class="lgc spot"></i>Spotting</span></div>
       <div class="cy-log"><div class="small"><b>${isT ? "Today" : esc(fmtDate(k))}</b> · flow</div>
-        <div class="qa-chips wrap">${FLOW.map(([v, l]) => `<button type="button" class="qc fl-${v || "none"}" data-flow="${v}" aria-pressed="${(d.flow || "") === v}">${l}</button>`).join("")}</div>
+        <div class="qa-chips cwrap">${FLOW.map(([v, l]) => `<button type="button" class="qc fl-${v || "none"}" data-flow="${v}" aria-pressed="${(d.flow || "") === v}">${l}</button>`).join("")}</div>
         <div class="small" style="margin-top:4px"><b>Symptoms</b></div>
-        <div class="qa-chips wrap">${SYMS.map(s => `<button type="button" class="qc" data-sym="${esc(s)}" aria-pressed="${(d.sym || []).includes(s)}">${esc(s)}</button>`).join("")}</div></div>
+        <div class="qa-chips cwrap">${SYMS.map(s => `<button type="button" class="qc" data-sym="${esc(s)}" aria-pressed="${(d.sym || []).includes(s)}">${esc(s)}</button>`).join("")}</div></div>
       <p class="small muted" style="margin:0">Predictions are estimates from your own history. Don't rely on them for contraception.</p>`;
     const st = $("#cy-strip");
     if (st && renderHealth._scrolled && prevScroll !== null) st.scrollLeft = prevScroll;
@@ -1205,6 +1241,182 @@ document.addEventListener("change", e => {
   if (e.target.id === "h-goal") { S.waterGoal = +e.target.value; saveCats(); renderHealth(); }
   if (e.target.id === "h-cyc-toggle") { S.showCycle = e.target.checked; saveCats(); renderHealth(); }
 });
+
+// ---------- Mind & mood check-ins (stored in the day's health record)
+const MOODS = [[1,"Awful"],[2,"Low"],[3,"Okay"],[4,"Good"],[5,"Great"]];
+const FEELS = ["Happy","Calm","Grateful","Proud","Motivated","Excited","Tired","Stressed","Anxious","Overwhelmed","Sad","Lonely","Frustrated","Angry","Bored","Unmotivated"];
+const WHYS = ["Work","Study","Family","Friends","Relationship","Health","Sleep","Money","Food","Exercise","Weather","Social media","Me-time"];
+S.moodDraft = { m: 0, feel: [], why: [], stress: 0 };
+const moodColor = m => ["", "var(--crit)", "#e0857b", "var(--med)", "var(--c1)", "var(--ok)"][Math.round(m)] || "var(--line)";
+function moodFace(m){ // simple drawn faces, no emoji
+  const mouth = { 1: "M8 16.5c2.2-2.4 5.8-2.4 8 0", 2: "M8.5 16c2-1.3 5-1.3 7 0", 3: "M8.5 15.5h7", 4: "M8.5 14.5c2 1.6 5 1.6 7 0", 5: "M8 14c2.2 2.8 5.8 2.8 8 0" }[m];
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/><path d="${mouth}"/></svg>`;
+}
+function dayMood(k){ const ms = (hDoc(k).moods || []); return ms.length ? ms.reduce((a, x) => a + x.m, 0) / ms.length : null; }
+function needsSupport(){
+  const tk = todayKey(); let low = 0;
+  for (let i = 0; i < 7; i++) { const v = dayMood(addDays(tk, -i)); if (v !== null && v <= 2) low++; }
+  const today = hDoc(tk).moods || [], last = today[today.length - 1];
+  let hidden = false; try { hidden = (localStorage.getItem("daybook-support-hide") || "") >= tk; } catch {}
+  return !hidden && (low >= 3 || (last && last.m === 1));
+}
+function renderMood(){
+  const box = $("#h-mood"); if (!box) return;
+  const k = hk(), d = hDoc(k), isT = k === todayKey(), D = S.moodDraft;
+  const entries = (d.moods || []).slice().sort((a, b) => a.time.localeCompare(b.time));
+  const days = rangeKeys(14), vals = days.map(dayMood);
+  const feelCount = {}; rangeKeys(30).forEach(x => (hDoc(x).moods || []).forEach(e => (e.feel || []).forEach(f => feelCount[f] = (feelCount[f] || 0) + 1)));
+  const topFeel = Object.entries(feelCount).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const avg14 = vals.filter(v => v !== null); const a14 = avg14.length ? avg14.reduce((a, b) => a + b, 0) / avg14.length : null;
+  box.innerHTML = `
+    ${needsSupport() ? `<div class="support"><b>Things seem heavy lately.</b> You don't have to carry it alone. Talking to someone you trust, or a trained listener, can really help.
+      <div class="sup-lines"><span><b>Befrienders KL</b> 03-7627 2929 · 24 hours</span><span><b>Talian HEAL</b> 15555 · 8am to midnight</span><span>In an emergency, call <b>999</b></span></div>
+      <button type="button" class="btn sm ghost" data-suphide>Hide for 3 days</button></div>` : ""}
+    <div class="small"><b>How are you feeling${isT ? " right now" : ""}?</b></div>
+    <div class="moods">${MOODS.map(([v, l]) => `<button type="button" class="mood-b ${D.m === v ? "on" : ""}" data-mood-m="${v}" style="--mc:${moodColor(v)}" aria-pressed="${D.m === v}">${moodFace(v)}<span>${l}</span></button>`).join("")}</div>
+    ${D.m ? `<div class="small muted">Feelings <span>(pick any)</span></div>
+      <div class="qa-chips cwrap">${FEELS.map(f => `<button type="button" class="qc" data-mood-f="${esc(f)}" aria-pressed="${D.feel.includes(f)}">${esc(f)}</button>`).join("")}</div>
+      <div class="small muted">What's affecting you?</div>
+      <div class="qa-chips cwrap">${WHYS.map(f => `<button type="button" class="qc ghost" data-mood-w="${esc(f)}" aria-pressed="${D.why.includes(f)}">${esc(f)}</button>`).join("")}</div>
+      <div class="small muted">Stress level</div>
+      <div class="seg stress">${[1,2,3,4,5].map(n => `<button type="button" data-mood-s="${n}" aria-pressed="${D.stress === n}">${n}</button>`).join("")}<span class="small muted">1 relaxed · 5 very stressed</span></div>
+      <textarea id="mood-note" class="inp" rows="2" placeholder="What's on your mind? (optional, only you can see this in the app)">${esc(D.note || "")}</textarea>
+      <div class="row"><button class="btn sm primary" type="button" data-mood-save>Save check-in</button><button class="btn sm" type="button" data-mood-cancel>Cancel</button></div>` : ""}
+    ${entries.length ? `<ul class="mood-list">${entries.map(e => `<li><span class="mood-dot" style="--mc:${moodColor(e.m)}">${moodFace(e.m)}</span><div><div><b>${esc(MOODS[e.m - 1][1])}</b> <span class="small muted">${esc(e.time)}${e.stress ? ` · stress ${e.stress}/5` : ""}</span></div>
+        ${(e.feel || []).length ? `<div class="small">${e.feel.map(esc).join(", ")}</div>` : ""}${(e.why || []).length ? `<div class="small muted">Because of: ${e.why.map(esc).join(", ")}</div>` : ""}${e.note ? `<div class="small mood-note">${esc(e.note)}</div>` : ""}</div>
+        <button type="button" class="x" data-mood-del="${esc(e.id)}" aria-label="Delete check-in">✕</button></li>`).join("")}</ul>` : ""}
+    <div class="mood-trend"><div class="small muted">Last 14 days${a14 !== null ? ` · average <b style="color:${moodColor(a14)}">${MOODS[Math.round(a14) - 1][1].toLowerCase()}</b>` : ""}</div>
+      <div class="mt-row">${days.map((x, i) => { const v = vals[i]; return `<span class="mt-d ${x === k ? "sel" : ""}" title="${esc(fmtDate(x))}${v !== null ? " · " + MOODS[Math.round(v) - 1][1] : " · no check-in"}"><i style="height:${v === null ? 4 : 8 + v * 8}px;background:${v === null ? "var(--line)" : moodColor(v)}"></i><em>${esc(DAYS[keyDow(x)].slice(0, 1))}</em></span>`; }).join("")}</div></div>
+    ${topFeel.length ? `<div class="small muted">Most felt this month: ${topFeel.map(([f, n]) => `<span class="feel-pill">${esc(f)} <b>${n}</b></span>`).join(" ")}</div>` : ""}`;
+}
+document.addEventListener("click", e => {
+  if (S.view !== "health") return;
+  const t = e.target.closest("button"); if (!t || !t.closest("#h-mood")) return;
+  const D = S.moodDraft; if ($("#mood-note")) D.note = $("#mood-note").value;
+  if (t.dataset.moodM) { D.m = +t.dataset.moodM; renderMood(); }
+  else if (t.dataset.moodF) { const f = t.dataset.moodF; D.feel = D.feel.includes(f) ? D.feel.filter(x => x !== f) : [...D.feel, f]; renderMood(); }
+  else if (t.dataset.moodW) { const f = t.dataset.moodW; D.why = D.why.includes(f) ? D.why.filter(x => x !== f) : [...D.why, f]; renderMood(); }
+  else if (t.dataset.moodS) { D.stress = D.stress === +t.dataset.moodS ? 0 : +t.dataset.moodS; renderMood(); }
+  else if (t.dataset.moodCancel !== undefined) { S.moodDraft = { m: 0, feel: [], why: [], stress: 0 }; renderMood(); }
+  else if (t.dataset.moodSave !== undefined) {
+    const k = hk(), d = hDoc(k);
+    d.moods = [...(d.moods || []), { id: hid(), time: k === todayKey() ? nowHMs() : "20:00", m: D.m, feel: D.feel, why: D.why, stress: D.stress, note: (D.note || "").trim() }];
+    S.moodDraft = { m: 0, feel: [], why: [], stress: 0 }; saveHealth(k, d);
+    toast(D.m >= 4 ? "Check-in saved. Glad you're doing well." : D.m === 3 ? "Check-in saved." : "Check-in saved. Be gentle with yourself today.");
+  }
+  else if (t.dataset.moodDel) { const k = hk(), d = hDoc(k); d.moods = (d.moods || []).filter(x => x.id !== t.dataset.moodDel); saveHealth(k, d); }
+  else if (t.dataset.suphide !== undefined) { try { localStorage.setItem("daybook-support-hide", addDays(todayKey(), 2)); } catch {} renderMood(); }
+});
+
+// ---------- Money: shopping list + expenses
+S.shop = []; S.exp = []; S.cur = "RM"; S.budget = 0; S.shopHist = []; S.eDay = null; S.eMonth = null;
+S.shopCat = "other"; S.shopPicked = false; S.expCat = "food"; S.expPay = "cash"; S.groceryLog = false;
+const SHOP_CATS = [["produce","Fruit & veg"],["meat","Meat & fish"],["dairy","Dairy & eggs"],["bakery","Bread"],["pantry","Pantry"],["frozen","Frozen"],["snacks","Snacks & drinks"],["household","Household"],["personal","Toiletries"],["other","Other"]];
+const EXP_CATS = [["food","Food & drinks",0],["groceries","Groceries",1],["transport","Transport",5],["shopping","Shopping",2],["bills","Bills",3],["health","Health",4],["fun","Entertainment",2],["education","Education",0],["other","Other",5]];
+const PAY = [["cash","Cash"],["card","Card"],["ewallet","E-wallet"],["transfer","Transfer"]];
+const money = n => S.cur + " " + (+n || 0).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const expCat = c => EXP_CATS.find(x => x[0] === c) || ["other", "Other", 5];
+const ek = () => S.eDay || todayKey(), em = () => S.eMonth || todayKey().slice(0, 7);
+function renderMoney(){
+  if (S.view !== "money") return;
+  const k = ek(), tk = todayKey(), isT = k === tk;
+  // ---- expenses for the day
+  const dayExp = S.exp.filter(e => e.date === k).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  const dayTot = dayExp.reduce((s, e) => s + (+e.amount || 0), 0);
+  $("#m-day").innerHTML = `<div class="pager" style="margin:0"><button class="btn sm" type="button" data-eday="-1" aria-label="Previous day">‹</button><span class="mid">${isT ? "Today" : esc(DAYS[keyDow(k)])}<small>${esc(fmtDate(k))}</small></span><button class="btn sm" type="button" data-eday="1" ${isT ? "disabled" : ""} aria-label="Next day">›</button></div>
+    <div class="m-total"><span class="small muted">Spent ${isT ? "today" : "this day"}</span><b>${money(dayTot)}</b></div>
+    <form id="m-exp-form" class="m-form" autocomplete="off">
+      <div class="m-amt"><span>${esc(S.cur)}</span><input id="m-amt" inputmode="decimal" placeholder="0.00" aria-label="Amount"></div>
+      <input id="m-note" class="inp" placeholder="What was it? e.g. Lunch at mamak, Grab to office" aria-label="What was it">
+      <button class="btn primary" type="submit">Add</button>
+    </form>
+    <div class="qa-chips cwrap">${EXP_CATS.map(([v, l, ci]) => `<button type="button" class="qc ci-${ci}" data-ecat="${v}" aria-pressed="${S.expCat === v}">${l}</button>`).join("")}</div>
+    <div class="qa-chips cwrap">${PAY.map(([v, l]) => `<button type="button" class="qc" data-epay="${v}" aria-pressed="${S.expPay === v}">${l}</button>`).join("")}</div>
+    ${dayExp.length ? `<ul class="hlist m-list">${dayExp.map(e => { const c = expCat(e.cat); return `<li><span class="hl-tag cat-${c[2]}">${esc(c[1])}</span><span class="hl-b">${esc(e.note || c[1])}<span class="small muted"> · ${esc((PAY.find(p => p[0] === e.pay) || ["", ""])[1])}</span></span><b class="m-amtv">${money(e.amount)}</b><button type="button" class="x" data-edel="${esc(e.id)}" aria-label="Delete">✕</button></li>`; }).join("")}</ul>` : `<p class="small muted" style="margin:0">No spending logged${isT ? " today" : ""}.</p>`}`;
+  // ---- month summary
+  const mk = em(), [y, m] = mk.split("-").map(Number), nDays = new Date(y, m, 0).getDate();
+  const mExp = S.exp.filter(e => (e.date || "").startsWith(mk)), mTot = mExp.reduce((s, e) => s + (+e.amount || 0), 0);
+  const prevMk = dkey(new Date(y, m - 2, 1)).slice(0, 7), prevTot = S.exp.filter(e => (e.date || "").startsWith(prevMk)).reduce((s, e) => s + (+e.amount || 0), 0);
+  const byCat = {}; mExp.forEach(e => byCat[e.cat] = (byCat[e.cat] || 0) + (+e.amount || 0));
+  const cats = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
+  const daily = Array.from({ length: nDays }, (_, i) => { const d = mk + "-" + pad(i + 1); return d > tk ? null : mExp.filter(e => e.date === d).reduce((s, e) => s + (+e.amount || 0), 0); });
+  const isCur = mk === tk.slice(0, 7), daysLeft = isCur ? nDays - (+tk.slice(8)) + 1 : 0, left = S.budget ? S.budget - mTot : 0;
+  const maxD = Math.max(10, ...daily.map(v => v || 0)), niceMax = Math.ceil(maxD / 10) * 10;
+  const labels = daily.map((_, i) => ({ full: fmtDate(mk + "-" + pad(i + 1)), short: String(i + 1), show: i === 0 || i === nDays - 1 || ((i + 1) % 5 === 0 && i + 1 <= nDays - 3) }));
+  $("#m-month").innerHTML = `<div class="pager" style="margin:0"><button class="btn sm" type="button" data-emon="-1" aria-label="Previous month">‹</button><span class="mid">${MONTHS[m - 1]} ${y}</span><button class="btn sm" type="button" data-emon="1" ${isCur ? "disabled" : ""} aria-label="Next month">›</button></div>
+    <div class="m-sum"><div><span class="small muted">Spent this month</span><b>${money(mTot)}</b>${prevTot ? `<span class="small ${mTot > prevTot ? "up" : "down"}">${mTot > prevTot ? "▲" : "▼"} ${money(Math.abs(mTot - prevTot))} vs ${MONTHS[(m + 10) % 12].slice(0, 3)}</span>` : ""}</div>
+      <div><span class="small muted">Daily average</span><b>${money(mTot / (isCur ? +tk.slice(8) : nDays))}</b><span class="small muted">${mExp.length} entr${mExp.length === 1 ? "y" : "ies"}</span></div></div>
+    ${S.budget ? `<div class="m-budget"><div class="m-bud-top"><span class="small"><b>Budget ${money(S.budget)}</b></span><span class="small ${left < 0 ? "over" : "muted"}">${left >= 0 ? `${money(left)} left${isCur && daysLeft ? ` · about ${money(left / daysLeft)}/day for ${daysLeft} day${daysLeft === 1 ? "" : "s"}` : ""}` : `${money(-left)} over budget`}</span></div>
+      <span class="bar m-bar"><i style="width:${Math.min(100, mTot / S.budget * 100)}%;background:${mTot / S.budget > 1 ? "var(--crit)" : mTot / S.budget > .85 ? "var(--high)" : "var(--accent)"}"></i></span></div>` : ""}
+    <label class="small muted m-setbud">Monthly budget <span class="m-amt sm"><span>${esc(S.cur)}</span><input id="m-budget" inputmode="decimal" value="${S.budget || ""}" placeholder="None"></span></label>
+    ${mTot ? `<div class="chartbox m-chart">${barChart(daily, labels, niceMax, v => (v >= 1000 ? (v / 1000).toFixed(1) + "k" : Math.round(v)), "var(--accent)")}</div>` : ""}
+    ${cats.length ? `<div class="m-cats">${cats.map(([c, v]) => { const C = expCat(c); return `<div class="m-cat"><span class="hl-tag cat-${C[2]}">${esc(C[1])}</span><span class="bar"><i style="width:${(v / cats[0][1] * 100).toFixed(1)}%;background:var(--c${C[2]})"></i></span><b>${money(v)}</b><span class="small muted">${Math.round(v / mTot * 100)}%</span></div>`; }).join("")}</div>` : `<p class="small muted" style="margin:0">No spending this month yet.</p>`}
+    ${mExp.length ? `<details><summary class="small">Biggest spends</summary><ul class="hlist m-list">${mExp.slice().sort((a, b) => b.amount - a.amount).slice(0, 5).map(e => `<li><span class="hl-t">${esc(fmtDate(e.date).split(", ")[1])}</span><span class="hl-b">${esc(e.note || expCat(e.cat)[1])}</span><b class="m-amtv">${money(e.amount)}</b></li>`).join("")}</ul></details>` : ""}
+    <label class="small muted m-setbud">Currency <select id="m-cur">${["RM","S$","$","¥","£","€","₱","Rp","฿"].map(c => `<option ${c === S.cur ? "selected" : ""}>${c}</option>`).join("")}</select></label>`;
+  // ---- shopping list
+  const open = S.shop.filter(i => !i.done), got = S.shop.filter(i => i.done);
+  const groups = SHOP_CATS.map(([v, l]) => [v, l, open.filter(i => (i.cat || "other") === v)]).filter(g => g[2].length);
+  const onList = new Set(open.map(i => i.name.toLowerCase()));
+  const sugg = S.shopHist.filter(n => !onList.has(n.toLowerCase())).slice(0, 12);
+  $("#m-shop").innerHTML = `<form id="m-shop-form" class="m-form" autocomplete="off"><input id="m-item" class="inp" placeholder="Add item, e.g. Eggs" aria-label="Item"><input id="m-qty" class="inp" placeholder="Qty" aria-label="Quantity" style="max-width:80px"><button class="btn primary" type="submit">Add</button></form>
+    <div class="qa-chips cwrap">${SHOP_CATS.map(([v, l]) => `<button type="button" class="qc" data-scat="${v}" aria-pressed="${S.shopCat === v}">${l}</button>`).join("")}</div>
+    ${sugg.length ? `<div class="m-sugg"><span class="small muted">Buy again:</span>${sugg.map(n => `<button type="button" class="qc ghost" data-sagain="${esc(n)}">+ ${esc(n)}</button>`).join("")}</div>` : ""}
+    ${groups.length ? groups.map(([v, l, items]) => `<div class="m-grp"><div class="m-grp-h">${esc(l)} <span class="muted">${items.length}</span></div><ul class="m-items">${items.map(i => `<li><input type="checkbox" data-sdone="${esc(i.id)}" aria-label="Bought ${esc(i.name)}"><span class="m-iname">${esc(i.name)}</span>${i.qty ? `<span class="m-qty">${esc(i.qty)}</span>` : ""}<button type="button" class="x" data-sdel="${esc(i.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul></div>`).join("") : `<p class="small muted" style="margin:0">Your list is empty. Add what you need above.</p>`}
+    ${got.length ? `<div class="m-grp got"><div class="m-grp-h">In the basket <span class="muted">${got.length}</span><button type="button" class="btn sm ghost" data-sclear>Clear bought</button></div><ul class="m-items">${got.map(i => `<li class="done"><input type="checkbox" checked data-sdone="${esc(i.id)}" aria-label="Not bought ${esc(i.name)}"><span class="m-iname">${esc(i.name)}</span>${i.qty ? `<span class="m-qty">${esc(i.qty)}</span>` : ""}</li>`).join("")}</ul>
+      ${S.groceryLog ? `<form id="m-groc-form" class="m-form" autocomplete="off"><div class="m-amt"><span>${esc(S.cur)}</span><input id="m-groc" inputmode="decimal" placeholder="Total paid"></div><button class="btn sm primary" type="submit">Save expense</button><button class="btn sm" type="button" data-sgroc="0">Cancel</button></form>`
+        : `<button type="button" class="btn sm" data-sgroc="1">Log grocery bill as an expense</button>`}</div>` : ""}`;
+}
+async function batchColl(coll, ops){
+  if (!db || !FS) { ops.forEach(([op, id, d]) => op === "delete" ? del(coll, id) : put(coll, id, d)); return; }
+  for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(FS); ops.slice(i, i + 400).forEach(([op, id, d]) => { const r = doc(FS, `users/${UID}/${coll}/${id}`); op === "delete" ? b.delete(r) : b.set(r, d); }); await b.commit(); }
+}
+function rememberItem(name){ const n = name.trim(); if (!n) return; S.shopHist = [n, ...S.shopHist.filter(x => x.toLowerCase() !== n.toLowerCase())].slice(0, 40); saveCats(); }
+function guessShopCat(name){ const n = name.toLowerCase();
+  const R = [["produce",/\b(apple|banana|orange|veg|sayur|tomato|onion|garlic|potato|carrot|lettuce|cabbage|fruit|lemon|lime|chili|cili|ginger|spinach|kangkung|cucumber|grape|mango|papaya)/],["meat",/\b(chicken|ayam|beef|pork|fish|ikan|prawn|udang|meat|sausage|ham|bacon|squid)/],["dairy",/\b(milk|susu|egg|telur|cheese|yogurt|yoghurt|butter|cream)/],["bakery",/\b(bread|roti|bun|cake|croissant)/],["pantry",/\b(rice|beras|flour|sugar|salt|oil|minyak|sauce|kicap|pasta|noodle|mee|bihun|cereal|oat|spice|coffee|tea|kopi|teh|honey|jam)/],["frozen",/\b(frozen|ice cream|nugget|dumpling)/],["snacks",/\b(snack|chips|biscuit|chocolate|candy|juice|soda|coke|drink|water|milo)/],["household",/\b(soap|detergent|tissue|toilet paper|dish|bin bag|sponge|bleach|cleaner|light bulb|battery)/],["personal",/\b(shampoo|toothpaste|toothbrush|lotion|pad|tampon|deodorant|razor|sunscreen|floss|medicine|vitamin)/]];
+  const hit = R.find(([, re]) => re.test(n)); return hit ? hit[0] : null; }
+document.addEventListener("click", async e => {
+  if (S.view !== "money") return;
+  const t = e.target.closest("button"); if (!t || !t.closest("#v-money")) return;
+  if (t.dataset.eday) { const n = addDays(ek(), +t.dataset.eday); S.eDay = n > todayKey() ? todayKey() : n; renderMoney(); }
+  else if (t.dataset.emon) { const [y, m] = em().split("-").map(Number); const d = new Date(y, m - 1 + +t.dataset.emon, 1); const mk = dkey(d).slice(0, 7); S.eMonth = mk > todayKey().slice(0, 7) ? null : mk; renderMoney(); }
+  else if (t.dataset.ecat) { S.expCat = t.dataset.ecat; t.parentElement.querySelectorAll("[data-ecat]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
+  else if (t.dataset.epay) { S.expPay = t.dataset.epay; t.parentElement.querySelectorAll("[data-epay]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
+  else if (t.dataset.edel) { del("expenses", t.dataset.edel); toast("Expense deleted"); }
+  else if (t.dataset.scat) { S.shopCat = t.dataset.scat; S.shopPicked = true; t.parentElement.querySelectorAll("[data-scat]").forEach(b => b.setAttribute("aria-pressed", b === t)); $("#m-item").focus(); }
+  else if (t.dataset.sagain) { const n = t.dataset.sagain; put("shop", newId(), { name: n, qty: "", cat: guessShopCat(n) || "other", done: false, doneAt: "", createdAt: nowISO() }); }
+  else if (t.dataset.sdel) { del("shop", t.dataset.sdel); }
+  else if (t.dataset.sclear !== undefined) { const got = S.shop.filter(i => i.done); await batchColl("shop", got.map(i => ["delete", i.id])); S.groceryLog = false; toast(`Cleared ${got.length} item${got.length === 1 ? "" : "s"}`); }
+  else if (t.dataset.sgroc) { S.groceryLog = t.dataset.sgroc === "1"; renderMoney(); if (S.groceryLog) $("#m-groc").focus(); }
+});
+document.addEventListener("change", e => {
+  const c = e.target.closest && e.target.closest("[data-sdone]");
+  if (c) { const i = S.shop.find(x => x.id === c.dataset.sdone); if (i) { put("shop", i.id, { ...strip(i), done: c.checked, doneAt: c.checked ? nowISO() : "" }); if (c.checked) rememberItem(i.name); } return; }
+  if (e.target.id === "m-budget") { S.budget = Math.max(0, parseFloat(e.target.value) || 0); saveCats(); renderMoney(); toast(S.budget ? "Budget saved" : "Budget removed"); }
+  if (e.target.id === "m-cur") { S.cur = e.target.value; saveCats(); renderMoney(); }
+});
+document.addEventListener("submit", e => {
+  const f = e.target; if (!f.closest || !f.closest("#v-money")) return; e.preventDefault();
+  if (f.id === "m-exp-form") {
+    const amt = parseFloat(($("#m-amt").value || "").replace(/[^\d.]/g, ""));
+    if (!amt || amt <= 0) { toast("Enter an amount first"); $("#m-amt").focus(); return; }
+    put("expenses", newId(), { date: ek(), amount: Math.round(amt * 100) / 100, cat: S.expCat, pay: S.expPay, note: $("#m-note").value.trim(), createdAt: nowISO() });
+    toast(`${money(amt)} · ${expCat(S.expCat)[1]}`); $("#m-amt").value = ""; $("#m-note").value = ""; $("#m-amt").focus();
+  } else if (f.id === "m-shop-form") {
+    const n = $("#m-item").value.trim(); if (!n) { $("#m-item").focus(); return; }
+    // a category you tapped wins; otherwise guess from the name (eggs → Dairy & eggs)
+    const cat = S.shopPicked ? S.shopCat : (guessShopCat(n) || S.shopCat || "other");
+    put("shop", newId(), { name: n, qty: $("#m-qty").value.trim(), cat, done: false, doneAt: "", createdAt: nowISO() });
+    S.shopPicked = false;
+    $("#m-item").value = ""; $("#m-qty").value = ""; $("#m-item").focus();
+  } else if (f.id === "m-groc-form") {
+    const amt = parseFloat(($("#m-groc").value || "").replace(/[^\d.]/g, "")); if (!amt) { $("#m-groc").focus(); return; }
+    const n = S.shop.filter(i => i.done).length;
+    put("expenses", newId(), { date: todayKey(), amount: Math.round(amt * 100) / 100, cat: "groceries", pay: S.expPay, note: `Groceries (${n} item${n === 1 ? "" : "s"})`, createdAt: nowISO() });
+    S.groceryLog = false; toast("Grocery bill saved to expenses"); renderMoney();
+  }
+});
+// Enter in the amount box jumps to the description
+document.addEventListener("keydown", e => { if (e.target.id === "m-amt" && e.key === "Enter" && !$("#m-note").value.trim()) { e.preventDefault(); $("#m-note").focus(); } });
 
 // ---------- calendar
 S.calY = new Date().getFullYear(); S.calM = new Date().getMonth(); S.calSel = todayKey();
@@ -1571,12 +1783,14 @@ function startData(){
   sub("tasks", "tasks"); sub("todos", "todos");
   { let first = true; db.collection("routine").onSnapshot(s => { S.routine = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); refreshPush(true); } else render(); clearTimeout(syncFireFields._t); syncFireFields._t = setTimeout(syncFireFields, 1500); }, fail); }
   db.collection("health").orderBy("date", "desc").limit(400).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.health = o; render(); }, fail);
+  db.collection("shop").onSnapshot(s => { S.shop = s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")); render(); }, fail);
+  db.collection("expenses").orderBy("date", "desc").limit(3000).onSnapshot(s => { S.exp = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("body").onSnapshot(s => { S.body = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("conditions").onSnapshot(s => { S.conds = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("courses").onSnapshot(s => { S.courses = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("time").orderBy("start", "desc").limit(1500).onSnapshot(s => { S.time = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.doc("settings/timer").onSnapshot(s => { const t = s.exists ? s.data() : null; const changed = JSON.stringify(t) !== JSON.stringify(S.timer); S.timer = t && t.start ? t : null; if (changed) render(); }, fail);
-  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
+  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (s.exists) { const sd = s.data(); if (sd.cur) S.cur = sd.cur; if (sd.budget) S.budget = sd.budget; if (Array.isArray(sd.shopHist)) S.shopHist = sd.shopHist; } if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(1000).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
   watchChecks = () => { const k = viewKey(); if (k === watchedDay) return; watchedDay = k; if (unsubCheck) unsubCheck(); unsubCheck = db.doc("checks/" + k).onSnapshot(s => { const d = s.exists ? s.data() : {}; S.day[k] = { done: d.done || {}, skip: d.skip || {}, extra: d.extra || [] }; render(); }, fail); };
@@ -1593,7 +1807,7 @@ $("#uname").addEventListener("change", () => { S.name = $("#uname").value.trim()
 $("#bk-export").onclick = () => {
   const data = { app: "daybook", exportedAt: nowISO(), settings: { categories: S.cats },
     tasks: S.tasks, todos: S.todos, routine: S.routine, refl: S.refl, day: S.day,
-    courses: S.courses, time: S.time, health: S.health, body: S.body, conditions: S.conds };
+    courses: S.courses, time: S.time, health: S.health, body: S.body, conditions: S.conds, shop: S.shop, expenses: S.exp };
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
   const a = document.createElement("a"); a.href = url; a.download = "daybook-backup-" + todayKey() + ".json"; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000); toast("Backup downloaded");
@@ -1611,6 +1825,8 @@ $("#bk-import").onchange = async e => {
     (d.courses || []).forEach(t => ops.push(["courses/" + t.id, strip(t)]));
     (d.time || []).forEach(t => ops.push(["time/" + t.id, strip(t)]));
     (d.body || []).forEach(t => ops.push(["body/" + t.id, strip(t)]));
+    (d.shop || []).forEach(t => ops.push(["shop/" + t.id, strip(t)]));
+    (d.expenses || []).forEach(t => ops.push(["expenses/" + t.id, strip(t)]));
     (d.conditions || []).forEach(t => ops.push(["conditions/" + t.id, strip(t)]));
     Object.entries(d.health || {}).forEach(([k, v]) => ops.push(["health/" + k, v]));
     Object.entries(d.day || {}).forEach(([k, v]) => ops.push(["checks/" + k, { date: k, done: v.done || {}, skip: v.skip || {}, extra: v.extra || [] }]));

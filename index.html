@@ -454,7 +454,7 @@ div.task:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .links li svg{width:14px;height:14px;color:var(--muted)}
 .links a{color:var(--accent);word-break:break-all}
 .inp{flex:1;min-width:0;width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px;font-size:.92rem}
-.qrow.wrap{flex-wrap:wrap}
+.qrow.rwrap{flex-wrap:wrap}
 textarea.mono{font-family:var(--f-mono)!important;font-size:.84rem!important;min-height:80px}
 /* header timer + search */
 .tpill{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:3px 4px 3px 12px;max-width:min(46vw,320px);box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}
@@ -851,7 +851,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 .cup.on svg{fill:currentColor}
 .hw-goal{display:flex;align-items:center;gap:6px}
 .hw-goal select{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:3px 6px}
-.qa-chips.wrap{flex-wrap:wrap;overflow:visible;justify-content:flex-start}
+.qa-chips.cwrap{flex-wrap:wrap;overflow:visible;justify-content:flex-start}
 .hcard > .btn{justify-self:start}
 .hlist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
 .hlist li{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;font-size:.9rem;padding:4px 0;border-bottom:1px dashed var(--line)}
@@ -907,6 +907,85 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 .cyc-toggle{display:flex;align-items:center;gap:8px}
 @media (min-width:1000px){ #v-health{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px} }
 @media (max-width:560px){ .hb-form{grid-template-columns:1fr 1fr} .hb-form .btn{grid-column:1 / -1} .hb-form label:first-child{grid-column:1 / -1} }
+
+/* ===== Money tab ===== */
+#v-money{align-items:start}
+.m-total{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.m-total b{font-family:var(--f-display);font-size:1.8rem;color:var(--accent)}
+.m-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.m-form .inp{flex:1 1 160px}
+.m-amt{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--bg);border-radius:8px;overflow:hidden;flex:0 0 auto}
+.m-amt span{padding:0 4px 0 10px;font-weight:700;color:var(--muted);font-size:.85rem}
+.m-amt input{border:0;background:transparent;padding:7px 10px 7px 4px;width:96px;font-family:var(--f-mono);font-size:1rem;outline:none}
+.m-amt.sm input{width:84px;padding:4px 8px 4px 2px;font-size:.9rem}
+.m-list li{grid-template-columns:auto 1fr auto auto}
+.m-amtv{font-family:var(--f-mono);font-weight:500;white-space:nowrap}
+.m-sum{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.m-sum > div{display:grid;gap:1px;background:var(--bg);border-radius:10px;padding:10px 12px}
+.m-sum b{font-family:var(--f-mono);font-weight:500;font-size:1.25rem}
+.m-sum .up{color:var(--high)} .m-sum .down{color:var(--ok)}
+.m-budget{display:grid;gap:6px}
+.m-bud-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px}
+.m-bud-top .over{color:var(--crit);font-weight:700}
+.m-bar{height:9px}
+.m-setbud{display:flex;align-items:center;gap:8px}
+.m-setbud select{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:3px 6px}
+.m-chart{padding:0}
+.m-chart text{font-size:13px}
+@media (max-width:560px){.m-chart text{font-size:22px}}
+.m-cats{display:grid;gap:7px}
+.m-cat{display:grid;grid-template-columns:118px 1fr auto 38px;gap:8px;align-items:center}
+.m-cat .hl-tag{justify-self:start}
+.m-cat b{font-family:var(--f-mono);font-weight:500;font-size:.85rem;white-space:nowrap}
+.m-cat .small{text-align:right}
+.m-sugg{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.m-sugg .qc{font-size:.76rem;padding:3px 10px}
+.m-grp{display:grid;gap:4px}
+.m-grp-h{display:flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.m-grp-h .btn{margin-left:auto;text-transform:none;letter-spacing:0}
+.m-items{list-style:none;margin:0;padding:0;display:grid}
+.m-items li{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px dashed var(--line)}
+.m-items li:last-child{border-bottom:0}
+.m-iname{min-width:0;overflow-wrap:anywhere}
+.m-qty{font-family:var(--f-mono);font-size:.78rem;background:var(--sunk);border-radius:6px;padding:1px 7px}
+.m-items li.done .m-iname{text-decoration:line-through;color:var(--muted)}
+.m-grp.got{padding-top:8px;border-top:1px solid var(--line)}
+@media (min-width:1000px){ #v-money{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px} }
+@media (max-width:560px){ .m-cat{grid-template-columns:96px 1fr auto} .m-cat .small{display:none} .m-form .btn.primary{flex:1 0 100%} }
+
+/* ===== Mind & mood ===== */
+.moods{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.mood-b{display:grid;justify-items:center;gap:3px;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:8px 2px;cursor:pointer;color:var(--muted);font-size:.74rem;font-weight:600;transition:border-color .15s,background .15s,color .15s}
+.mood-b svg{width:28px;height:28px}
+.mood-b:hover{border-color:var(--mc);color:var(--mc)}
+.mood-b.on{border-color:var(--mc);background:color-mix(in srgb,var(--mc) 14%,transparent);color:var(--mc)}
+.stress{align-items:center}
+.stress button{min-width:34px}
+#h-mood .row{display:flex;gap:8px}
+.mood-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.mood-list li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:8px 10px;border-radius:10px;background:var(--bg)}
+.mood-dot{color:var(--mc);display:grid}
+.mood-dot svg{width:26px;height:26px}
+.mood-note{white-space:pre-wrap;margin-top:2px}
+.mood-trend{display:grid;gap:6px}
+.mt-row{display:grid;grid-template-columns:repeat(14,minmax(0,1fr));gap:4px;align-items:end;height:62px}
+.mt-d{display:grid;justify-items:center;align-content:end;gap:2px;height:100%}
+.mt-d i{width:100%;max-width:18px;border-radius:5px 5px 2px 2px}
+.mt-d em{font-style:normal;font-size:.6rem;color:var(--muted)}
+.mt-d.sel em{color:var(--ink);font-weight:700}
+.feel-pill{display:inline-block;background:var(--sunk);border-radius:99px;padding:1px 8px;margin:2px 2px 0 0;color:var(--ink)}
+.support{background:var(--pink-soft);border:1px solid var(--pink);border-radius:12px;padding:12px 14px;display:grid;gap:8px;font-size:.9rem}
+.sup-lines{display:grid;gap:3px;font-size:.86rem}
+.support .btn{justify-self:start}
+/* overview wellbeing & spending */
+.ovx{display:grid;gap:10px}
+.ovx h3{font-size:.85rem;margin:0}
+.minis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.mini{display:grid;gap:1px;background:var(--bg);border-radius:10px;padding:8px 10px;min-width:0}
+.mini span{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.mini b{font-family:var(--f-mono);font-weight:500;font-size:1.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini small{font-size:.72rem;color:var(--muted)}
+@media (max-width:560px){ .minis{grid-template-columns:repeat(2,minmax(0,1fr))} .mood-b span{font-size:.66rem} }
 </style>
 </head>
 <body class="locked">
@@ -1058,6 +1137,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
       <a href="#overview" data-v="overview">Overview</a>
       <a href="#growth" data-v="growth">Growth</a>
       <a href="#health" data-v="health">Health</a>
+      <a href="#money" data-v="money">Money</a>
       <a href="#reflect" data-v="reflect">Reflection</a>
       <a href="#routine" data-v="routine">Routine</a>
     </nav>
@@ -1139,6 +1219,10 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
       <div><div class="sechead"><h2>Daily life habits</h2><span class="meta">done / scheduled</span></div><div class="panel" id="ov-habits"></div></div>
     </div>
     <div class="ov2">
+      <div><div class="sechead"><h2>Wellbeing</h2><a class="meta" href="#health">Health</a></div><div class="panel chartbox ovx" id="ov-well"></div></div>
+      <div><div class="sechead"><h2>Spending</h2><a class="meta" href="#money">Money</a></div><div class="panel chartbox ovx" id="ov-spend"></div></div>
+    </div>
+    <div class="ov2">
       <div><div class="sechead"><h2>Needs attention</h2></div><div class="panel"><ul class="rows" id="ov-attn"></ul></div></div>
       <div><div class="sechead"><h2>Recent learnings</h2><a class="meta" href="#reflect">Reflection</a></div><div class="panel"><ul class="rows" id="ov-learn"></ul></div></div>
     </div>
@@ -1186,6 +1270,10 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
       </div>
     </div>
     <div class="g-col">
+      <div>
+        <div class="sechead"><h2>Mind & mood</h2><span class="meta">Check in once or a few times a day</span></div>
+        <div class="panel hcard" id="h-mood"></div>
+      </div>
       <div id="h-cycle-wrap">
         <div class="sechead"><h2>Menstrual cycle</h2><span class="meta">Tap a day, then choose the flow</span></div>
         <div class="panel hcard" id="h-cycle"></div>
@@ -1199,6 +1287,25 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
         <div class="panel hcard" id="h-body"></div>
       </div>
       <label class="small muted cyc-toggle"><input type="checkbox" id="h-cyc-toggle"> Show menstrual cycle tracking</label>
+    </div>
+  </section>
+
+  <section class="view" id="v-money" hidden>
+    <div class="g-col">
+      <div>
+        <div class="sechead"><h2>Expenses</h2><span class="meta">Amount → what → category</span></div>
+        <div class="panel hcard" id="m-day"></div>
+      </div>
+      <div>
+        <div class="sechead"><h2>Shopping list</h2><span class="meta">Tick items as they go in the basket</span></div>
+        <div class="panel hcard" id="m-shop"></div>
+      </div>
+    </div>
+    <div class="g-col">
+      <div>
+        <div class="sechead"><h2>Monthly summary</h2></div>
+        <div class="panel hcard" id="m-month"></div>
+      </div>
     </div>
   </section>
 
@@ -1315,6 +1422,6 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=19"></script>
+<script type="module" src="app.js?v=22"></script>
 </body>
 </html>
