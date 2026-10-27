@@ -197,6 +197,38 @@ dialog::backdrop{background:rgba(10,20,16,.45)}
 .hab:first-child{border-top:0}
 .hab .n{font-family:var(--f-mono);font-size:.8rem;text-align:right;color:var(--muted)}
 @media (max-width:700px){.ov2{grid-template-columns:1fr}}
+.calhead{display:flex;align-items:center;gap:8px}
+.calhead h2{font-size:1.15rem;min-width:9.5em;text-align:center}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:8px}
+.cal-dow{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:center;padding:2px 0 4px}
+.cal-day{position:relative;display:grid;grid-template-rows:auto 1fr auto;align-items:start;justify-items:start;gap:2px;min-height:72px;padding:6px 6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);text-align:left}
+.cal-day.is-we{background:var(--sunk)}
+.cal-day.is-future .cal-n{color:var(--muted)}
+.cal-day.is-today .cal-n{background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:0 6px}
+.cal-day.is-sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.cal-n{font-family:var(--f-mono);font-size:.86rem;font-weight:500;line-height:1.5}
+.cal-c{position:absolute;top:6px;right:6px;font-family:var(--f-mono);font-size:.68rem;color:var(--ok)}
+.cal-marks{display:flex;gap:3px;align-self:end}
+.mk{display:inline-block;width:7px;height:7px;border-radius:99px;vertical-align:middle}
+.mk-work{background:var(--high)} .mk-refl{background:var(--accent)} .mk-due{background:var(--crit)}
+.cal-bar{position:absolute;left:6px;right:6px;bottom:4px;height:3px;background:var(--line);border-radius:99px;overflow:hidden}
+.cal-bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.lg-bar{display:inline-block;width:16px;height:3px;border-radius:99px;background:var(--ok)}
+.cd{padding:14px 16px;display:grid;gap:14px}
+.cd h3{font-family:var(--f-display);font-size:.95rem;margin:0}
+.cd-sec .sechead{margin-bottom:4px}
+.cd-list{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.cd-list li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;font-size:.88rem}
+.cd-list .tm{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+.cd-st{font-size:.75rem;color:var(--muted);white-space:nowrap}
+.cd-done .cd-st{color:var(--ok)} .cd-miss .cd-st{color:var(--high)} .cd-skip{opacity:.6}
+.cd-work li{cursor:pointer;grid-template-columns:auto 1fr;padding:4px 0}
+.cd-refl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:.88rem}
+.cd-refl dt{font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding-top:2px}
+.cd-refl dd{margin:0;white-space:pre-wrap}
+@media (max-width:560px){.cal-day{min-height:56px;padding:4px 4px 7px}.dow-rest{display:none}.cal-c{position:static;font-size:.62rem}.cal-n{font-size:.78rem}.calhead h2{min-width:0;flex:1}}
 .muted{color:var(--muted)}
 .small{font-size:.82rem}
 @media (max-width:560px){
@@ -233,6 +265,7 @@ body.locked{overflow:hidden}
     <nav class="tabs" id="tabs">
       <a href="#today" data-v="today">Today</a>
       <a href="#work" data-v="work">Work <span class="count" id="c-work">0</span></a>
+      <a href="#calendar" data-v="calendar">Calendar</a>
       <a href="#overview" data-v="overview">Overview</a>
       <a href="#reflect" data-v="reflect">Reflection</a>
       <a href="#routine" data-v="routine">Routine</a>
@@ -282,6 +315,18 @@ body.locked{overflow:hidden}
     <div class="stats" id="stats"></div>
     <div class="chips" id="catchips"></div>
     <div class="tasks" id="tasklist"></div>
+  </section>
+
+  <section class="view" id="v-calendar" hidden>
+    <div class="calhead">
+      <button class="btn sm" type="button" data-calm="-1" aria-label="Previous month">‹</button>
+      <h2 id="cal-title"></h2>
+      <button class="btn sm" type="button" data-calm="1" aria-label="Next month">›</button>
+      <button class="btn sm ghost" type="button" data-caltoday style="margin-left:auto">Today</button>
+    </div>
+    <div class="panel calgrid" id="cal-grid"></div>
+    <div class="legend small muted"><span><i class="mk mk-work"></i>Work activity</span><span><i class="mk mk-refl"></i>Reflection</span><span><i class="mk mk-due"></i>Task due</span><span><b class="lg-bar"></b>Routine kept</span><span>✓ items done</span></div>
+    <div id="cal-day"></div>
   </section>
 
   <section class="view" id="v-overview" hidden>
@@ -341,6 +386,7 @@ body.locked{overflow:hidden}
     <div class="panel" style="padding:14px;display:grid;gap:10px">
       <h2>Account &amp; backup</h2>
       <p class="small muted" style="margin:0">Signed in as <b id="acct-email"></b>. Your data syncs across every device you sign in on.</p>
+      <label class="f">Workplace line on daily reports<input id="org" placeholder="e.g. Internship, Bina Plastic Sdn Bhd" autocomplete="organization"></label>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         <button class="btn sm" type="button" id="bk-export">Download backup</button>
         <label class="btn sm" for="bk-import" style="cursor:pointer">Restore from backup</label><input type="file" id="bk-import" accept="application/json,.json" hidden>

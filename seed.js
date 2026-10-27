@@ -1,5 +1,5 @@
-// Your starting data, copied from the Claude version of Daybook.
-// It is written to your account only the first time you sign in.
+// Starter data for a brand-new account: a general routine everyone can edit.
+// It is written only the first time someone signs in.
 export const SEED = {
  "settings": {
   "categories": [
@@ -19,283 +19,198 @@ export const SEED = {
     "name": "Admin / Documentation",
     "tag": "admin"
    }
-  ]
+  ],
+  "org": ""
  },
  "routine": {
-  "r01": {
-   "days": [
-    1,
-    2,
-    3,
-    4,
-    5
-   ],
-   "kind": "health",
+  "d01": {
+   "time": "07:00",
    "label": "Wake up, drink a glass of water",
-   "time": "07:00"
-  },
-  "r02": {
+   "kind": "health",
    "days": [
     1,
     2,
     3,
     4,
     5
-   ],
-   "kind": "meal",
+   ]
+  },
+  "d02": {
+   "time": "07:30",
    "label": "Breakfast",
-   "time": "07:30"
-  },
-  "r03": {
+   "kind": "meal",
    "days": [
     1,
     2,
     3,
     4,
     5
-   ],
-   "kind": "supplement",
-   "label": "Morning supplements",
-   "time": "07:45"
+   ]
   },
-  "r04": {
-   "days": [
-    1,
-    2,
-    3,
-    4,
-    5
-   ],
-   "kind": "work",
+  "d03": {
+   "time": "09:00",
    "label": "Start work: review today's tasks",
-   "time": "09:00"
-  },
-  "r05": {
+   "kind": "work",
    "days": [
     1,
     2,
     3,
     4,
     5
-   ],
-   "kind": "break",
-   "label": "Toilet break & stretch",
-   "time": "10:30"
+   ]
   },
-  "r06": {
+  "d04": {
+   "time": "10:30",
+   "label": "Short break & stretch",
+   "kind": "break",
    "days": [
-    0,
     1,
     2,
     3,
     4,
-    5,
-    6
-   ],
-   "kind": "meal",
+    5
+   ]
+  },
+  "d05": {
+   "time": "12:30",
    "label": "Lunch",
-   "time": "12:30"
-  },
-  "r07": {
+   "kind": "meal",
    "days": [
+    0,
     1,
     2,
     3,
     4,
-    5
-   ],
+    5,
+    6
+   ]
+  },
+  "d06": {
+   "time": "15:30",
+   "label": "Short break, refill water",
    "kind": "break",
-   "label": "Toilet break, water refill",
-   "time": "15:30"
-  },
-  "r08": {
    "days": [
     1,
     2,
     3,
     4,
     5
-   ],
-   "kind": "work",
+   ]
+  },
+  "d07": {
+   "time": "18:00",
    "label": "Wrap up work, log task progress",
-   "time": "18:00"
-  },
-  "r09": {
-   "days": [
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6
-   ],
-   "kind": "meal",
-   "label": "Dinner",
-   "time": "19:00"
-  },
-  "r10": {
-   "days": [
-    0,
-    1,
-    2,
-    3,
-    4,
-    5,
-    6
-   ],
-   "kind": "supplement",
-   "label": "Evening supplements",
-   "time": "19:30"
-  },
-  "r11": {
-   "days": [
-    1,
-    2,
-    3,
-    4
-   ],
-   "kind": "study",
-   "label": "Study: Google certificate (1 hour)",
-   "time": "20:30"
-  },
-  "r12": {
+   "kind": "work",
    "days": [
     1,
     2,
     3,
     4,
     5
-   ],
-   "kind": "work",
-   "label": "Daily reflection",
-   "time": "21:30"
+   ]
   },
-  "r13": {
+  "d08": {
+   "time": "19:00",
+   "label": "Dinner",
+   "kind": "meal",
+   "days": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+   ]
+  },
+  "d09": {
+   "time": "21:30",
+   "label": "Daily reflection",
+   "kind": "work",
+   "days": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ]
+  },
+  "d10": {
+   "time": "23:00",
+   "label": "Sleep",
+   "kind": "health",
    "days": [
     0,
     1,
     2,
     3,
     4
-   ],
-   "kind": "health",
-   "label": "Sleep",
-   "time": "23:00"
+   ]
   },
-  "r14": {
-   "days": [
-    6
-   ],
-   "kind": "class",
-   "label": "Swimming class",
-   "time": "10:00"
-  },
-  "r15": {
-   "days": [
-    0
-   ],
-   "kind": "study",
-   "label": "Study: Google certificate (2 hours)",
-   "time": "10:00"
-  },
-  "w01": {
-   "days": [
-    0,
-    6
-   ],
-   "kind": "health",
+  "e01": {
+   "time": "08:30",
    "label": "Wake up, drink a glass of water",
-   "time": "08:00"
-  },
-  "w02": {
+   "kind": "health",
    "days": [
     0,
     6
-   ],
-   "kind": "meal",
+   ]
+  },
+  "e02": {
+   "time": "09:00",
    "label": "Breakfast",
-   "time": "08:30"
-  },
-  "w03": {
+   "kind": "meal",
    "days": [
     0,
     6
-   ],
-   "kind": "supplement",
-   "label": "Morning supplements",
-   "time": "08:45"
+   ]
   },
-  "w04": {
+  "e03": {
+   "time": "15:00",
+   "label": "Chores & errands",
+   "kind": "other",
    "days": [
     6
-   ],
-   "kind": "other",
-   "label": "Chores, laundry, groceries",
-   "time": "15:00"
+   ]
   },
-  "w05": {
+  "e04": {
+   "time": "20:30",
+   "label": "Plan next week: review tasks & to-dos",
+   "kind": "work",
    "days": [
     0
-   ],
-   "kind": "work",
-   "label": "Plan next week: review work tasks & to-dos",
-   "time": "20:30"
+   ]
   },
-  "w06": {
+  "e05": {
+   "time": "23:30",
+   "label": "Sleep",
+   "kind": "health",
    "days": [
     5,
     6
-   ],
-   "kind": "health",
-   "label": "Sleep",
-   "time": "23:30"
+   ]
   }
  },
  "tasks": {
-  "example1": {
-   "assignedBy": "Supervisor",
-   "bottleneck": "Waiting for read access to the production database",
-   "category": "sql",
-   "createdAt": "2026-10-27T13:00:00.000Z",
-   "desc": "Example task to show the layout. Remove duplicate batch IDs from the production table and share the row count with supervisor. Delete this once you add your own tasks.",
-   "doneAt": "",
-   "due": "2026-10-30",
-   "log": [
-    {
-     "at": "2026-10-27T13:00:00.000Z",
-     "note": "Task added"
-    },
-    {
-     "at": "2026-10-27T13:05:00.000Z",
-     "note": "Progress 0% → 40%"
-    }
-   ],
-   "progress": 40,
-   "status": "doing",
-   "title": "(Example) Clean monthly production data",
-   "updatedAt": "2026-10-27T13:00:00.000Z",
-   "urgency": "high"
-  },
-  "example2": {
-   "assignedBy": "Supervisor",
-   "bottleneck": "",
-   "category": "excel",
-   "createdAt": "2026-10-27T13:00:00.000Z",
-   "desc": "Example task. Refresh the pivot table and chart in the weekly scrap report.",
-   "doneAt": "",
-   "due": "2026-11-02",
-   "log": [
-    {
-     "at": "2026-10-27T13:00:00.000Z",
-     "note": "Task added"
-    }
-   ],
-   "progress": 0,
+  "welcome": {
+   "title": "(Example) Tap me to see how a task works",
+   "desc": "This is an example task. Tap it to change progress, status and urgency, note a bottleneck, or log an update. Delete it when you're ready.",
+   "category": "admin",
+   "urgency": "medium",
    "status": "todo",
-   "title": "(Example) Update weekly scrap rate report",
-   "updatedAt": "2026-10-27T13:00:00.000Z",
-   "urgency": "medium"
+   "progress": 0,
+   "bottleneck": "",
+   "assignedBy": "",
+   "due": "",
+   "createdAt": "2026-10-27T15:00:00.000Z",
+   "updatedAt": "2026-10-27T15:00:00.000Z",
+   "doneAt": "",
+   "log": [
+    {
+     "at": "2026-10-27T15:00:00.000Z",
+     "note": "Task added"
+    }
+   ]
   }
  }
 };

@@ -52,7 +52,7 @@ const strip = o => { const c={...o}; delete c.id; return c; };
 
 // ---------- categories
 const DEFAULT_CATS = [{name:"SQL / Database",tag:"sql"},{name:"Excel / Reporting",tag:"excel"},{name:"Python / Automation",tag:"python"},{name:"Admin / Documentation",tag:"admin"}];
-function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats})); }
+function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||""})); }
 function catByTag(t){ t=t.toLowerCase(); return S.cats.find(c=>c.tag===t) || S.cats.find(c=>c.tag.startsWith(t)) || S.cats.find(c=>c.name.toLowerCase().includes(t)); }
 const catName = tag => (S.cats.find(c=>c.tag===tag)||{name:tag||"Uncategorised"}).name;
 
@@ -115,7 +115,7 @@ $("#quick").addEventListener("submit", e => {
 });
 
 // ---------- routing
-const VIEWS=["today","work","overview","reflect","routine"];
+const VIEWS=["today","work","calendar","overview","reflect","routine"];
 function route(){ const h=location.hash.slice(1); S.view=VIEWS.includes(h)?h:"today";
   if(S.view==="work") setMode("work"); else if(S.view==="today") setMode("todo");
   render(); }
@@ -129,6 +129,7 @@ function render(){
   $("#c-work").textContent = S.tasks.filter(t=>t.status!=="done").length;
   if(S.view==="today") renderToday();
   if(S.view==="work") renderWork();
+  if(S.view==="calendar") renderCalendar();
   if(S.view==="overview") renderOverview();
   if(S.view==="reflect") renderReflect();
   if(S.view==="routine") renderRoutine();
@@ -326,6 +327,83 @@ function renderOverview(){
     : `<li class="empty">What you write under "What I learned" collects here.</li>`;
 }
 
+// ---------- calendar
+S.calY = new Date().getFullYear(); S.calM = new Date().getMonth(); S.calSel = todayKey();
+const loadedMonths = new Set();
+function loadMonth(y, m){
+  const key = y + "-" + m; if (!db || loadedMonths.has(key)) return; loadedMonths.add(key);
+  const a = dkey(new Date(y, m, 1)), b = dkey(new Date(y, m + 1, 0));
+  db.collection("checks").where("date", ">=", a).where("date", "<=", b).get().then(s => { s.docs.forEach(d => { if (!S.day[d.id]) { const x = d.data(); S.day[d.id] = { done: x.done || {}, skip: x.skip || {}, extra: x.extra || [] }; } }); if (S.view === "calendar") renderCalendar(); }).catch(e => { loadedMonths.delete(key); console.error(e); });
+  db.collection("reflections").where("date", ">=", a).where("date", "<=", b).get().then(s => { s.docs.forEach(d => { if (!S.refl[d.id]) S.refl[d.id] = d.data(); }); if (S.view === "calendar") renderCalendar(); }).catch(e => { loadedMonths.delete(key); console.error(e); });
+}
+function dayInfo(k){
+  const tk = todayKey(), dd = dayDoc(k), skip = dd.skip || {}, done = dd.done || {};
+  const items = routineFor(k).filter(r => !skip[r.id]);
+  const hasRec = !!S.day[k];
+  const rDone = items.filter(r => done[r.id]).length;
+  const pct = (k <= tk && hasRec && items.length) ? Math.round(rDone / items.length * 100) : null;
+  const todos = S.todos.filter(t => t.date === k || (t.done && isoDay(t.doneAt) === k));
+  const todosDone = S.todos.filter(t => t.done && isoDay(t.doneAt) === k);
+  const due = S.tasks.filter(t => t.due === k);
+  const updates = S.tasks.map(t => ({ t, e: (t.log || []).filter(l => isoDay(l.at) === k && l.note !== "Task added") })).filter(x => x.e.length);
+  const added = S.tasks.filter(t => isoDay(t.createdAt) === k);
+  const finished = S.tasks.filter(t => t.status === "done" && isoDay(t.doneAt) === k);
+  return { k, dd, items, rDone, pct, todos, todosDone, due, updates, added, finished, refl: S.refl[k] };
+}
+function renderCalendar(){
+  const y = S.calY, m = S.calM, tk = todayKey();
+  loadMonth(y, m);
+  $("#cal-title").textContent = new Date(y, m, 1).toLocaleString("en-GB", { month: "long", year: "numeric" });
+  const first = new Date(y, m, 1), lead = (first.getDay() + 6) % 7, nDays = new Date(y, m + 1, 0).getDate();
+  let h = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => `<span class="cal-dow">${d.slice(0,1)}<span class="dow-rest">${d.slice(1)}</span></span>`).join("");
+  for (let i = 0; i < lead; i++) h += `<span class="cal-blank"></span>`;
+  for (let d = 1; d <= nDays; d++) {
+    const k = dkey(new Date(y, m, d)), I = dayInfo(k), we = isWeekend(keyDow(k));
+    const doneN = I.todosDone.length + I.finished.length;
+    const dueOpen = I.due.filter(t => t.status !== "done").length;
+    const pc = I.pct;
+    const bar = pc === null ? "" : `<span class="cal-bar"><i style="width:${pc}%;background:${pc >= 80 ? "var(--ok)" : pc >= 50 ? "var(--med)" : "var(--crit)"}"></i></span>`;
+    const marks = (I.refl ? `<i class="mk mk-refl" title="Reflection written"></i>` : "") + (I.updates.length || I.finished.length ? `<i class="mk mk-work" title="Work activity"></i>` : "") + (dueOpen ? `<i class="mk mk-due" title="Task due"></i>` : "");
+    h += `<button type="button" class="cal-day ${k === tk ? "is-today" : ""} ${k === S.calSel ? "is-sel" : ""} ${we ? "is-we" : ""} ${k > tk ? "is-future" : ""}" data-cdate="${k}" aria-label="${esc(fmtDate(k))}" aria-pressed="${k === S.calSel}">
+      <span class="cal-n">${d}</span>${doneN ? `<span class="cal-c">✓${doneN}</span>` : ""}<span class="cal-marks">${marks}</span>${bar}</button>`;
+  }
+  $("#cal-grid").innerHTML = h;
+  renderCalDay();
+}
+function renderCalDay(){
+  const k = S.calSel, I = dayInfo(k), tk = todayKey(), off = Math.round((new Date(k + "T00:00") - new Date(tk + "T00:00")) / 864e5);
+  const done = I.dd.done || {}, skip = I.dd.skip || {};
+  const sec = (title, body, meta = "") => `<div class="cd-sec"><div class="sechead"><h3>${title}</h3><span class="meta">${meta}</span></div>${body}</div>`;
+  const none = t => `<p class="muted small" style="margin:0">${t}</p>`;
+  const all = routineFor(k);
+  const routineHtml = all.length ? `<ul class="cd-list">${all.map(r => { const st = skip[r.id] ? "skip" : done[r.id] ? "done" : (k < tk || (k === tk && r.time < pad(new Date().getHours()) + ":" + pad(new Date().getMinutes()))) ? "miss" : "todo";
+      return `<li class="cd-${st}"><span class="tm">${esc(r.time)}</span><span>${esc(r.label)}</span><span class="cd-st">${st === "done" ? "✓ " + esc(done[r.id]) : st === "skip" ? "Skipped" : st === "miss" ? "Not ticked" : ""}</span></li>`; }).join("")}</ul>` : none("No routine items.");
+  const todoHtml = I.todos.length ? `<ul class="cd-list">${I.todos.map(t => `<li class="${t.done ? "cd-done" : ""}"><span>${t.done ? "✓" : "○"}</span><span>${esc(t.title)}</span><span class="cd-st">${t.done ? "Done " + fmtTime(t.doneAt) : t.date < tk ? "Not done" : ""}</span></li>`).join("")}</ul>` : none("No to-dos for this day.");
+  const workBits = [];
+  I.finished.forEach(t => workBits.push(`<li data-task="${esc(t.id)}"><span class="st done">Finished</span><span>${esc(t.title)}</span></li>`));
+  I.due.filter(t => t.status !== "done").forEach(t => workBits.push(`<li data-task="${esc(t.id)}"><span class="urg ${esc(t.urgency)}">Due</span><span>${esc(t.title)} <span class="muted small">· ${esc(STATUS_LABEL[t.status])} ${+t.progress || 0}%</span></span></li>`));
+  I.updates.filter(x => !I.finished.includes(x.t)).forEach(x => workBits.push(`<li data-task="${esc(x.t.id)}"><span class="tag">${esc(catName(x.t.category))}</span><span><b>${esc(x.t.title)}</b>: ${x.e.map(e => esc(e.note)).join("; ")}</span></li>`));
+  I.added.filter(t => !I.updates.some(x => x.t === t) && !I.finished.includes(t) && !I.due.includes(t)).forEach(t => workBits.push(`<li data-task="${esc(t.id)}"><span class="tag">New</span><span>${esc(t.title)}</span></li>`));
+  const workHtml = workBits.length ? `<ul class="cd-list cd-work">${workBits.join("")}</ul>` : none("No work activity or deadlines.");
+  const r = I.refl;
+  const reflHtml = r && (r.did || r.learned || r.mistakes || r.improve) ? `<dl class="cd-refl">${[["Did", r.did], ["Learned", r.learned], ["Mistakes", r.mistakes], ["Improve", r.improve]].filter(x => (x[1] || "").trim()).map(([a, b]) => `<dt>${a}</dt><dd>${esc(b)}</dd>`).join("")}${r.mood ? `<dt>Energy</dt><dd>${r.mood}/5</dd>` : ""}</dl>` : none(k <= tk ? "No reflection written for this day." : "Reflection opens on the day.");
+  $("#cal-day").innerHTML = `<div class="panel cd">
+    <div class="sechead" style="align-items:center"><h2>${esc(DAYS[keyDow(k)])}, ${esc(fmtDate(k).split(", ")[1])} ${k.slice(0, 4)}</h2>
+      <span style="display:flex;gap:6px;flex-wrap:wrap">${off >= -1 && off <= 6 ? `<button class="btn sm" type="button" data-calopen="${off}">Open in Today</button>` : ""}${k <= tk ? `<button class="btn sm" type="button" data-calrefl="${k}">${r ? "Edit reflection" : "Write reflection"}</button>` : ""}</span></div>
+    ${sec("Work", workHtml)}
+    ${sec("Reflection", reflHtml)}
+    ${sec("To-dos", todoHtml)}
+    ${sec((isWeekend(keyDow(k)) ? "Weekend" : "Weekday") + " routine", routineHtml, I.pct !== null ? `${I.rDone} of ${I.items.length} done` : "")}
+  </div>`;
+}
+document.addEventListener("click", e => {
+  const c = e.target.closest("[data-cdate]"); if (c) { S.calSel = c.dataset.cdate; renderCalendar(); return; }
+  const m = e.target.closest("[data-calm]"); if (m) { const d = new Date(S.calY, S.calM + +m.dataset.calm, 1); S.calY = d.getFullYear(); S.calM = d.getMonth(); renderCalendar(); return; }
+  if (e.target.closest("[data-caltoday]")) { const d = new Date(); S.calY = d.getFullYear(); S.calM = d.getMonth(); S.calSel = todayKey(); renderCalendar(); return; }
+  const o = e.target.closest("[data-calopen]"); if (o) { S.dayOff = +o.dataset.calopen; watchChecks(); location.hash = "#today"; return; }
+  const rf = e.target.closest("[data-calrefl]"); if (rf) { rDate = rf.dataset.calrefl; rDirty = false; location.hash = "#reflect"; return; }
+});
+
 // ---------- reflection
 let rDate=todayKey(), rMood=0, rDirty=false;
 function workLogFor(day){
@@ -356,7 +434,7 @@ function saveRefl(quiet){
 }
 $("#r-copy").onclick=async()=>{
   const wl=workLogFor(rDate);
-  const lines=[`Daily Report — ${fmtDate(rDate)} ${rDate.slice(0,4)}`,`Internship, Bina Plastic Sdn Bhd`,``,`Work progress:`];
+  const lines=[`Daily Report — ${fmtDate(rDate)} ${rDate.slice(0,4)}`, ...(S.org?[S.org]:[]),``,`Work progress:`];
   wl.forEach(x=>lines.push(`- [${catName(x.t.category)}] ${x.t.title} — ${STATUS_LABEL[x.t.status]}, ${+x.t.progress||0}%${x.entries.length?" ("+x.entries.map(e=>e.note).join("; ")+")":""}${x.t.bottleneck&&x.t.status!=="done"?" | Bottleneck: "+x.t.bottleneck:""}`));
   if(!wl.length) lines.push("- (no task updates logged)");
   const add=(h,v)=>{ if(v.trim()){ lines.push("",h+":",v.trim()); } };
@@ -464,13 +542,16 @@ function startData(){
   let loaded = 0; const mark = () => { if (++loaded >= 5) { S.ready = true; } render(); };
   const sub = (coll, key) => { let first = true; db.collection(coll).onSnapshot(s => { S[key] = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); } else render(); }, fail); };
   sub("tasks", "tasks"); sub("todos", "todos"); sub("routine", "routine");
-  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); if (f1) { f1 = false; mark(); } else render(); }, fail);
+  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(90).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
   watchChecks = () => { const k = viewKey(); if (k === watchedDay) return; watchedDay = k; if (unsubCheck) unsubCheck(); unsubCheck = db.doc("checks/" + k).onSnapshot(s => { const d = s.exists ? s.data() : {}; S.day[k] = { done: d.done || {}, skip: d.skip || {}, extra: d.extra || [] }; render(); }, fail); };
   watchChecks(); setInterval(watchChecks, 60000);
   db.collection("checks").orderBy("date", "desc").limit(70).onSnapshot(s => { s.docs.forEach(d => { const x = d.data(); S.day[d.id] = { done: x.done || {}, skip: x.skip || {}, extra: x.extra || [] }; }); render(); }, fail);
 }
+
+// ---------- workplace line on reports
+$("#org").addEventListener("change", () => { S.org = $("#org").value.trim(); saveCats(); toast(S.org ? "Saved. Reports will show this line." : "Removed from reports"); });
 
 // ---------- backup
 $("#bk-export").onclick = () => {
@@ -500,9 +581,10 @@ $("#bk-import").onchange = async e => {
 const AUTH_MSG = {
   "auth/invalid-credential": "Email or password is wrong.", "auth/wrong-password": "Email or password is wrong.", "auth/user-not-found": "No account with that email. Tap Create account.",
   "auth/email-already-in-use": "That email already has an account. Tap Sign in.", "auth/weak-password": "Use a password with at least 6 characters.",
-  "auth/invalid-email": "That email address doesn't look right.", "auth/operation-not-allowed": "Email/Password sign-in isn't switched on in Firebase yet (setup step 2).",
+  "auth/invalid-email": "That email address doesn't look right.", "auth/operation-not-allowed": "New accounts are switched off for this Daybook. Ask the owner to add you.",
   "auth/network-request-failed": "No internet connection. Connect and try again.", "auth/too-many-requests": "Too many tries. Wait a minute and try again.",
   "auth/unauthorized-domain": "This web address isn't allowed yet. Add it under Firebase Authentication → Settings → Authorized domains (setup step 6).",
+  "auth/admin-restricted-operation": "New accounts are switched off for this Daybook. Ask the owner to add you.",
   "auth/configuration-not-found": "Email/Password sign-in isn't switched on in Firebase yet (setup step 2)."
 };
 function showAuth(mode){
@@ -534,9 +616,10 @@ else {
     startData();
   });
   const creds = () => [$("#a-email").value.trim(), $("#a-pass").value];
+  const filled = () => { const [e, p] = creds(); if (!e || !p) { $("#auth-err").textContent = "Type your email and password first."; return false; } if (p.length < 6) { $("#auth-err").textContent = "Use a password with at least 6 characters."; return false; } return true; };
   $("#auth-form").addEventListener("submit", async e => { e.preventDefault(); $("#auth-err").textContent = "";
     try { await signInWithEmailAndPassword(auth, ...creds()); } catch (err) { authErr(err); } });
-  $("#a-create").onclick = async () => { $("#auth-err").textContent = "";
+  $("#a-create").onclick = async () => { $("#auth-err").textContent = ""; if (!filled()) return;
     try { await createUserWithEmailAndPassword(auth, ...creds()); } catch (err) { authErr(err); } };
   $("#a-forgot").onclick = async () => { const em = $("#a-email").value.trim(); if (!em) { $("#auth-err").textContent = "Type your email first, then tap Forgot password."; return; }
     try { await sendPasswordResetEmail(auth, em); $("#auth-err").textContent = "Reset link sent. Check your inbox."; } catch (err) { authErr(err); } };
