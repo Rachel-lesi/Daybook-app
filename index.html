@@ -16,7 +16,7 @@
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Noto+Serif+SC:wght@500;600&display=swap">
 <style>
 /* Layout: one sticky command header (name, tabs, quick-add), then a single focused column per view. */
 :root{
@@ -820,12 +820,93 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 @media (max-width:560px){ .qa-row{grid-template-columns:62px minmax(0,1fr)} .qa-tip{display:none} .qc{padding:5px 11px} }
 
 /* ===== Routine clear / restore ===== */
-.rt-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+.rt-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .rt-actions-r{display:flex;flex-wrap:wrap;gap:6px}
-.rt-confirm{margin-top:8px;padding:14px 16px;display:grid;gap:10px;border-color:color-mix(in srgb,var(--crit) 45%,var(--line));background:var(--crit-soft)}
+.rt-confirm{margin-bottom:8px;padding:14px 16px;display:grid;gap:10px;border-color:color-mix(in srgb,var(--crit) 45%,var(--line));background:var(--crit-soft)}
 .rt-confirm p{margin:0}
 .rt-confirm .row{display:flex;flex-wrap:wrap;gap:8px}
 .btn.solid-danger{background:var(--crit);border-color:var(--crit);color:#fff}
+
+/* ===== Opening quotes: Chinese and book picks ===== */
+.sp-kind{justify-self:center;font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--pink-ink);background:var(--pink-soft);border-radius:99px;padding:3px 10px}
+.sp-tr{margin:0;font-family:"Instrument Serif",Georgia,serif;font-style:italic;font-size:1.05rem;color:var(--muted);text-wrap:balance}
+.sp-quote.k-zh blockquote{font-family:"Noto Serif SC","Songti SC","STSong","SimSun",serif;font-style:normal;font-weight:600;font-size:clamp(1.4rem,5.2vw,1.9rem);letter-spacing:.04em}
+.sp-quote.k-book blockquote{font-family:var(--f-display);font-style:normal;font-weight:700;font-size:clamp(1.35rem,5vw,1.75rem)}
+.sp-quote.k-book .sp-tr{font-family:var(--f-body);font-style:normal;font-size:.92rem;max-width:26rem;justify-self:center}
+.sp-quote.k-book .sp-kind{order:-2}
+.sp-quote.k-book figcaption{order:1;margin-top:-4px}
+.sp-quote.k-book .sp-tr{order:2}
+
+/* ===== Health tab ===== */
+#v-health{align-items:start}
+.h-pager{margin:0}
+.hcard{padding:14px 16px;display:grid;gap:10px}
+.hw-top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px}
+.hw-n{font-family:var(--f-display);font-size:2.2rem;line-height:1;color:var(--c0)}
+.hw-btns{display:flex;gap:6px}
+.cups{display:flex;flex-wrap:wrap;gap:6px}
+.cup{width:34px;height:40px;border-radius:8px 8px 12px 12px;border:1.5px solid color-mix(in srgb,var(--c0) 40%,var(--line));background:var(--surface);color:color-mix(in srgb,var(--c0) 45%,transparent);display:grid;place-items:center;padding:0;cursor:pointer;transition:background .15s}
+.cup svg{width:16px;height:16px}
+.cup.on{background:var(--c0s);border-color:var(--c0);color:var(--c0)}
+.cup.on svg{fill:currentColor}
+.hw-goal{display:flex;align-items:center;gap:6px}
+.hw-goal select{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:3px 6px}
+.qa-chips.wrap{flex-wrap:wrap;overflow:visible;justify-content:flex-start}
+.hcard > .btn{justify-self:start}
+.hlist{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.hlist li{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;font-size:.9rem;padding:4px 0;border-bottom:1px dashed var(--line)}
+.hlist li:last-child{border-bottom:0}
+.hl-t{font-family:var(--f-mono);font-size:.76rem;color:var(--muted)}
+.hl-tag{font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--sunk);color:var(--ink);white-space:nowrap}
+.hl-tag.m-breakfast{background:var(--c3s);color:var(--c3)} .hl-tag.m-lunch{background:var(--c1s);color:var(--c1)} .hl-tag.m-dinner{background:var(--c2s);color:var(--c2)} .hl-tag.m-snack{background:var(--c4s);color:var(--c4)} .hl-tag.m-drink{background:var(--c0s);color:var(--c0)}
+.hl-tag.b-normal{background:var(--c1s);color:var(--c1)} .hl-tag.b-hard{background:var(--c3s);color:var(--c3)} .hl-tag.b-soft{background:var(--c5s);color:var(--c5)} .hl-tag.b-watery{background:var(--c4s);color:var(--c4)}
+.hl-b{min-width:0;overflow-wrap:anywhere}
+.hb-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.hb-stats > div{display:grid;gap:1px;background:var(--bg);border-radius:10px;padding:8px 10px}
+.hb-stats b{font-family:var(--f-mono);font-weight:500;font-size:1.15rem}
+.hb-stats .up{color:var(--high)} .hb-stats .down{color:var(--ok)}
+.spark{width:100%;height:54px;display:block}
+.hb-form{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:8px;align-items:end}
+.hb-form input{width:100%}
+.hb-hist summary,.hcard details summary{cursor:pointer;font-weight:600}
+.cond-form{display:grid;gap:8px;padding:10px;border:1px dashed var(--line);border-radius:12px}
+.cond-form .row{display:flex;gap:8px}
+.qc.sv-mild[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.qc.sv-moderate[aria-pressed="true"]{background:var(--high);border-color:var(--high);color:#fff}
+.qc.sv-severe[aria-pressed="true"]{background:var(--crit);border-color:var(--crit);color:#fff}
+.conds{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
+.cond{border:1px solid var(--line);border-left:4px solid var(--ok);border-radius:10px;padding:8px 12px;display:grid;gap:3px;background:var(--bg)}
+.cond.sev-moderate{border-left-color:var(--high)} .cond.sev-severe{border-left-color:var(--crit)}
+.cd-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.cd-top .sev{font-size:.72rem;color:var(--muted)}
+.cd-act{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.cy-status{display:flex;align-items:center;gap:14px}
+.cy-status > b{display:block}
+.cy-ring{flex:none;width:62px;height:62px;border-radius:50%;display:grid;place-items:center;align-content:center;background:var(--pink-soft);border:3px solid var(--pink);line-height:1}
+.cy-ring b{font-family:var(--f-display);font-size:1.4rem;color:var(--pink-ink)}
+.cy-ring span{font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--pink-ink)}
+.cy-strip{display:flex;gap:4px;overflow-x:auto;padding:4px 2px 6px;scrollbar-width:thin;scroll-snap-type:x proximity}
+.cy-d{flex:none;width:38px;display:grid;justify-items:center;gap:1px;padding:5px 0;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;scroll-snap-align:center}
+.cy-d span{font-size:.6rem;color:var(--muted);font-weight:700}
+.cy-d b{font-family:var(--f-mono);font-weight:500;font-size:.9rem}
+.cy-d.per{background:#e98a80;border-color:#e98a80;color:#fff}
+.cy-d.per span{color:rgba(255,255,255,.85)}
+.cy-d.per.f-light{background:#f2b3ac;border-color:#f2b3ac;color:#5a2620}
+.cy-d.per.f-heavy{background:#c95a50;border-color:#c95a50}
+.cy-d.spot{border-color:#e98a80;border-style:dashed}
+.cy-d.pred{border:2px dashed #e98a80;color:var(--pink-ink)}
+.cy-d.fert{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.cy-d.today{box-shadow:0 0 0 2px var(--accent)}
+.cy-d.sel{outline:2px solid var(--ink);outline-offset:1px}
+.lgc{display:inline-block;width:12px;height:12px;border-radius:4px;border:1px solid var(--line)}
+.lgc.per{background:#e98a80;border-color:#e98a80} .lgc.pred{border:2px dashed #e98a80} .lgc.fert{background:var(--accent-soft)} .lgc.spot{border:1.5px dashed #e98a80}
+.cy-log{display:grid;gap:6px;padding-top:8px;border-top:1px solid var(--line)}
+.qc.fl-light[aria-pressed="true"],.qc.fl-spotting[aria-pressed="true"]{background:#f2b3ac;border-color:#f2b3ac;color:#5a2620}
+.qc.fl-medium[aria-pressed="true"]{background:#e98a80;border-color:#e98a80;color:#fff}
+.qc.fl-heavy[aria-pressed="true"]{background:#c95a50;border-color:#c95a50;color:#fff}
+.cyc-toggle{display:flex;align-items:center;gap:8px}
+@media (min-width:1000px){ #v-health{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:28px} }
+@media (max-width:560px){ .hb-form{grid-template-columns:1fr 1fr} .hb-form .btn{grid-column:1 / -1} .hb-form label:first-child{grid-column:1 / -1} }
 </style>
 </head>
 <body class="locked">
@@ -835,7 +916,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     <img class="sp-icon" src="icon-512.png" alt="" width="92" height="92">
     <div class="sp-name">Daybook</div>
     <div class="sp-date" id="sp-date"></div>
-    <figure class="sp-quote"><blockquote id="sp-q"></blockquote><figcaption id="sp-a"></figcaption></figure>
+    <figure class="sp-quote"><span class="sp-kind" id="sp-kind" hidden></span><blockquote id="sp-q"></blockquote><p class="sp-tr" id="sp-tr" hidden></p><figcaption id="sp-a"></figcaption></figure>
   </div>
   <div class="sp-foot"><span class="sp-bar"><i></i></span><span id="sp-hint">Getting your day ready…</span></div>
 </div>
@@ -872,12 +953,97 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     ["Quality is not an act, it is a habit.","Aristotle"],
     ["What we learn with pleasure we never forget.","Alfred Mercier"],
     ["Rest is not idleness.","John Lubbock"],
-    ["Little strokes fell great oaks.","Benjamin Franklin"]
+    ["Little strokes fell great oaks.","Benjamin Franklin"],
+    ["No man is free who is not master of himself.","Epictetus"],
+    ["First say to yourself what you would be; and then do what you have to do.","Epictetus"],
+    ["It is not that we have a short time to live, but that we waste a lot of it.","Seneca"],
+    ["Difficulties strengthen the mind, as labour does the body.","Seneca"],
+    ["We suffer more often in imagination than in reality.","Seneca"],
+    ["The happiness of your life depends upon the quality of your thoughts.","Marcus Aurelius"],
+    ["Very little is needed to make a happy life.","Marcus Aurelius"],
+    ["Real knowledge is to know the extent of one's ignorance.","Confucius"],
+    ["Nature does not hurry, yet everything is accomplished.","Lao Tzu"],
+    ["Knowing others is intelligence; knowing yourself is true wisdom.","Lao Tzu"],
+    ["Diligence is the mother of good luck.","Benjamin Franklin"],
+    ["Never leave that till tomorrow which you can do today.","Benjamin Franklin"],
+    ["Great things are done by a series of small things brought together.","Vincent van Gogh"],
+    ["I am always doing that which I cannot do, in order that I may learn how to do it.","Vincent van Gogh"],
+    ["There is no substitute for hard work.","Thomas Edison"],
+    ["The beginning is the most important part of the work.","Plato"],
+    ["Slow and steady wins the race.","Aesop"],
+    ["Hitch your wagon to a star.","Ralph Waldo Emerson"],
+    ["Courage is resistance to fear, mastery of fear, not absence of fear.","Mark Twain"],
+    ["Little by little, a little becomes a lot.","Tanzanian proverb"],
+    ["If you want to go fast, go alone. If you want to go far, go together.","African proverb"],
+    ["Learning is a treasure that will follow its owner everywhere.","Chinese proverb"],
+    ["Where there is a will, there is a way.","English proverb"],
+    ["Sedikit-sedikit, lama-lama jadi bukit. (Little by little, it becomes a hill.)","Malay proverb"],
+    ["Hendak seribu daya, tak hendak seribu dalih. (Want it, and you find a thousand ways; don't, and you find a thousand excuses.)","Malay proverb"],
+    ["Berat sama dipikul, ringan sama dijinjing. (Heavy loads carried together, light ones shared too.)","Malay proverb"]
   ];
-  var d = new Date(), start = new Date(d.getFullYear(),0,0), day = Math.floor((d - start)/864e5);
-  var q = Q[day % Q.length];
-  document.getElementById("sp-q").textContent = "\u201C" + q[0] + "\u201D";
-  document.getElementById("sp-a").textContent = "\u2014 " + q[1];
+  // Classical Chinese quotes: [Chinese, English meaning, source]
+  var ZH = [
+    ["千里之行，始于足下。","A journey of a thousand li begins with a single step.","老子《道德经》"],
+    ["合抱之木，生于毫末。","A tree too wide to hug grows from a tiny sprout.","老子《道德经》"],
+    ["学而时习之，不亦说乎？","Isn't it a joy to learn something and keep practising it?","孔子《论语》"],
+    ["知之者不如好之者，好之者不如乐之者。","Knowing is good, loving it is better, enjoying it is best.","孔子《论语》"],
+    ["三人行，必有我师焉。","Among any three people walking together, one can teach me.","孔子《论语》"],
+    ["温故而知新，可以为师矣。","Review the old to discover the new.","孔子《论语》"],
+    ["欲速则不达。","Rushing gets you there more slowly.","孔子《论语》"],
+    ["敏而好学，不耻下问。","Be eager to learn and never ashamed to ask.","孔子《论语》"],
+    ["不积跬步，无以至千里；不积小流，无以成江海。","No small steps, no thousand miles; no little streams, no rivers and seas.","荀子《劝学》"],
+    ["锲而不舍，金石可镂。","Keep carving, and even metal and stone will give way.","荀子《劝学》"],
+    ["业精于勤，荒于嬉。","Skill grows with diligence and fades with idleness.","韩愈《进学解》"],
+    ["天行健，君子以自强不息。","As the heavens keep moving, keep striving to grow stronger.","《周易》"],
+    ["博学之，审问之，慎思之，明辨之，笃行之。","Learn widely, question closely, think carefully, judge clearly, act wholeheartedly.","《中庸》"],
+    ["静以修身，俭以养德。","Stay calm to cultivate yourself; live simply to grow in character.","诸葛亮《诫子书》"],
+    ["宝剑锋从磨砺出，梅花香自苦寒来。","A sharp sword comes from grinding; plum blossoms bloom after bitter cold.","《警世贤文》"],
+    ["一年之计在于春，一日之计在于晨。","Plan the year in spring, and the day in the morning.","《增广贤文》"],
+    ["绳锯木断，水滴石穿。","A rope can saw through wood; drops of water wear through stone.","罗大经《鹤林玉露》"],
+    ["少壮不努力，老大徒伤悲。","Idle in youth, regretful in old age.","汉乐府《长歌行》"],
+    ["路漫漫其修远兮，吾将上下而求索。","The road ahead is long; I will keep searching high and low.","屈原《离骚》"],
+    ["不怕慢，就怕站。","Don't fear going slowly; fear standing still.","中国谚语"]
+  ];
+  // Book picks: [title, author, why]
+  var BK = [
+    ["Atomic Habits","James Clear","Tiny daily habits compound into big results. Pairs well with your routine and streaks."],
+    ["Deep Work","Cal Newport","How to focus without distraction. Try it with the focus timer."],
+    ["Storytelling with Data","Cole Nussbaumer Knaflic","Turn spreadsheets into clear charts people understand. Great for your SQL and Excel work."],
+    ["Mindset","Carol S. Dweck","Why treating skills as learnable helps you grow faster and handle mistakes."],
+    ["The Psychology of Money","Morgan Housel","Short, readable stories about saving, risk and patience. A good first-job read."],
+    ["Thinking, Fast and Slow","Daniel Kahneman","How we make decisions, and where our thinking quietly trips us up."],
+    ["The 7 Habits of Highly Effective People","Stephen R. Covey","A classic on priorities, responsibility and working well with others."],
+    ["Make Time","Jake Knapp & John Zeratsky","Simple everyday tactics for making time for what matters to you."],
+    ["Grit","Angela Duckworth","Why passion plus persistence often beats talent alone."],
+    ["Show Your Work!","Austin Kleon","Share what you learn as you go. Handy for building a portfolio during your internship."],
+    ["Peak (《刻意练习》)","Anders Ericsson & Robert Pool","How deliberate practice, not hours alone, builds real skill."],
+    ["《被讨厌的勇气》 The Courage to Be Disliked","岸见一郎 · 古贺史健","A conversation about living by your own values instead of others' expectations."],
+    ["《活着》 To Live","余华 Yu Hua","A moving novel about endurance and finding meaning through hardship."],
+    ["《人类简史》 Sapiens","Yuval Noah Harari","A big-picture tour of human history that changes how you see everyday life."]
+  ];
+  var pool = [];
+  Q.forEach(function(q){ pool.push({ k: "q", a: q[0], b: q[1] }); });
+  ZH.forEach(function(z){ pool.push({ k: "zh", a: z[0], tr: z[1], b: z[2] }); pool.push({ k: "zh", a: z[0], tr: z[1], b: z[2] }); });
+  BK.forEach(function(x){ pool.push({ k: "book", a: x[0], b: x[1], tr: x[2] }); });
+  var d = new Date(), last = "", pick;
+  try { last = localStorage.getItem("daybook-quote2") || ""; } catch (e) {}
+  for (var n = 0; n < 6; n++) { pick = pool[Math.floor(Math.random() * pool.length)]; if (pick.a !== last) break; }
+  try { localStorage.setItem("daybook-quote2", pick.a); } catch (e) {}
+  var fig = document.querySelector(".sp-quote"); fig.classList.add("k-" + pick.k);
+  var kind = document.getElementById("sp-kind"), tr = document.getElementById("sp-tr");
+  if (pick.k === "book") {
+    kind.hidden = false; kind.textContent = "Book pick";
+    document.getElementById("sp-q").textContent = pick.a;
+    document.getElementById("sp-a").textContent = pick.b;
+    tr.hidden = false; tr.textContent = pick.tr;
+  } else if (pick.k === "zh") {
+    document.getElementById("sp-q").textContent = "“" + pick.a + "”";
+    tr.hidden = false; tr.textContent = pick.tr;
+    document.getElementById("sp-a").textContent = "— " + pick.b;
+  } else {
+    document.getElementById("sp-q").textContent = "“" + pick.a + "”";
+    document.getElementById("sp-a").textContent = "— " + pick.b;
+  }
   document.getElementById("sp-date").textContent = d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
 })();
 </script>
@@ -891,6 +1057,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
       <a href="#calendar" data-v="calendar">Calendar</a>
       <a href="#overview" data-v="overview">Overview</a>
       <a href="#growth" data-v="growth">Growth</a>
+      <a href="#health" data-v="health">Health</a>
       <a href="#reflect" data-v="reflect">Reflection</a>
       <a href="#routine" data-v="routine">Routine</a>
     </nav>
@@ -1002,6 +1169,39 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </div>
   </section>
 
+  <section class="view" id="v-health" hidden>
+    <div class="g-col">
+      <div class="pager h-pager" id="h-day"></div>
+      <div>
+        <div class="sechead"><h2>Water</h2><span class="meta">1 cup = 250 ml</span></div>
+        <div class="panel hcard" id="h-water"></div>
+      </div>
+      <div>
+        <div class="sechead"><h2>Meals</h2><span class="meta">What you ate and drank</span></div>
+        <div class="panel hcard" id="h-meals"></div>
+      </div>
+      <div>
+        <div class="sechead"><h2>Bowel movements</h2><span class="meta">Tap a type, then Log</span></div>
+        <div class="panel hcard" id="h-bowel"></div>
+      </div>
+    </div>
+    <div class="g-col">
+      <div id="h-cycle-wrap">
+        <div class="sechead"><h2>Menstrual cycle</h2><span class="meta">Tap a day, then choose the flow</span></div>
+        <div class="panel hcard" id="h-cycle"></div>
+      </div>
+      <div>
+        <div class="sechead"><h2>Health log</h2><span class="meta">Illness, symptoms, medicine, doctor visits</span></div>
+        <div class="panel hcard" id="h-cond"></div>
+      </div>
+      <div>
+        <div class="sechead"><h2>Height & weight</h2></div>
+        <div class="panel hcard" id="h-body"></div>
+      </div>
+      <label class="small muted cyc-toggle"><input type="checkbox" id="h-cyc-toggle"> Show menstrual cycle tracking</label>
+    </div>
+  </section>
+
   <section class="view" id="v-reflect" hidden>
     <div class="panel refl">
       <div class="sechead" style="margin:0"><h2>Daily reflection</h2>
@@ -1052,9 +1252,9 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
         </details>
       </div>
       <div class="seg" id="rt-filter" style="margin-bottom:8px"></div>
-      <div class="panel" id="rt-edit"></div>
       <div class="rt-actions"><button class="btn sm" type="button" id="rt-add">Add routine item</button><span class="rt-actions-r"><button class="btn sm ghost" type="button" id="rt-restore">Restore starter routine</button><button class="btn sm ghost danger" type="button" id="rt-clear">Clear all</button></span></div>
       <div class="panel rt-confirm" id="rt-confirm" hidden></div>
+      <div class="panel" id="rt-edit"></div>
     </div>
     <div class="rt-side">
     <div>
@@ -1115,6 +1315,6 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=16"></script>
+<script type="module" src="app.js?v=19"></script>
 </body>
 </html>

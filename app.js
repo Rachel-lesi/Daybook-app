@@ -41,7 +41,7 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; cle
 // ---------- data ops (db or in-memory fallback)
 function newId(){ return db ? db.collection("tasks").doc().id : Math.random().toString(36).slice(2,12); }
 function put(coll, id, data){
-  const list = coll==="tasks"?S.tasks:coll==="todos"?S.todos:coll==="routine"?S.routine:null;
+  const list = coll==="tasks"?S.tasks:coll==="todos"?S.todos:coll==="routine"?S.routine:coll==="body"?S.body:coll==="conditions"?S.conds:coll==="courses"?S.courses:null;
   if(!db && list){ const i=list.findIndex(x=>x.id===id); const row={...data,id}; i>=0?list.splice(i,1,row):list.push(row); render(); return; }
   if(!db){ render(); return; }
   return write(coll+"/"+id, () => db.doc(coll+"/"+id).set(data));
@@ -55,7 +55,7 @@ const strip = o => { const c={...o}; delete c.id; return c; };
 
 // ---------- categories
 const DEFAULT_CATS = [{name:"SQL / Database",tag:"sql"},{name:"Excel / Reporting",tag:"excel"},{name:"Python / Automation",tag:"python"},{name:"Admin / Documentation",tag:"admin"}];
-function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null})); }
+function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false})); }
 
 // ---------- look & feel helpers
 const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -222,7 +222,7 @@ $("#quick").addEventListener("submit", e => {
 });
 
 // ---------- routing
-const VIEWS=["today","work","calendar","overview","growth","reflect","routine"];
+const VIEWS=["today","work","calendar","overview","growth","health","reflect","routine"];
 function route(){ const h=location.hash.slice(1); S.view=VIEWS.includes(h)?h:"today";
   if(S.view==="work") setMode("work"); else if(S.view==="today") setMode("todo");
   render(); }
@@ -239,6 +239,7 @@ function render(){
   if(S.view==="calendar") renderCalendar();
   if(S.view==="overview") renderOverview();
   if(S.view==="growth") renderGrowth();
+  if(S.view==="health") renderHealth();
   if(S.view==="reflect") renderReport();
   if(S.view==="today") renderFocus();
   tickTimer();
@@ -840,6 +841,7 @@ function runSearch(){
   for (const t of S.todos) if (match(t.title)) R.push({ g: "To-dos", title: t.title, sub: (t.done ? "Done · " : "") + (t.date ? fmtDate(t.date) : ""), act: `data-sr-date="${esc(t.date || todayKey())}"` });
   for (const r of Object.values(S.refl)) { const hay = [r.did, r.learned, r.mistakes, r.improve].join(" \n "); if (match(hay)) R.push({ g: "Reflections", title: fmtDate(r.date) + " " + r.date.slice(0, 4), sub: "", snip: snippet(hay, q), act: `data-sr-refl="${esc(r.date)}"` }); }
   for (const c of S.courses) { const hay = [c.name, ...(c.modules || []).map(m => m.title)].join(" \n "); if (match(hay)) R.push({ g: "Courses", title: c.name, sub: `${(c.modules || []).filter(m => m.done).length}/${(c.modules || []).length} modules`, snip: match(c.name) ? "" : snippet(hay, q), act: `data-sr-view="growth"` }); }
+  for (const c of S.conds) { const hay = [c.title, c.notes].join(" \n "); if (match(hay)) R.push({ g: "Health", title: c.title, sub: `${fmtDate(c.start)} · ${c.status === "resolved" ? "recovered" : "ongoing"}`, snip: match(c.title) ? "" : snippet(hay, q), act: `data-sr-view="health"` }); }
   for (const r of S.routine) if (match(r.label)) R.push({ g: "Routine", title: r.label, sub: r.time + " · " + (daysLabel(r.days) || "Custom days"), act: `data-sr-view="routine"` });
   if (!R.length) { out.innerHTML = `<p class="small muted" style="padding:8px 4px;margin:0">Nothing found for “${esc(q)}”.</p>`; return; }
   const groups = [...new Set(R.map(r => r.g))];
@@ -1054,6 +1056,155 @@ $("#x-pdf").addEventListener("click", () => {
   setTimeout(() => { window.print(); setTimeout(() => { document.body.classList.remove("printing-export"); document.title = t0; }, 600); }, 80);
 });
 document.addEventListener("click", e => { const x = e.target.closest("[data-xopen]"); if (x) { e.preventDefault(); e.stopPropagation(); openExport(x.dataset.xopen); } }, true);
+
+// ---------- Health: water, meals, bowel, body, conditions, cycle
+S.health = {}; S.body = []; S.conds = []; S.hDay = null; S.waterGoal = 8; S.showCycle = true; S.condForm = false; S.condDel = null;
+const hk = () => S.hDay || todayKey();
+const hDoc = k => ({ date: k, water: 0, meals: [], bowel: [], flow: "", sym: [], ...(S.health[k] || {}) });
+function saveHealth(k, d){ S.health[k] = d; if (db) write("health/" + k, () => db.doc("health/" + k).set(d)); renderHealth(); }
+const hid = () => "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+const nowHMs = () => pad(new Date().getHours()) + ":" + pad(new Date().getMinutes());
+const MEALS = [["breakfast","Breakfast"],["lunch","Lunch"],["dinner","Dinner"],["snack","Snack"],["drink","Drink"]];
+const BOWEL = [["hard","Hard / constipated"],["normal","Normal"],["soft","Soft"],["watery","Watery / diarrhoea"]];
+const FLOW = [["","None"],["spotting","Spotting"],["light","Light"],["medium","Medium"],["heavy","Heavy"]];
+const SYMS = ["Cramps","Headache","Bloating","Back pain","Tender breasts","Acne","Fatigue","Mood swings","Cravings","Nausea"];
+const COND_KIND = [["symptom","Symptom"],["illness","Illness"],["injury","Injury"],["medication","Medication"],["doctor","Doctor visit"]];
+const SEV = [["mild","Mild"],["moderate","Moderate"],["severe","Severe"]];
+S.mealType = "breakfast"; S.bowelType = "normal"; S.condKind = "symptom"; S.condSev = "mild";
+function guessMeal(){ const h = new Date().getHours(); return h < 11 ? "breakfast" : h < 15 ? "lunch" : h < 17 ? "snack" : h < 22 ? "dinner" : "snack"; }
+// --- cycle maths (from days marked with flow)
+function cycleInfo(){
+  const days = Object.values(S.health).filter(d => d.flow && d.flow !== "spotting").map(d => d.date).sort();
+  const set = new Set(days), starts = days.filter(k => !set.has(addDays(k, -1)));
+  const runs = starts.map(s => { let n = 0, k = s; while (set.has(k)) { n++; k = addDays(k, 1); } return n; });
+  const diff = (a, b) => Math.round((new Date(b + "T00:00") - new Date(a + "T00:00")) / 864e5);
+  const lens = starts.slice(1).map((s, i) => diff(starts[i], s)).filter(n => n >= 15 && n <= 60).slice(-6);
+  const avg = lens.length ? Math.round(lens.reduce((a, b) => a + b, 0) / lens.length) : 28;
+  const pavg = runs.length ? Math.round(runs.slice(-6).reduce((a, b) => a + b, 0) / Math.min(6, runs.length)) : 5;
+  const tk = todayKey(), last = starts[starts.length - 1];
+  if (!last) return { starts, avg, pavg, lens, none: true };
+  let next = addDays(last, avg); while (next < tk && diff(next, tk) > 7) next = addDays(next, avg);
+  const day = diff(last, tk) + 1, ov = addDays(next, -14);
+  return { starts, runs, avg, pavg, lens, last, next, day, until: diff(tk, next), fertA: addDays(ov, -5), fertB: addDays(ov, 1), ov, set };
+}
+function sparkline(vals){
+  if (vals.length < 2) return "";
+  const W = 260, H = 54, lo = Math.min(...vals), hi = Math.max(...vals), r = hi - lo || 1;
+  const pts = vals.map((v, i) => [i / (vals.length - 1) * (W - 8) + 4, H - 6 - (v - lo) / r * (H - 14)]);
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><path d="M${pts.map(p => p.map(n => n.toFixed(1)).join(",")).join("L")}" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/><path d="M${pts[0][0]},${H}L${pts.map(p => p.map(n => n.toFixed(1)).join(",")).join("L")}L${pts[pts.length - 1][0]},${H}Z" fill="color-mix(in srgb,var(--accent) 12%,transparent)"/><circle cx="${pts[pts.length - 1][0]}" cy="${pts[pts.length - 1][1]}" r="3.5" fill="var(--accent)"/></svg>`;
+}
+function bmiInfo(h, w){ if (!h || !w) return null; const b = w / Math.pow(h / 100, 2); return { b: b.toFixed(1), cat: b < 18.5 ? "Underweight" : b < 25 ? "Healthy range" : b < 30 ? "Overweight" : "Obese" }; }
+function renderHealth(){
+  if (!$("#v-health") || S.view !== "health") return;
+  const k = hk(), tk = todayKey(), d = hDoc(k), isT = k === tk;
+  // day pager
+  $("#h-day").innerHTML = `<button class="btn sm" type="button" data-hday="-1" aria-label="Previous day">‹</button><span class="mid">${isT ? "Today" : esc(DAYS[keyDow(k)])}<small>${esc(fmtDate(k))}</small></span><button class="btn sm" type="button" data-hday="1" ${isT ? "disabled" : ""} aria-label="Next day">›</button>`;
+  // water
+  const goal = S.waterGoal || 8, cups = d.water || 0;
+  const wk = rangeKeys(7).map(x => hDoc(x).water || 0), avgW = (wk.reduce((a, b) => a + b, 0) / 7).toFixed(1);
+  $("#h-water").innerHTML = `<div class="hw-top"><div><b class="hw-n">${cups}</b><span class="muted"> / ${goal} cups</span><div class="small muted">${Math.round(cups * 250)} ml · 7-day average ${avgW} cups</div></div>
+      <div class="hw-btns"><button class="btn sm" type="button" data-water="-1" aria-label="Remove a cup" ${cups ? "" : "disabled"}>−</button><button class="btn sm primary" type="button" data-water="1">+ 1 cup</button></div></div>
+    <div class="cups">${Array.from({ length: Math.max(goal, cups) }, (_, i) => `<button type="button" class="cup ${i < cups ? "on" : ""}" data-cup="${i + 1}" aria-label="${i + 1} cups">${SVG(ICON.water)}</button>`).join("")}</div>
+    <label class="small muted hw-goal">Daily goal <select id="h-goal">${[6,7,8,9,10,12].map(n => `<option value="${n}" ${n === goal ? "selected" : ""}>${n} cups</option>`).join("")}</select></label>`;
+  // meals
+  const meals = (d.meals || []).slice().sort((a, b) => a.time.localeCompare(b.time));
+  $("#h-meals").innerHTML = `${meals.length ? `<ul class="hlist">${meals.map(m => `<li><span class="hl-t">${esc(m.time)}</span><span class="hl-tag m-${esc(m.type)}">${esc((MEALS.find(x => x[0] === m.type) || ["", m.type])[1])}</span><span class="hl-b">${esc(m.text)}</span><button type="button" class="x" data-hdel="meals:${esc(m.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Nothing logged${isT ? " yet today" : ""}.</p>`}
+    <div class="qa-chips wrap">${MEALS.map(([v, l]) => `<button type="button" class="qc" data-meal="${v}" aria-pressed="${S.mealType === v}">${l}</button>`).join("")}</div>
+    <form class="qrow" id="h-meal-form" autocomplete="off"><input id="h-meal" class="inp" placeholder="What did you eat? e.g. Nasi lemak, teh o"><input type="time" id="h-meal-t" class="inp" value="${isT ? nowHMs() : "12:00"}" style="max-width:110px"><button class="btn sm" type="submit">Add</button></form>`;
+  // bowel
+  const bw = (d.bowel || []).slice().sort((a, b) => a.time.localeCompare(b.time));
+  const wkB = rangeKeys(7).reduce((a, x) => a + (hDoc(x).bowel || []).length, 0);
+  $("#h-bowel").innerHTML = `${bw.length ? `<ul class="hlist">${bw.map(b => `<li><span class="hl-t">${esc(b.time)}</span><span class="hl-tag b-${esc(b.type)}">${esc((BOWEL.find(x => x[0] === b.type) || ["", b.type])[1])}</span><span class="hl-b">${esc(b.note || "")}</span><button type="button" class="x" data-hdel="bowel:${esc(b.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">No entries${isT ? " today" : ""}.</p>`}
+    <div class="qa-chips wrap">${BOWEL.map(([v, l]) => `<button type="button" class="qc" data-bowel="${v}" aria-pressed="${S.bowelType === v}">${l}</button>`).join("")}</div>
+    <form class="qrow" id="h-bowel-form" autocomplete="off"><input id="h-bowel-note" class="inp" placeholder="Note (optional), e.g. stomach ache, after spicy food"><button class="btn sm primary" type="submit">Log</button></form>
+    <p class="small muted" style="margin:0">Last 7 days: <b>${wkB}</b> time${wkB === 1 ? "" : "s"}</p>`;
+  // body
+  const recs = S.body.slice().sort((a, b) => a.date.localeCompare(b.date)), lastH = [...recs].reverse().find(r => r.height), lastW = [...recs].reverse().find(r => r.weight);
+  const bi = bmiInfo(lastH && +lastH.height, lastW && +lastW.weight), ws = recs.filter(r => r.weight).slice(-20).map(r => +r.weight);
+  const prevW = recs.filter(r => r.weight).slice(-2)[0];
+  $("#h-body").innerHTML = `<div class="hb-stats">
+      <div><span class="small muted">Height</span><b>${lastH ? esc(lastH.height) + " cm" : "–"}</b></div>
+      <div><span class="small muted">Weight</span><b>${lastW ? esc(lastW.weight) + " kg" : "–"}</b>${lastW && prevW && prevW !== lastW ? `<span class="small ${+lastW.weight > +prevW.weight ? "up" : "down"}">${+lastW.weight > +prevW.weight ? "▲" : "▼"} ${Math.abs(lastW.weight - prevW.weight).toFixed(1)}</span>` : ""}</div>
+      <div><span class="small muted">BMI</span><b>${bi ? bi.b : "–"}</b>${bi ? `<span class="small muted">${bi.cat}</span>` : ""}</div></div>
+    ${sparkline(ws)}
+    <form class="hb-form" id="h-body-form" autocomplete="off"><label class="f">Date<input type="date" id="hb-date" value="${tk}"></label><label class="f">Height (cm)<input type="number" step="0.1" min="50" max="250" id="hb-h" placeholder="${lastH ? esc(lastH.height) : "160"}" inputmode="decimal"></label><label class="f">Weight (kg)<input type="number" step="0.1" min="20" max="300" id="hb-w" placeholder="${lastW ? esc(lastW.weight) : "55"}" inputmode="decimal"></label><button class="btn sm primary" type="submit">Save</button></form>
+    ${recs.length ? `<details class="hb-hist"><summary class="small">All records (${recs.length})</summary><ul class="hlist">${recs.slice().reverse().map(r => `<li><span class="hl-t">${esc(fmtDate(r.date))}</span><span class="hl-b">${r.height ? esc(r.height) + " cm" : ""}${r.height && r.weight ? " · " : ""}${r.weight ? esc(r.weight) + " kg" : ""}</span><button type="button" class="x" data-bdel="${esc(r.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul></details>` : ""}
+    <p class="small muted" style="margin:0">BMI is a rough guide only, not a diagnosis.</p>`;
+  // conditions
+  const ongoing = S.conds.filter(c => c.status !== "resolved").sort((a, b) => b.start.localeCompare(a.start)), past = S.conds.filter(c => c.status === "resolved").sort((a, b) => b.start.localeCompare(a.start));
+  const condRow = c => `<li class="cond sev-${esc(c.severity)}"><div class="cd-top"><b>${esc(c.title)}</b><span class="hl-tag">${esc((COND_KIND.find(x => x[0] === c.kind) || ["", c.kind])[1])}</span><span class="sev">${esc((SEV.find(x => x[0] === c.severity) || ["", ""])[1])}</span></div>
+      <div class="small muted">${esc(fmtDate(c.start))}${c.status === "resolved" && c.end ? ` → ${esc(fmtDate(c.end))}` : " · ongoing"}</div>${c.notes ? `<div class="small">${esc(c.notes)}</div>` : ""}
+      <div class="cd-act">${c.status !== "resolved" ? `<button type="button" class="btn sm" data-cres="${esc(c.id)}">Mark recovered</button>` : ""}<button type="button" class="btn sm ghost danger" data-cdelx="${esc(c.id)}">${S.condDel === c.id ? "Tap again to delete" : "Delete"}</button></div></li>`;
+  $("#h-cond").innerHTML = `${S.condForm ? `<form class="cond-form" id="h-cond-form" autocomplete="off">
+      <label class="f">What's wrong?<input id="hc-title" class="inp" placeholder="e.g. Sore throat, fever, gastric, took panadol" required></label>
+      <div class="qa-chips wrap">${COND_KIND.map(([v, l]) => `<button type="button" class="qc" data-ckind="${v}" aria-pressed="${S.condKind === v}">${l}</button>`).join("")}</div>
+      <div class="qa-chips wrap">${SEV.map(([v, l]) => `<button type="button" class="qc sv-${v}" data-csev="${v}" aria-pressed="${S.condSev === v}">${l}</button>`).join("")}</div>
+      <div class="grid2"><label class="f">Started<input type="date" id="hc-start" value="${tk}"></label><label class="f">Notes<input id="hc-notes" class="inp" placeholder="Symptoms, medicine, clinic…"></label></div>
+      <div class="row"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" data-cform="0">Cancel</button></div></form>`
+      : `<button class="btn sm primary" type="button" data-cform="1">+ Log how you're feeling</button>`}
+    ${ongoing.length ? `<ul class="conds">${ongoing.map(condRow).join("")}</ul>` : `<p class="small muted" style="margin:0">Nothing ongoing. Hope you're feeling well.</p>`}
+    ${past.length ? `<details><summary class="small">History (${past.length})</summary><ul class="conds">${past.map(condRow).join("")}</ul></details>` : ""}`;
+  // cycle
+  $("#h-cycle-wrap").hidden = !S.showCycle;
+  if (S.showCycle) {
+    const C = cycleInfo(), strip = [];
+    for (let i = -20; i <= 20; i++) { const x = addDays(tk, i), dd = hDoc(x), per = dd.flow && dd.flow !== "spotting";
+      const pred = !C.none && !per && x > tk && x >= C.next && x < addDays(C.next, C.pavg), fert = !C.none && x > tk && x >= C.fertA && x <= C.fertB;
+      strip.push(`<button type="button" class="cy-d ${per ? "per f-" + dd.flow : ""} ${dd.flow === "spotting" ? "spot" : ""} ${pred ? "pred" : ""} ${fert ? "fert" : ""} ${x === tk ? "today" : ""} ${x === k ? "sel" : ""}" data-hset="${x}" title="${esc(fmtDate(x))}${per ? " · period (" + dd.flow + ")" : pred ? " · predicted period" : fert ? " · fertile window (estimate)" : ""}"><span>${esc(DAYS[keyDow(x)].slice(0, 1))}</span><b>${+x.slice(8)}</b></button>`); }
+    const prevScroll = $("#cy-strip") ? $("#cy-strip").scrollLeft : null;
+    $("#h-cycle").innerHTML = `<div class="cy-status">${C.none ? `<b>No period logged yet.</b><span class="small muted">Tap the day your last period started below, then choose the flow.</span>`
+        : `<div class="cy-ring"><b>${C.day > 0 && C.day <= 60 ? C.day : "–"}</b><span>day</span></div><div><b>${C.until > 0 ? `Next period in about ${C.until} day${C.until === 1 ? "" : "s"}` : C.until === 0 ? "Period expected today" : `Period about ${-C.until} day${C.until === -1 ? "" : "s"} late`}</b><div class="small muted">Expected around ${esc(fmtDate(C.next))} · average cycle ${C.avg} days · period ${C.pavg} days${C.lens.length < 2 ? " (estimate improves as you log more)" : ""}</div></div>`}</div>
+      <div class="cy-strip" id="cy-strip">${strip.join("")}</div>
+      <div class="tl-legend"><span><i class="lgc per"></i>Period</span><span><i class="lgc pred"></i>Predicted</span><span><i class="lgc fert"></i>Fertile window (estimate)</span><span><i class="lgc spot"></i>Spotting</span></div>
+      <div class="cy-log"><div class="small"><b>${isT ? "Today" : esc(fmtDate(k))}</b> · flow</div>
+        <div class="qa-chips wrap">${FLOW.map(([v, l]) => `<button type="button" class="qc fl-${v || "none"}" data-flow="${v}" aria-pressed="${(d.flow || "") === v}">${l}</button>`).join("")}</div>
+        <div class="small" style="margin-top:4px"><b>Symptoms</b></div>
+        <div class="qa-chips wrap">${SYMS.map(s => `<button type="button" class="qc" data-sym="${esc(s)}" aria-pressed="${(d.sym || []).includes(s)}">${esc(s)}</button>`).join("")}</div></div>
+      <p class="small muted" style="margin:0">Predictions are estimates from your own history. Don't rely on them for contraception.</p>`;
+    const st = $("#cy-strip");
+    if (st && renderHealth._scrolled && prevScroll !== null) st.scrollLeft = prevScroll;
+    else if (st) requestAnimationFrame(() => { const t = st.querySelector(".today"); if (t && st.clientWidth) { st.scrollLeft = t.offsetLeft - st.offsetLeft - st.clientWidth / 2 + t.offsetWidth / 2; renderHealth._scrolled = true; } });
+  }
+  $("#h-cyc-toggle").checked = !!S.showCycle;
+}
+function addHealthItem(field, item){ const k = hk(), d = hDoc(k); d[field] = [...(d[field] || []), item]; saveHealth(k, d); }
+document.addEventListener("click", e => {
+  if (S.view !== "health") return;
+  const t = e.target.closest("button,[data-hset]"); if (!t || !t.closest("#v-health")) return;
+  const k = hk(), d = hDoc(k);
+  if (t.dataset.hday) { const n = addDays(k, +t.dataset.hday); S.hDay = n > todayKey() ? todayKey() : n; renderHealth(); }
+  else if (t.dataset.water) { d.water = Math.max(0, (d.water || 0) + +t.dataset.water); saveHealth(k, d); if (+t.dataset.water > 0 && d.water === (S.waterGoal || 8)) toast("Water goal reached! 💧"); }
+  else if (t.dataset.cup) { const n = +t.dataset.cup; d.water = d.water === n ? n - 1 : n; saveHealth(k, d); }
+  else if (t.dataset.meal) { S.mealType = t.dataset.meal; renderHealth(); $("#h-meal").focus(); }
+  else if (t.dataset.bowel) { S.bowelType = t.dataset.bowel; renderHealth(); }
+  else if (t.dataset.hdel) { const [f, id] = t.dataset.hdel.split(":"); d[f] = (d[f] || []).filter(x => x.id !== id); saveHealth(k, d); }
+  else if (t.dataset.bdel) { del("body", t.dataset.bdel); }
+  else if (t.dataset.cform !== undefined) { S.condForm = t.dataset.cform === "1"; renderHealth(); if (S.condForm) $("#hc-title").focus(); }
+  else if (t.dataset.ckind) { S.condKind = t.dataset.ckind; t.parentElement.querySelectorAll("[data-ckind]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
+  else if (t.dataset.csev) { S.condSev = t.dataset.csev; t.parentElement.querySelectorAll("[data-csev]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
+  else if (t.dataset.cres) { const c = S.conds.find(x => x.id === t.dataset.cres); if (c) { put("conditions", c.id, { ...strip(c), status: "resolved", end: todayKey() }); toast("Glad you're feeling better"); } }
+  else if (t.dataset.cdelx) { if (S.condDel !== t.dataset.cdelx) { S.condDel = t.dataset.cdelx; renderHealth(); } else { del("conditions", t.dataset.cdelx); S.condDel = null; } }
+  else if (t.dataset.hset) { S.hDay = t.dataset.hset > todayKey() ? todayKey() : t.dataset.hset; if (t.dataset.hset > todayKey()) toast("You can log flow up to today"); renderHealth(); }
+  else if (t.dataset.flow !== undefined) { d.flow = t.dataset.flow; saveHealth(k, d); }
+  else if (t.dataset.sym) { const s = t.dataset.sym, cur = d.sym || []; d.sym = cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s]; saveHealth(k, d); }
+});
+document.addEventListener("submit", e => {
+  const f = e.target; if (!f.closest || !f.closest("#v-health")) return;
+  e.preventDefault();
+  if (f.id === "h-meal-form") { const txt = $("#h-meal").value.trim(); if (!txt) { $("#h-meal").focus(); return; } addHealthItem("meals", { id: hid(), type: S.mealType, text: txt, time: $("#h-meal-t").value || nowHMs() }); setTimeout(() => $("#h-meal") && $("#h-meal").focus(), 30); }
+  else if (f.id === "h-bowel-form") { addHealthItem("bowel", { id: hid(), type: S.bowelType, note: $("#h-bowel-note").value.trim(), time: hk() === todayKey() ? nowHMs() : "12:00" }); toast("Logged"); }
+  else if (f.id === "h-body-form") { const hh = parseFloat($("#hb-h").value), ww = parseFloat($("#hb-w").value), dt = $("#hb-date").value || todayKey();
+    if (!hh && !ww) { toast("Enter your height, weight or both"); return; }
+    const ex = S.body.find(r => r.date === dt); const rec = { date: dt, height: hh ? +hh.toFixed(1) : (ex && ex.height) || "", weight: ww ? +ww.toFixed(1) : (ex && ex.weight) || "", createdAt: nowISO() };
+    put("body", ex ? ex.id : newId(), rec); toast("Saved"); }
+  else if (f.id === "h-cond-form") { const ti = $("#hc-title").value.trim(); if (!ti) return;
+    put("conditions", newId(), { title: ti, kind: S.condKind, severity: S.condSev, start: $("#hc-start").value || todayKey(), end: "", status: "ongoing", notes: $("#hc-notes").value.trim(), createdAt: nowISO() });
+    S.condForm = false; toast("Logged. Take care of yourself."); }
+});
+document.addEventListener("change", e => {
+  if (e.target.id === "h-goal") { S.waterGoal = +e.target.value; saveCats(); renderHealth(); }
+  if (e.target.id === "h-cyc-toggle") { S.showCycle = e.target.checked; saveCats(); renderHealth(); }
+});
 
 // ---------- calendar
 S.calY = new Date().getFullYear(); S.calM = new Date().getMonth(); S.calSel = todayKey();
@@ -1419,10 +1570,13 @@ function startData(){
   const sub = (coll, key) => { let first = true; db.collection(coll).onSnapshot(s => { S[key] = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); } else render(); }, fail); };
   sub("tasks", "tasks"); sub("todos", "todos");
   { let first = true; db.collection("routine").onSnapshot(s => { S.routine = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); refreshPush(true); } else render(); clearTimeout(syncFireFields._t); syncFireFields._t = setTimeout(syncFireFields, 1500); }, fail); }
+  db.collection("health").orderBy("date", "desc").limit(400).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.health = o; render(); }, fail);
+  db.collection("body").onSnapshot(s => { S.body = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
+  db.collection("conditions").onSnapshot(s => { S.conds = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("courses").onSnapshot(s => { S.courses = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("time").orderBy("start", "desc").limit(1500).onSnapshot(s => { S.time = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.doc("settings/timer").onSnapshot(s => { const t = s.exists ? s.data() : null; const changed = JSON.stringify(t) !== JSON.stringify(S.timer); S.timer = t && t.start ? t : null; if (changed) render(); }, fail);
-  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
+  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(1000).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
   watchChecks = () => { const k = viewKey(); if (k === watchedDay) return; watchedDay = k; if (unsubCheck) unsubCheck(); unsubCheck = db.doc("checks/" + k).onSnapshot(s => { const d = s.exists ? s.data() : {}; S.day[k] = { done: d.done || {}, skip: d.skip || {}, extra: d.extra || [] }; render(); }, fail); };
@@ -1438,7 +1592,8 @@ $("#uname").addEventListener("change", () => { S.name = $("#uname").value.trim()
 // ---------- backup
 $("#bk-export").onclick = () => {
   const data = { app: "daybook", exportedAt: nowISO(), settings: { categories: S.cats },
-    tasks: S.tasks, todos: S.todos, routine: S.routine, refl: S.refl, day: S.day };
+    tasks: S.tasks, todos: S.todos, routine: S.routine, refl: S.refl, day: S.day,
+    courses: S.courses, time: S.time, health: S.health, body: S.body, conditions: S.conds };
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
   const a = document.createElement("a"); a.href = url; a.download = "daybook-backup-" + todayKey() + ".json"; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000); toast("Backup downloaded");
@@ -1453,6 +1608,11 @@ $("#bk-import").onchange = async e => {
     (d.todos || []).forEach(t => ops.push(["todos/" + t.id, strip(t)]));
     (d.routine || []).forEach(t => ops.push(["routine/" + t.id, strip(t)]));
     Object.entries(d.refl || {}).forEach(([k, v]) => ops.push(["reflections/" + k, v]));
+    (d.courses || []).forEach(t => ops.push(["courses/" + t.id, strip(t)]));
+    (d.time || []).forEach(t => ops.push(["time/" + t.id, strip(t)]));
+    (d.body || []).forEach(t => ops.push(["body/" + t.id, strip(t)]));
+    (d.conditions || []).forEach(t => ops.push(["conditions/" + t.id, strip(t)]));
+    Object.entries(d.health || {}).forEach(([k, v]) => ops.push(["health/" + k, v]));
     Object.entries(d.day || {}).forEach(([k, v]) => ops.push(["checks/" + k, { date: k, done: v.done || {}, skip: v.skip || {}, extra: v.extra || [] }]));
     for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(FS); ops.slice(i, i + 400).forEach(([p, v]) => b.set(doc(FS, "users/" + UID + "/" + p), v)); await b.commit(); }
     toast("Backup restored: " + ops.length + " items");
