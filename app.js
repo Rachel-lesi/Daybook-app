@@ -420,7 +420,7 @@ function renderCalendar(){
     const dueOpen = I.due.filter(t => t.status !== "done").length;
     const pc = I.pct;
     const bar = pc === null ? "" : `<span class="cal-bar"><i style="width:${pc}%;background:${pc >= 80 ? "var(--ok)" : pc >= 50 ? "var(--med)" : "var(--crit)"}"></i></span>`;
-    const marks = (I.refl ? `<i class="mk mk-refl" title="Reflection written"></i>` : "") + (I.updates.length || I.finished.length ? `<i class="mk mk-work" title="Work activity"></i>` : "") + (dueOpen ? `<i class="mk mk-due" title="Task due"></i>` : "");
+    const marks = (I.refl ? `<i class="mk mk-refl" title="Reflection written"></i>` : "") + (I.updates.length || I.finished.length || I.added.length ? `<i class="mk mk-work" title="Work activity"></i>` : "") + (dueOpen ? `<i class="mk mk-due" title="Task due"></i>` : "");
     h += `<button type="button" class="cal-day ${k === tk ? "is-today" : ""} ${k === S.calSel ? "is-sel" : ""} ${we ? "is-we" : ""} ${k > tk ? "is-future" : ""}" data-cdate="${k}" aria-label="${esc(fmtDate(k))}" aria-pressed="${k === S.calSel}">
       <span class="cal-n">${d}</span>${doneN ? `<span class="cal-c">✓${doneN}</span>` : ""}<span class="cal-marks">${marks}</span>${bar}</button>`;
   }
@@ -660,6 +660,10 @@ updateHint();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 const setOnline = () => { $("#offline").hidden = navigator.onLine; };
 addEventListener("online", setOnline); addEventListener("offline", setOnline); setOnline();
+
+// keep sticky side panels below the header
+const setHdr = () => { const h=document.querySelector("header.top"); if(h) document.documentElement.style.setProperty("--hdr", h.offsetHeight+"px"); };
+addEventListener("resize", setHdr); setHdr(); setTimeout(setHdr, 500);
 
 // ---------- opening screen
 const SPLASH_MIN = 1800;

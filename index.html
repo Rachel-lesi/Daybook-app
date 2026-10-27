@@ -374,6 +374,34 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
 .hero-plan{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
 @media (prefers-reduced-motion:reduce){.task:hover{transform:none}}
 
+
+/* ===== Wide screens: use the whole laptop width ===== */
+.t-main,.t-side,.cal-main,.rt-side{display:grid;gap:22px;align-content:start;min-width:0}
+.cal-main{gap:14px}
+.t-main > *,.t-side > *,.cal-main > *,.rt-side > *{min-width:0}
+.addonce #ao-l{width:0}
+@media (min-width:1000px){
+  .wrap{max-width:1380px;padding-left:max(32px,env(safe-area-inset-left,0px));padding-right:max(32px,env(safe-area-inset-right,0px))}
+  main{padding-block:24px 48px}
+  /* Today: hero across the top, routine left, to-dos / focus / done right */
+  #v-today{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);column-gap:28px;align-items:start}
+  #v-today > .now{grid-column:1 / -1}
+  /* Work: task cards in columns */
+  #v-work .tasks{grid-template-columns:repeat(auto-fill,minmax(380px,1fr));align-items:start}
+  /* Calendar: month left, chosen day right (stays in view while you scroll) */
+  #v-calendar{grid-template-columns:minmax(0,1.45fr) minmax(340px,1fr);column-gap:28px;align-items:start}
+  .cal-side{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hdr,180px) + 16px);max-height:calc(100vh - var(--hdr,180px) - 40px);overflow:auto;border-radius:var(--r)}
+  .cal-day{min-height:92px}
+  /* Overview: six tiles in a row, wider charts */
+  .tiles{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .ov2{gap:22px}
+  /* Reflection: form left, history right */
+  #v-reflect{grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);column-gap:28px;align-items:start}
+  #v-reflect textarea{min-height:96px}
+  /* Routine: editor left, categories / reminders / account right */
+  #v-routine{grid-template-columns:minmax(0,1.4fr) minmax(320px,1fr);column-gap:28px;align-items:start}
+}
+@media (min-width:1000px) and (max-width:1180px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
 /* ===== Opening screen & sign-in background ===== */
 :root{--sp-base:#f3f7f6;--sp1:#bfead8;--sp2:#cfdcfb;--sp3:#f8dfcc;--sp-glow:rgba(15,138,102,.28)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sp-base:#0a0f11;--sp1:#0f4a3a;--sp2:#1b2b57;--sp3:#3b2a1d;--sp-glow:rgba(52,200,154,.25)}}
@@ -490,13 +518,14 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
 
   <section class="view" id="v-today" hidden>
     <div class="now" id="now"></div>
-    <div>
+    <div class="t-main">
       <div class="sechead"><h2 id="rt-title">Routine</h2><span class="meta" id="rt-meta"></span></div>
       <div class="pager" id="daypager"></div>
       <div class="panel"><ol class="timeline" id="timeline"></ol>
         <form class="addonce" id="addonce" autocomplete="off"><input type="time" id="ao-t" value="14:00" aria-label="Time"><input id="ao-l" placeholder="Add just for this day, e.g. Dentist, family dinner" aria-label="One-off item"><button class="btn sm" type="submit">Add</button></form>
       </div>
     </div>
+    <div class="t-side">
     <div>
       <div class="sechead"><h2>To-do</h2><span class="meta" id="todo-meta"></span></div>
       <div class="panel"><ul class="rows" id="todos"></ul></div>
@@ -509,6 +538,7 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
       <div class="sechead"><h2>Done today</h2><span class="meta" id="done-meta"></span></div>
       <div class="panel"><ul class="rows" id="donetoday"></ul></div>
     </div>
+    </div>
   </section>
 
   <section class="view" id="v-work" hidden>
@@ -518,6 +548,7 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
   </section>
 
   <section class="view" id="v-calendar" hidden>
+    <div class="cal-main">
     <div class="calhead">
       <button class="btn sm" type="button" data-calm="-1" aria-label="Previous month">‹</button>
       <h2 id="cal-title"></h2>
@@ -526,7 +557,8 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
     </div>
     <div class="panel calgrid" id="cal-grid"></div>
     <div class="legend small muted"><span><i class="mk mk-work"></i>Work activity</span><span><i class="mk mk-refl"></i>Reflection</span><span><i class="mk mk-due"></i>Task due</span><span><b class="lg-bar"></b>Routine kept</span><span>✓ items done</span></div>
-    <div id="cal-day"></div>
+    </div>
+    <div id="cal-day" class="cal-side"></div>
   </section>
 
   <section class="view" id="v-overview" hidden>
@@ -572,6 +604,7 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
       <div class="panel" id="rt-edit"></div>
       <div style="margin-top:8px"><button class="btn sm" type="button" id="rt-add">Add routine item</button></div>
     </div>
+    <div class="rt-side">
     <div>
       <div class="sechead"><h2>Work categories</h2><span class="meta">Use the short tag after # in quick add</span></div>
       <div class="panel" style="padding:12px;display:grid;gap:10px">
@@ -593,6 +626,7 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
         <label class="btn sm" for="bk-import" style="cursor:pointer">Restore from backup</label><input type="file" id="bk-import" accept="application/json,.json" hidden>
         <button class="btn sm ghost danger" type="button" id="signout">Sign out</button>
       </div>
+    </div>
     </div>
   </section>
 </main>
@@ -618,6 +652,6 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=6"></script>
+<script type="module" src="app.js?v=7"></script>
 </body>
 </html>
