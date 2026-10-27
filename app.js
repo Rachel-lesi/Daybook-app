@@ -728,7 +728,7 @@ function reportHTML(forFile){
   const body = reportSections(W).map(([h, items]) => `<h2>${esc(h)}</h2>${items.length ? `<ul>${items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="none">None</p>`}`).join("");
   const head = `<h1>${esc(reportTitle(W))}</h1>${S.name || S.org ? `<p class="who">${esc([S.name, S.org].filter(Boolean).join(" · "))}</p>` : ""}`;
   if (!forFile) return head + body;
-  return `<html><head><meta charset="utf-8"><title>${esc(reportTitle(W))}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#0f6f53;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
+  return `<html><head><meta charset="utf-8"><title>${esc(reportTitle(W))}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#465c47;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
 }
 function renderReport(){
   const W = weekData(S.wkOff);

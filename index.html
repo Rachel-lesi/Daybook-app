@@ -7,8 +7,8 @@
 <meta name="description" content="Daily routine, to-dos, internship work tasks and daily reflections.">
 <link rel="manifest" href="manifest.webmanifest">
 <script>try{var t=localStorage.getItem("daybook-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}</script>
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#16211d" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f6f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171d18" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -585,6 +585,60 @@ mark{background:color-mix(in srgb,var(--med) 35%,transparent);color:inherit;bord
 .authcard{background:var(--glass);-webkit-backdrop-filter:blur(18px) saturate(1.3);backdrop-filter:blur(18px) saturate(1.3);border-color:color-mix(in srgb,var(--line) 70%,transparent)}
 .authcard img{box-shadow:0 10px 26px var(--sp-glow)}
 @media (prefers-reduced-motion:reduce){.sp-bg i,.sp-icon,.sp-name,.sp-date,.sp-quote,.sp-bar i{animation:none}}
+
+/* ===== Sage & blush theme (#465C47 main, #FACBC6 accent) ===== */
+:root{
+  --bg:#f4f6f2; --surface:#ffffff; --sunk:#ecf0ea; --line:#dde4da; --ink:#1e2a1f; --muted:#68746a;
+  --accent:#465c47; --accent-2:#6a836b; --accent-ink:#ffffff; --accent-soft:#e3ebe1;
+  --pink:#facbc6; --pink-soft:#fdebe8; --pink-ink:#8c4a43;
+  --hero-a:#e4ece1; --hero-b:#fde6e2; --glass:rgba(255,255,255,.84);
+  --sp-base:#f4f6f2; --sp1:#c8d8c4; --sp2:#facbc6; --sp3:#dfe8d6; --sp-glow:rgba(70,92,71,.28);
+  --c0:#4a6fa5; --c0s:#e6edf7; --c1:#465c47; --c1s:#e3ebe1; --c2:#86659f; --c2s:#f0e9f5;
+  --c3:#b8743f; --c3s:#f8ece1; --c4:#c0646f; --c4s:#fde8e9; --c5:#3f8789; --c5s:#e1f1f1;
+  --ok:#4f7d50;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101411; --surface:#171d18; --sunk:#1e261f; --line:#2a352b; --ink:#e6ede5; --muted:#97a597;
+  --accent:#9ab89a; --accent-2:#b9d0b8; --accent-ink:#122014; --accent-soft:#25332a;
+  --pink:#f2b6af; --pink-soft:#3a2523; --pink-ink:#f6c6c0;
+  --hero-a:#1d2a1f; --hero-b:#2e2022; --glass:rgba(23,29,24,.84);
+  --sp-base:#0d110e; --sp1:#2c4430; --sp2:#5a3431; --sp3:#24331f; --sp-glow:rgba(154,184,154,.22);
+  --c0:#8fb0e3; --c0s:#1f2a3c; --c1:#a6c4a6; --c1s:#22301f; --c2:#c3a3dc; --c2s:#2d2438; --c3:#e3a774; --c3s:#382818; --c4:#ef9aa3; --c4s:#3b2226; --c5:#7cc6c8; --c5s:#183334;
+  --ok:#8cc08d; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101411; --surface:#171d18; --sunk:#1e261f; --line:#2a352b; --ink:#e6ede5; --muted:#97a597;
+  --accent:#9ab89a; --accent-2:#b9d0b8; --accent-ink:#122014; --accent-soft:#25332a;
+  --pink:#f2b6af; --pink-soft:#3a2523; --pink-ink:#f6c6c0;
+  --hero-a:#1d2a1f; --hero-b:#2e2022; --glass:rgba(23,29,24,.84);
+  --sp-base:#0d110e; --sp1:#2c4430; --sp2:#5a3431; --sp3:#24331f; --sp-glow:rgba(154,184,154,.22);
+  --c0:#8fb0e3; --c0s:#1f2a3c; --c1:#a6c4a6; --c1s:#22301f; --c2:#c3a3dc; --c2s:#2d2438; --c3:#e3a774; --c3s:#382818; --c4:#ef9aa3; --c4s:#3b2226; --c5:#7cc6c8; --c5s:#183334;
+  --ok:#8cc08d; color-scheme:dark}
+/* where the blush accent appears */
+nav.tabs a[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+nav.tabs a[aria-current="page"] .count{background:var(--pink);color:#4a2622}
+nav.tabs .count{background:var(--pink-soft);color:var(--pink-ink)}
+.btn.primary{background:var(--accent);box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 28%,transparent)}
+.btn.primary:hover{background:color-mix(in srgb,var(--accent) 88%,#000)}
+.qmode button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.ring-bg{stroke:var(--pink-soft)}
+.ring-fg{stroke:var(--accent)}
+.hero-stats span{border-color:color-mix(in srgb,var(--pink) 45%,var(--line))}
+ol.timeline li.next{background:var(--pink-soft)}
+.impact{background:var(--pink-soft)}
+.impact svg{color:var(--pink-ink)}
+.tpill.focus{background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--pink) 70%,var(--accent)))}
+.hb-streak.on svg,.co-stats svg{color:#e0857b}
+.cal-day.is-today .cal-n{background:var(--accent);color:var(--accent-ink)}
+.cal-day.is-sel{border-color:var(--pink);box-shadow:inset 0 0 0 2px var(--pink)}
+.mk-refl{background:var(--accent)} .mk-work{background:#e0857b}
+.chip[aria-pressed="true"],.stat[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.stat[aria-pressed="true"] span{color:var(--accent-ink);opacity:.85}
+.seg button[aria-pressed="true"],.mood button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.bell[aria-pressed="true"]{background:var(--pink-soft);border-color:var(--pink);color:var(--ink)}
+.bell[aria-pressed="true"] svg{color:var(--pink-ink)}
+mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
+.sp-bar i{background:linear-gradient(90deg,var(--accent),var(--pink))}
+.wk-doc h2{color:var(--accent)}
 </style>
 </head>
 <body class="locked">
@@ -864,6 +918,6 @@ mark{background:color-mix(in srgb,var(--med) 35%,transparent);color:inherit;bord
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=10"></script>
+<script type="module" src="app.js?v=11"></script>
 </body>
 </html>
