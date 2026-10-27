@@ -376,9 +376,9 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
 
 
 /* ===== Wide screens: use the whole laptop width ===== */
-.t-main,.t-side,.cal-main,.rt-side{display:grid;gap:22px;align-content:start;min-width:0}
+.cal-top,.t-main,.t-side,.cal-main,.rt-side{display:grid;gap:22px;align-content:start;min-width:0}
 .cal-main{gap:14px}
-.t-main > *,.t-side > *,.cal-main > *,.rt-side > *{min-width:0}
+.cal-top > *,.t-main > *,.t-side > *,.cal-main > *,.rt-side > *{min-width:0}
 .addonce #ao-l{width:0}
 @media (min-width:1000px){
   .wrap{max-width:1380px;padding-left:max(32px,env(safe-area-inset-left,0px));padding-right:max(32px,env(safe-area-inset-right,0px))}
@@ -389,7 +389,7 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
   /* Work: task cards in columns */
   #v-work .tasks{grid-template-columns:repeat(auto-fill,minmax(380px,1fr));align-items:start}
   /* Calendar: month left, chosen day right (stays in view while you scroll) */
-  #v-calendar{grid-template-columns:minmax(0,1.45fr) minmax(340px,1fr);column-gap:28px;align-items:start}
+  .cal-top{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(340px,1fr);column-gap:28px;align-items:start}
   .cal-side{position:sticky;top:calc(env(safe-area-inset-top,0px) + var(--hdr,180px) + 16px);max-height:calc(100vh - var(--hdr,180px) - 40px);overflow:auto;border-radius:var(--r)}
   .cal-day{min-height:92px}
   /* Overview: six tiles in a row, wider charts */
@@ -677,6 +677,76 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 .tl-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.72rem;color:var(--muted)}
 .tl-legend span{display:inline-flex;align-items:center;gap:5px}
 .tl-legend .tl-dot{position:static;margin:0;width:10px;height:10px}
+
+/* ===== Schedule grid (Calendar tab) ===== */
+.sched{padding:14px 0 12px;display:grid;gap:10px;min-width:0}
+.sch-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:0 16px}
+.sch-title{display:grid}
+.sch-title h2{margin:0}
+.sch-ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.sch-ctrl .seg{margin-left:6px}
+.sch-scroll{max-height:min(68vh,680px);overflow:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);overscroll-behavior:contain}
+.sch-grid{display:grid;grid-template-columns:52px repeat(var(--cols),minmax(0,1fr));position:relative}
+.sch-hd{position:sticky;top:0;z-index:4;background:var(--surface);border:0;border-bottom:1px solid var(--line);border-left:1px solid var(--line);padding:8px 2px 6px;display:grid;justify-items:center;gap:1px;text-align:center}
+.sch-corner{border-left:0}
+.sch-dow{font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.sch-num{font-family:var(--f-display);font-size:1.35rem;font-weight:500;width:36px;height:36px;display:grid;place-items:center;border-radius:99px;line-height:1}
+.sch-hd.is-today .sch-dow{color:var(--accent)}
+.sch-hd.is-today .sch-num{background:var(--accent);color:var(--accent-ink)}
+.sch-hd.is-sel:not(.is-today) .sch-num{background:var(--pink-soft);color:var(--pink-ink)}
+.sch-sum{font-family:var(--f-mono);font-size:.62rem;color:var(--muted);white-space:nowrap;overflow:hidden;max-width:100%}
+.sch-ad-lbl{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:6px 6px;text-align:right;border-bottom:1px solid var(--line)}
+.sch-ad{border-left:1px solid var(--line);border-bottom:1px solid var(--line);padding:3px;display:grid;gap:2px;align-content:start;min-width:0}
+.ev-due{font-size:.7rem;font-weight:600;padding:2px 6px;border-radius:5px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-left:3px solid currentColor}
+.sch-times{position:relative;border-right:0}
+.sch-times span{position:absolute;right:8px;transform:translateY(-50%);font-family:var(--f-mono);font-size:.66rem;color:var(--muted)}
+.sch-col{position:relative;border-left:1px solid var(--line);background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(var(--hr) - 1px),var(--line) calc(var(--hr) - 1px),var(--line) var(--hr))}
+.sch-col.is-we{background-color:color-mix(in srgb,var(--sunk) 55%,transparent)}
+.sch-col.is-today{background-color:color-mix(in srgb,var(--pink-soft) 45%,transparent)}
+.sch-now{position:absolute;left:-1px;right:0;height:2px;margin-top:-1px;background:#e0857b;z-index:3}
+.sch-now::before{content:"";position:absolute;left:-5px;top:-4px;width:10px;height:10px;border-radius:99px;background:#e0857b}
+.ev{position:absolute;box-sizing:border-box;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;overflow:hidden;border-radius:6px;padding:2px 6px;font-size:.72rem;line-height:1.35;text-align:left;border:0;cursor:pointer;z-index:1;min-width:0}
+.ev:hover{z-index:2;box-shadow:var(--shadow-lg)}
+.ev-t{display:flex;align-items:center;gap:4px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ev-t svg{width:11px;height:11px;flex:none}
+.ev-s{font-size:.66rem;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-rt{flex-direction:row;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--line);color:var(--ink)}
+.ev-rt .ri{width:16px;height:16px;border-radius:5px;flex:none}
+.ev-rt .ri svg{width:10px;height:10px}
+.ev-rt.s-done{background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.ev-rt.s-done .ev-t{text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--ink) 35%,transparent)}
+.ev-rt.s-late,.ev-rt.s-miss{background:var(--pink-soft);border-color:#e0857b}
+.ev-rt.s-todo{border-style:dashed}
+.ev-rt.s-skip{opacity:.45;border-style:dashed}
+.ev-rt.s-none{opacity:.35}
+.ev-time{border-left:3px solid currentColor;color:var(--accent);background:var(--accent-soft)}
+.ev-time .ev-t,.ev-time .ev-s{color:var(--ink)}
+.ev-time.ev-course{color:var(--c1);background:var(--c1s)}
+.ev-time.ev-focus{color:var(--c2);background:var(--c2s)}
+.ev-time.live{outline:2px solid currentColor;outline-offset:-1px;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.75}}
+.ev-done{border-left:3px solid currentColor;flex-direction:row;align-items:center}
+.ev-done .ev-t{color:var(--ink)}
+.ev-todo{background:var(--sunk);color:var(--ink);flex-direction:row;align-items:center}
+.ev-refl{background:var(--pink);color:#4a2622;flex-direction:row;align-items:center}
+.sch-legend{padding:0 16px}
+.lg{display:inline-block;width:14px;height:10px;border-radius:3px;border:1px solid var(--line);background:var(--surface)}
+.lg-rt.s-done{background:var(--accent-soft);border-color:var(--accent)}
+.lg-rt.s-late{background:var(--pink-soft);border-color:#e0857b}
+.lg-rt.s-todo{border-style:dashed}
+.lg-time{background:var(--accent-soft);border:0;border-left:3px solid var(--accent)}
+.lg-done{background:var(--c0s);border:0;border-left:3px solid var(--c0)}
+.lg-refl{background:var(--pink);border:0}
+
+@media (max-width:700px){
+  .sch-grid{grid-template-columns:40px repeat(var(--cols),minmax(0,1fr))}
+  .sch-times span{right:4px;font-size:.6rem}
+  .sch-num{font-size:1.05rem;width:28px;height:28px}
+  .sched .ev{padding:1px 3px;font-size:.62rem}
+  .sch-grid[style*="--cols:7"] .ev-rt .ri{display:none}
+  .sch-grid[style*="--cols:7"] .sch-sum{display:none}
+}
+@media (prefers-reduced-motion:reduce){.ev-time.live{animation:none}}
 </style>
 </head>
 <body class="locked">
@@ -799,6 +869,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
   </section>
 
   <section class="view" id="v-calendar" hidden>
+    <div class="cal-top">
     <div class="cal-main">
     <div class="calhead">
       <button class="btn sm" type="button" data-calm="-1" aria-label="Previous month">‹</button>
@@ -810,6 +881,8 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     <div class="legend small muted"><span><i class="mk mk-work"></i>Work activity</span><span><i class="mk mk-refl"></i>Reflection</span><span><i class="mk mk-due"></i>Task due</span><span><b class="lg-bar"></b>Routine kept</span><span>✓ items done</span></div>
     </div>
     <div id="cal-day" class="cal-side"></div>
+    </div>
+    <div id="sched" class="panel sched"></div>
   </section>
 
   <section class="view" id="v-overview" hidden>
@@ -956,6 +1029,6 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=12"></script>
+<script type="module" src="app.js?v=13"></script>
 </body>
 </html>
