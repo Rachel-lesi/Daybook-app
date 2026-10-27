@@ -747,6 +747,49 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
   .sch-grid[style*="--cols:7"] .sch-sum{display:none}
 }
 @media (prefers-reduced-motion:reduce){.ev-time.live{animation:none}}
+
+/* ===== Reflection archive & export ===== */
+.arc{padding:12px 14px;display:grid;gap:10px}
+.arc-crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.arc-crumbs .btn{display:inline-flex;align-items:center;gap:6px}
+.arc-crumbs .btn svg,.arc-week .btn svg{width:13px;height:13px}
+.crumb{border:0;background:none;color:var(--accent);font-weight:600;padding:0;cursor:pointer}
+.crumb:hover{text-decoration:underline}
+.arc-year{font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--muted);margin-top:4px}
+.arc-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.folder{display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;align-items:center;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:10px 12px;cursor:pointer;transition:border-color .15s,background .15s}
+.folder:hover{border-color:var(--accent);background:var(--accent-soft)}
+.fd-ic{grid-row:1 / 3;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--pink-soft);color:var(--pink-ink)}
+.fd-ic svg{width:19px;height:19px;fill:color-mix(in srgb,var(--pink) 55%,transparent)}
+.fd-name{font-weight:700}
+.fd-meta{font-size:.74rem;color:var(--muted)}
+.arc-week{border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.arc-week summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;list-style:none}
+.arc-week summary::-webkit-details-marker{display:none}
+.arc-week summary .btn{margin-left:auto;display:inline-flex;align-items:center;gap:5px}
+.aw-ic{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+.aw-ic svg{width:14px;height:14px}
+.aw-name{font-weight:700;font-size:.92rem}
+.arc-days{list-style:none;margin:0;padding:0 8px 8px;display:grid;gap:4px}
+.arc-day{width:100%;display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;text-align:left;border:1px solid transparent;background:var(--surface);border-radius:10px;padding:7px 10px;cursor:pointer}
+.arc-day:hover{border-color:var(--line)}
+.arc-day.is-open{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.ad-date{display:grid;justify-items:center;line-height:1.1}
+.ad-date b{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.ad-date span{font-family:var(--f-display);font-size:1.25rem;font-weight:600}
+.ad-body{display:grid;gap:3px;min-width:0}
+.ad-snip{font-size:.86rem;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ad-tags{display:flex;flex-wrap:wrap;gap:4px}
+.ad-tags i{font-style:normal;font-size:.64rem;font-weight:600;padding:0 6px;border-radius:5px;background:var(--sunk);color:var(--muted)}
+.ad-mood{font-family:var(--f-mono);font-size:.72rem;color:var(--pink-ink);background:var(--pink-soft);border-radius:6px;padding:1px 6px}
+.xdlg{width:min(520px,calc(100vw - 24px))}
+#print-area{display:none}
+@media print{
+  body.printing-export *{visibility:hidden!important}
+  body.printing-export #print-area,body.printing-export #print-area *{visibility:visible!important}
+  body.printing-export #print-area{display:block!important;position:absolute;left:0;top:0;width:100%;background:#fff;color:#1e2a1f}
+  body.printing-export header.top,body.printing-export::before,body.printing-export .splash{display:none!important}
+}
 </style>
 </head>
 <body class="locked">
@@ -938,11 +981,11 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
       <label class="f">How I'll improve<textarea id="r-improve" placeholder="One concrete change for tomorrow"></textarea></label>
       <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Energy today (1 low – 5 great)</span><div class="mood" id="r-mood"></div></div>
       <div class="dlgfoot"><span class="saved" id="r-saved"></span>
-        <div style="display:flex;gap:8px"><button class="btn" type="button" id="r-copy">Copy as report</button><button class="btn primary" type="button" id="r-save">Save</button></div></div>
+        <div style="display:flex;gap:8px"><button class="btn" type="button" data-xopen="day:">Export</button><button class="btn" type="button" id="r-copy">Copy as report</button><button class="btn primary" type="button" id="r-save">Save</button></div></div>
     </div>
     <div>
-      <div class="sechead"><h2>Past reflections</h2></div>
-      <div class="panel"><ul class="rows" id="r-history"></ul></div>
+      <div class="sechead"><h2>Reflection archive</h2><button class="btn sm" type="button" data-xopen="month:">Export…</button></div>
+      <div class="panel arc" id="arc"></div>
     </div>
     <div class="panel weekly">
       <div class="wk-head"><div><h2>Weekly report</h2><p class="small muted" style="margin:0">For your supervisor or internship logbook. Built from your tasks, time and reflections.</p></div>
@@ -1009,6 +1052,16 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 
 <dialog id="dlg"><form class="dlg" id="tf" method="dialog"></form></dialog>
 <dialog id="sdlg" class="sdlg"><div class="s-wrap"><div class="s-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="s-q" type="search" placeholder="Search everything… e.g. VLOOKUP, scrap report" autocomplete="off" aria-label="Search"><button type="button" class="btn sm ghost" id="s-close">Close</button></div><div id="s-res" class="s-res"></div></div></dialog>
+<dialog id="xdlg" class="xdlg"><form class="dlg" method="dialog" onsubmit="return false">
+  <h3>Export reflections</h3>
+  <label class="f">Range<select id="x-kind"><option value="day">One day</option><option value="week">A week</option><option value="month">A month</option><option value="all">All reflections (whole internship)</option><option value="custom">Custom dates</option></select></label>
+  <div class="grid2"><label class="f">From<input type="date" id="x-from"></label><label class="f">To<input type="date" id="x-to"></label></div>
+  <label class="f">Layout<select id="x-layout"><option value="journal">Journal: reflections only</option><option value="logbook">Logbook: reflections + work done, time and results each day</option></select></label>
+  <p class="small muted" id="x-count" style="margin:0"></p>
+  <div class="dlgfoot"><button class="btn ghost" type="button" id="x-cancel">Cancel</button><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="x-word">Download Word</button><button class="btn primary" type="button" id="x-pdf">Save as PDF</button></div></div>
+  <p class="small muted" style="margin:0">PDF opens your print screen: choose <b>Save as PDF</b>. On iPhone, tap Share → Print, then pinch out on the preview to get the PDF.</p>
+</form></dialog>
+<div id="print-area" aria-hidden="true"></div>
 <div class="toast" id="toast" hidden></div>
 
 
@@ -1029,6 +1082,6 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=13"></script>
+<script type="module" src="app.js?v=14"></script>
 </body>
 </html>
