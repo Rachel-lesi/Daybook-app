@@ -1,6 +1,6 @@
 // Keeps Daybook opening instantly and working offline.
 // Bump VERSION whenever you upload changed files so devices pick them up.
-const VERSION = "daybook-v2";
+const VERSION = "daybook-v4";
 const SHELL = ["./", "./index.html", "./app.js", "./firebase-config.js", "./seed.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
@@ -17,8 +17,8 @@ self.addEventListener("fetch", e => {
   if (/googleapis\.com$/.test(url.hostname) && !/^fonts\./.test(url.hostname)) return;
   if (/(identitytoolkit|securetoken|firestore)/.test(url.hostname)) return;
   if (url.origin === location.origin) {
-    // App files: use the network when online so updates arrive, fall back to cache offline.
-    e.respondWith(fetch(req).then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return res; })
+    // App files: always check GitHub for a newer copy (skips the browser's 10-minute cache) and fall back to the saved copy offline.
+    e.respondWith(fetch(req, { cache: "no-cache" }).then(res => { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); return res; })
       .catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match("./index.html"))));
     return;
   }

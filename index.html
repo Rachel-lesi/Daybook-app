@@ -6,6 +6,7 @@
 <title>Daybook</title>
 <meta name="description" content="Daily routine, to-dos, internship work tasks and daily reflections.">
 <link rel="manifest" href="manifest.webmanifest">
+<script>try{var t=localStorage.getItem("daybook-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}</script>
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#16211d" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
@@ -255,13 +256,128 @@ body.locked{overflow:hidden}
 .authcard{width:min(380px,100%);display:grid;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px}
 .authcard h1{font-family:var(--f-display);margin:0;font-size:1.6rem}
 #auth-form{display:grid;gap:10px}
+
+/* ===== Clean & modern refresh ===== */
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --sunk:#eef1f4; --line:#e3e8ec; --ink:#14201c; --muted:#66737a;
+  --accent:#0f8a66; --accent-2:#17b38a; --accent-ink:#ffffff; --accent-soft:#e2f4ed;
+  --shadow:0 1px 2px rgba(20,32,28,.04),0 6px 20px rgba(20,32,28,.06); --shadow-lg:0 10px 30px rgba(20,32,28,.10);
+  --hero-a:#e6f6ef; --hero-b:#eef3fb; --glass:rgba(255,255,255,.82);
+  --c0:#2f6fde; --c0s:#e5eefc; --c1:#1f9d57; --c1s:#e2f5ea; --c2:#8a4fd8; --c2s:#f0e8fc;
+  --c3:#d97616; --c3s:#fcefe1; --c4:#d0457a; --c4s:#fbe6ee; --c5:#0e93a8; --c5s:#e0f4f7;
+  --k-meal:#e07b2a; --k-supplement:#8a4fd8; --k-break:#0e93a8; --k-work:#2f6fde; --k-study:#1f9d57; --k-class:#d0457a; --k-health:#e0525a; --k-other:#66737a;
+  --r:14px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1214; --surface:#151c1f; --sunk:#1b2427; --line:#253135; --ink:#e7eeec; --muted:#93a3a8;
+  --accent:#34c89a; --accent-2:#5ee0b8; --accent-ink:#04221a; --accent-soft:#16352c;
+  --shadow:0 1px 0 rgba(255,255,255,.02),0 6px 20px rgba(0,0,0,.25); --shadow-lg:0 10px 30px rgba(0,0,0,.45);
+  --hero-a:#132b24; --hero-b:#151f2e; --glass:rgba(21,28,31,.82);
+  --c0:#7aa7ff; --c0s:#1b2a45; --c1:#5ccf8e; --c1s:#173426; --c2:#bb93ff; --c2s:#2b2142; --c3:#f5a35a; --c3s:#3a2816; --c4:#f27aa6; --c4s:#3d1d2a; --c5:#4fc9db; --c5s:#163338;
+  --k-meal:#f5a35a; --k-supplement:#bb93ff; --k-break:#4fc9db; --k-work:#7aa7ff; --k-study:#5ccf8e; --k-class:#f27aa6; --k-health:#ff7f86; --k-other:#93a3a8;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1214; --surface:#151c1f; --sunk:#1b2427; --line:#253135; --ink:#e7eeec; --muted:#93a3a8;
+  --accent:#34c89a; --accent-2:#5ee0b8; --accent-ink:#04221a; --accent-soft:#16352c;
+  --shadow:0 1px 0 rgba(255,255,255,.02),0 6px 20px rgba(0,0,0,.25); --shadow-lg:0 10px 30px rgba(0,0,0,.45);
+  --hero-a:#132b24; --hero-b:#151f2e; --glass:rgba(21,28,31,.82);
+  --c0:#7aa7ff; --c0s:#1b2a45; --c1:#5ccf8e; --c1s:#173426; --c2:#bb93ff; --c2s:#2b2142; --c3:#f5a35a; --c3s:#3a2816; --c4:#f27aa6; --c4s:#3d1d2a; --c5:#4fc9db; --c5s:#163338;
+  --k-meal:#f5a35a; --k-supplement:#bb93ff; --k-break:#4fc9db; --k-work:#7aa7ff; --k-study:#5ccf8e; --k-class:#f27aa6; --k-health:#ff7f86; --k-other:#93a3a8;
+  color-scheme:dark}
+:root[data-theme="light"]{color-scheme:light}
+body{-webkit-font-smoothing:antialiased}
+header.top{background:var(--glass);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
+body::before{background:var(--glass)}
+.brand{align-items:center;padding-block:14px 6px}
+.brand h1{display:flex;align-items:center;gap:9px;font-size:1.3rem}
+.brand h1 img{border-radius:7px}
+.brand-r{display:flex;align-items:center;gap:10px}
+.iconbtn{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface);border-radius:10px;color:var(--muted);padding:0}
+.iconbtn:hover{color:var(--ink)}
+.iconbtn svg{width:18px;height:18px}
+nav.tabs{gap:4px;padding-block:2px}
+nav.tabs a{border:0;border-radius:99px;padding:7px 14px;transition:background .15s,color .15s}
+nav.tabs a:hover{background:var(--sunk);color:var(--ink)}
+nav.tabs a[aria-current="page"]{background:var(--ink);color:var(--bg)}
+nav.tabs a[aria-current="page"] .count{background:var(--accent);color:var(--accent-ink)}
+#q{background:var(--surface);border-color:var(--line);box-shadow:var(--shadow);border-radius:12px}
+#q:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.qmode{border-radius:12px;background:var(--surface)}
+.qmode button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.btn{border-radius:10px;transition:transform .08s,box-shadow .15s,background .15s}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));border-color:transparent;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}
+.panel,.task,.stat,.tile,.cal-day{border-color:var(--line);box-shadow:var(--shadow)}
+.panel{border-radius:var(--r)}
+h2{font-size:1.08rem}
+.sechead .meta{font-size:.8rem}
+/* hero */
+.now{display:block;padding:18px 20px;border-radius:18px;background:linear-gradient(135deg,var(--hero-a),var(--hero-b));border:1px solid var(--line);box-shadow:var(--shadow)}
+.hero{display:flex;align-items:center;gap:18px}
+.hero-txt{display:grid;gap:4px;min-width:0}
+.greet{font-family:var(--f-display);font-weight:700;font-size:1.45rem;letter-spacing:-.01em;line-height:1.15}
+.hero-sub{font-size:.85rem;color:var(--muted)}
+.hero-next{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:.95rem}
+.hero-next b{font-family:var(--f-mono);font-weight:500}
+.hero-stats{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.hero-stats span{font-size:.78rem;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:2px 10px;color:var(--muted)}
+.hero-stats b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+.hero-stats .warn b{color:var(--high)}
+.ring{flex:none}
+.ring-bg{fill:none;stroke:var(--surface);stroke-width:9}
+.ring-fg{fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;transition:stroke-dasharray .5s ease}
+.ring text{font-family:var(--f-mono);font-size:17px;font-weight:500;fill:var(--ink)}
+/* routine icons */
+.ri{flex:none;width:28px;height:28px;border-radius:9px;display:inline-grid;place-items:center;color:var(--k-other);background:color-mix(in srgb,currentColor 13%,transparent)}
+.ri svg{width:16px;height:16px}
+.ri-meal{color:var(--k-meal)} .ri-supplement{color:var(--k-supplement)} .ri-break{color:var(--k-break)} .ri-work{color:var(--k-work)}
+.ri-study{color:var(--k-study)} .ri-class{color:var(--k-class)} .ri-health{color:var(--k-health)} .ri-other{color:var(--k-other)}
+ol.timeline .lbl{display:flex;align-items:center;gap:10px;min-width:0}
+ol.timeline li{padding:9px 14px}
+ol.timeline li.next{background:var(--accent-soft)}
+ol.timeline li.done .ri{opacity:.5}
+ol.timeline li.done .lbl{text-decoration:none}
+ol.timeline li.done .lbl > span:last-child{text-decoration:line-through}
+.cd-lbl{display:flex;align-items:center;gap:8px}
+.cd-lbl .ri{width:22px;height:22px;border-radius:7px}
+.cd-lbl .ri svg{width:13px;height:13px}
+input[type="checkbox"]{width:20px;height:20px;border-radius:6px}
+/* category colours */
+.tag{border-radius:7px;padding:2px 8px}
+.cat-0{background:var(--c0s);color:var(--c0)} .cat-1{background:var(--c1s);color:var(--c1)} .cat-2{background:var(--c2s);color:var(--c2)}
+.cat-3{background:var(--c3s);color:var(--c3)} .cat-4{background:var(--c4s);color:var(--c4)} .cat-5{background:var(--c5s);color:var(--c5)}
+/* task cards */
+.task{border-radius:var(--r);transition:box-shadow .15s,transform .15s}
+.task:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
+.task .body{padding:13px 16px}
+.bar{height:7px}
+.bar i{background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.stat{border-radius:var(--r);padding:12px 14px}
+.stat b{font-size:1.45rem}
+.tile{border-radius:var(--r);padding:14px 16px}
+.tile b{font-size:1.75rem}
+.chip{padding:4px 12px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.seg button{border-radius:9px}
+dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
+.cal-day{border-radius:10px}
+.cal-day:hover{border-color:var(--accent)}
+.toast{border-radius:12px;box-shadow:var(--shadow-lg)}
+.authcard{box-shadow:var(--shadow-lg);border-radius:20px}
+@media (max-width:560px){
+  .hero{gap:14px} .ring{width:72px;height:72px} .greet{font-size:1.25rem}
+  nav.tabs a{padding:6px 11px}
+  .now{padding:16px}
+}
+.hero-plan{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+@media (prefers-reduced-motion:reduce){.task:hover{transform:none}}
 </style>
 </head>
 <body>
 
 <header class="top">
   <div class="wrap">
-    <div class="brand"><h1>Daybook</h1><span class="date" id="today-label"></span></div>
+    <div class="brand"><h1><img src="icon-192.png" alt="" width="26" height="26">Daybook</h1><span class="brand-r"><span class="date" id="today-label"></span><button type="button" class="iconbtn" id="theme" aria-label="Theme"></button></span></div>
     <nav class="tabs" id="tabs">
       <a href="#today" data-v="today">Today</a>
       <a href="#work" data-v="work">Work <span class="count" id="c-work">0</span></a>
@@ -386,6 +502,7 @@ body.locked{overflow:hidden}
     <div class="panel" style="padding:14px;display:grid;gap:10px">
       <h2>Account &amp; backup</h2>
       <p class="small muted" style="margin:0">Signed in as <b id="acct-email"></b>. Your data syncs across every device you sign in on.</p>
+      <label class="f">Your name (for the greeting)<input id="uname" placeholder="e.g. Rachel" autocomplete="given-name"></label>
       <label class="f">Workplace line on daily reports<input id="org" placeholder="e.g. Internship, Bina Plastic Sdn Bhd" autocomplete="organization"></label>
       <div style="display:flex;flex-wrap:wrap;gap:8px">
         <button class="btn sm" type="button" id="bk-export">Download backup</button>
@@ -416,6 +533,6 @@ body.locked{overflow:hidden}
     </form>
   </div>
 </div>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=4"></script>
 </body>
 </html>

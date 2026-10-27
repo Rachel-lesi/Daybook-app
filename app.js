@@ -52,7 +52,55 @@ const strip = o => { const c={...o}; delete c.id; return c; };
 
 // ---------- categories
 const DEFAULT_CATS = [{name:"SQL / Database",tag:"sql"},{name:"Excel / Reporting",tag:"excel"},{name:"Python / Automation",tag:"python"},{name:"Admin / Documentation",tag:"admin"}];
-function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||""})); }
+function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||""})); }
+
+// ---------- look & feel helpers
+const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const ICON = {
+  meal: '<path d="M4 3v7a2 2 0 0 0 2 2h1v9"/><path d="M8 3v6"/><path d="M6 3v6"/><path d="M18 21V3c-2 1-3 3.5-3 7v4h3"/>',
+  supplement: '<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-40 12 12)"/><path d="m9.2 9.6 5.2 4.6"/>',
+  break: '<path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 2.5v2.5M12 2.5v2.5"/>',
+  work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
+  study: '<path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/>',
+  class: '<path d="m22 9-10-5L2 9l10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/>',
+  health: '<path d="M19.5 13.5 12 21l-7.5-7.5A5 5 0 0 1 12 6a5 5 0 0 1 7.5 7.5z"/>',
+  other: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>',
+  swim: '<path d="M2 16c2 0 2-1.5 4-1.5S8 16 10 16s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><path d="M2 20c2 0 2-1.5 4-1.5S8 20 10 20s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"/><circle cx="16" cy="6" r="2"/><path d="m6 12 4-5 4 3"/>',
+  sleep: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  wake: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  water: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
+  chores: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
+  plan: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="m9 15 2 2 4-4"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
+  auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>'
+};
+function iconKey(r){
+  const l = (r.label||"").toLowerCase();
+  if (/swim/.test(l)) return "swim";
+  if (/sleep|bed\b/.test(l)) return "sleep";
+  if (/wake/.test(l)) return "wake";
+  if (/water/.test(l) && !/wake/.test(l)) return "water";
+  if (/chore|laundry|grocer|errand|clean/.test(l)) return "chores";
+  if (/plan|review/.test(l) && r.kind!=="work") return "plan";
+  if (/reflect/.test(l)) return "study";
+  return ICON[r.kind] ? r.kind : "other";
+}
+const routineIcon = r => `<span class="ri ri-${esc(r.kind||"other")}">${SVG(ICON[iconKey(r)])}</span>`;
+const CAT_N = 6;
+function catIdx(tag){ const i=S.cats.findIndex(c=>c.tag===tag); if(i>=0) return i%CAT_N; let h=0; for(const ch of String(tag||"")) h=(h*31+ch.charCodeAt(0))>>>0; return h%CAT_N; }
+const catTag = tag => tag ? `<span class="tag cat-${catIdx(tag)}">${esc(catName(tag))}</span>` : `<span class="tag">Uncategorised</span>`;
+function greeting(){ const h=new Date().getHours(); return h<5?"Good night":h<12?"Good morning":h<17?"Good afternoon":h<22?"Good evening":"Good night"; }
+function ring(pct, size=86){ const r=36, c=2*Math.PI*r, p=Math.max(0,Math.min(100,pct||0));
+  return `<svg class="ring" viewBox="0 0 90 90" width="${size}" height="${size}" role="img" aria-label="${p}% of today's routine done"><circle cx="45" cy="45" r="${r}" class="ring-bg"/><circle cx="45" cy="45" r="${r}" class="ring-fg" stroke-dasharray="${(c*p/100).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 45 45)"/><text x="45" y="50" text-anchor="middle">${p}%</text></svg>`; }
+
+// ---------- theme switch
+const THEMES = ["auto","light","dark"];
+function applyTheme(t){ if(t==="auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme=t;
+  const b=$("#theme"); if(b){ b.innerHTML=SVG(ICON[t==="auto"?"auto":t==="light"?"sun":"moon"]); b.setAttribute("aria-label","Theme: "+(t==="auto"?"match device":t)); b.title="Theme: "+(t==="auto"?"match device":t); } }
+let THEME="auto"; try{ THEME=localStorage.getItem("daybook-theme")||"auto"; }catch{}
+applyTheme(THEME);
+$("#theme").addEventListener("click", ()=>{ THEME=THEMES[(THEMES.indexOf(THEME)+1)%3]; try{ localStorage.setItem("daybook-theme",THEME); }catch{} applyTheme(THEME); toast(THEME==="auto"?"Theme: matches your device":THEME==="light"?"Theme: light":"Theme: dark"); });
 function catByTag(t){ t=t.toLowerCase(); return S.cats.find(c=>c.tag===t) || S.cats.find(c=>c.tag.startsWith(t)) || S.cats.find(c=>c.name.toLowerCase().includes(t)); }
 const catName = tag => (S.cats.find(c=>c.tag===tag)||{name:tag||"Uncategorised"}).name;
 
@@ -140,7 +188,7 @@ function taskCard(t){
   return `<button type="button" class="task ${t.status==="done"?"isdone":""}" data-u="${esc(t.urgency)}" data-task="${esc(t.id)}">
     <span class="stripe"></span><span class="body">
       <span class="ttl">${esc(t.title)}</span>
-      <span class="line"><span class="urg ${esc(t.urgency)}">${esc(t.urgency)}</span><span class="tag">${esc(catName(t.category))}</span>
+      <span class="line"><span class="urg ${esc(t.urgency)}">${esc(t.urgency)}</span>${catTag(t.category)}
         <span class="st ${esc(t.status)}">${esc(STATUS_LABEL[t.status]||t.status)}</span>
         ${t.due?`<span class="${over?"overdue":""}">${over?"Overdue · ":"Due "}${esc(fmtDate(t.due))}</span>`:""}
         ${t.assignedBy?`<span>from ${esc(t.assignedBy)}</span>`:""}</span>
@@ -152,6 +200,16 @@ function routineFor(k){ const wd=keyDow(k); const dd=dayDoc(k);
   return [...S.routine.filter(r=>!r.days||r.days.includes(wd)), ...(dd.extra||[]).map(x=>({...x,extra:true}))].sort((a,b)=>a.time.localeCompare(b.time)); }
 function saveDay(k, dd){ S.day[k]=dd; if(db) write("checks/"+k, ()=>db.doc("checks/"+k).set({date:k,done:dd.done||{},skip:dd.skip||{},extra:dd.extra||[]})); renderToday(); }
 const DAYLBL = {"-1":"Yesterday","0":"Today","1":"Tomorrow"};
+function heroHtml(active, done, next, missed){
+  const tk=todayKey(), dn=active.filter(r=>done[r.id]).length, pct=active.length?Math.round(dn/active.length*100):0;
+  const todoLeft=S.todos.filter(t=>!t.done&&(!t.date||t.date<=tk)).length, open=S.tasks.filter(t=>t.status!=="done").length;
+  return `<div class="hero">${ring(pct)}<div class="hero-txt">
+    <div class="greet">${esc(greeting())}${S.name?", "+esc(S.name):""}</div>
+    <div class="hero-sub">${esc(new Date().toLocaleDateString("en-GB",{weekday:"long"}))} · ${isWeekend(new Date().getDay())?"Weekend":"Weekday"} routine</div>
+    ${next?`<div class="hero-next">${routineIcon(next)}<span><b>${esc(next.time)}</b> ${esc(next.label)}</span></div>`:`<div class="hero-next"><span>${!active.length?"No routine yet. Add items in the Routine tab.":dn===active.length?"Routine complete for today. Nice work.":"Nothing else scheduled today. Tick off anything you did."}</span></div>`}
+    <div class="hero-stats"><span><b>${dn}/${active.length}</b> routine</span><span><b>${todoLeft}</b> to-do${todoLeft===1?"":"s"} left</span><span><b>${open}</b> task${open===1?"":"s"} open</span>${missed?`<span class="warn"><b>${missed}</b> not ticked</span>`:""}</div>
+  </div></div>`;
+}
 function renderToday(){
   const tk=todayKey(), k=viewKey(), isToday=S.dayOff===0, dd=dayDoc(k), done=dd.done||{}, skip=dd.skip||{};
   const items=routineFor(k), active=items.filter(r=>!skip[r.id]);
@@ -164,14 +222,13 @@ function renderToday(){
     <span class="mid">${esc(DAYLBL[S.dayOff]||DAYS[keyDow(k)])}<small>${esc(fmtDate(k))}</small></span>
     <button class="btn sm" type="button" data-dayoff="1" ${S.dayOff>=6?"disabled":""} aria-label="Next day">›</button>`;
   $("#now").innerHTML = !S.ready ? `<span class="s">Loading your day…</span>`
-    : !isToday ? `<span><span class="l">Planning ${esc(fmtDate(k))}</span><br><span class="s">Skip or add items for this day only. Your usual routine stays the same.</span></span> <button class="btn sm" type="button" data-dayreset style="margin-left:auto">Back to today</button>`
-    : next ? `<span class="t">${esc(next.time)}</span><span><span class="l">${esc(next.label)}</span><br><span class="s">Next up${missed?` · ${missed} earlier item${missed>1?"s":""} not ticked`:""}</span></span>`
-    : active.length ? `<span class="l">Routine complete for today.</span>` : `<span class="s">No routine yet. Add items in the Routine tab.</span>`;
+    : !isToday ? `<div class="hero-plan"><span><span class="greet" style="font-size:1.15rem">Planning ${esc(fmtDate(k))}</span><br><span class="hero-sub">Skip or add items for this day only. Your usual routine stays the same.</span></span><button class="btn sm" type="button" data-dayreset>Back to today</button></div>`
+    : heroHtml(active, done, next, missed);
   $("#rt-meta").textContent = active.length ? `${active.filter(r=>done[r.id]).length} of ${active.length} done` : "";
   $("#timeline").innerHTML = items.length ? items.map(r=>{ const sk=!!skip[r.id];
     return `<li class="${done[r.id]?"done":""} ${sk?"skipped":""} ${r.time<nowHM?"past":""} ${next&&next.id===r.id?"next":""}">
     <span class="tm">${esc(r.time)}</span><input type="checkbox" data-check="${esc(r.id)}" ${done[r.id]?"checked":""} ${sk?"disabled":""} aria-label="Done: ${esc(r.label)}">
-    <span class="lbl">${esc(r.label)}${sk?'<span class="pill">Skipped</span>':""}${r.extra?'<span class="pill">This day only</span>':""}</span>
+    <span class="lbl">${routineIcon(r)}<span>${esc(r.label)}${sk?'<span class="pill">Skipped</span>':""}${r.extra?'<span class="pill">This day only</span>':""}</span></span>
     <span class="kind">${esc((KINDS.find(x=>x[0]===r.kind)||["","Other"])[1])}</span>
     ${r.extra ? `<button class="x" type="button" data-delextra="${esc(r.id)}" aria-label="Remove ${esc(r.label)}">✕</button>`
       : `<button class="x small" type="button" data-skip="${esc(r.id)}">${sk?"Undo":"Skip"}</button>`}</li>`; }).join("")
@@ -310,7 +367,7 @@ function renderOverview(){
   const cats=[...new Set([...S.cats.map(c=>c.tag), ...S.tasks.map(t=>t.category||"")])].filter(c=>S.tasks.some(t=>(t.category||"")===c));
   $("#ov-cats").innerHTML = cats.length ? `<tr><th>Category</th><th>Open</th><th>Blocked</th><th>Done</th><th>Avg progress</th></tr>` + cats.map(c=>{ const ts=S.tasks.filter(t=>(t.category||"")===c), op=ts.filter(t=>t.status!=="done");
     const avg=op.length?Math.round(op.reduce((a,t)=>a+(+t.progress||0),0)/op.length):null;
-    return `<tr><td><span class="tag">${esc(catName(c))}</span></td><td>${op.length}</td><td>${ts.filter(t=>t.status==="blocked").length||"–"}</td><td>${ts.filter(t=>t.status==="done"&&inR(isoDay(t.doneAt))).length}</td><td>${avg===null?"–":`<span style="display:inline-flex;gap:6px;align-items:center"><span class="bar" style="width:60px"><i style="width:${avg}%"></i></span>${avg}%</span>`}</td></tr>`; }).join("")
+    return `<tr><td>${catTag(c)}</td><td>${op.length}</td><td>${ts.filter(t=>t.status==="blocked").length||"–"}</td><td>${ts.filter(t=>t.status==="done"&&inR(isoDay(t.doneAt))).length}</td><td>${avg===null?"–":`<span style="display:inline-flex;gap:6px;align-items:center"><span class="bar" style="width:60px"><i style="width:${avg}%"></i></span>${avg}%</span>`}</td></tr>`; }).join("")
     : `<tr><td class="empty">No work tasks yet.</td></tr>`;
   // habits
   const order=["meal","supplement","break","study","class","work","health","other"];
@@ -377,12 +434,12 @@ function renderCalDay(){
   const none = t => `<p class="muted small" style="margin:0">${t}</p>`;
   const all = routineFor(k);
   const routineHtml = all.length ? `<ul class="cd-list">${all.map(r => { const st = skip[r.id] ? "skip" : done[r.id] ? "done" : (k < tk || (k === tk && r.time < pad(new Date().getHours()) + ":" + pad(new Date().getMinutes()))) ? "miss" : "todo";
-      return `<li class="cd-${st}"><span class="tm">${esc(r.time)}</span><span>${esc(r.label)}</span><span class="cd-st">${st === "done" ? "✓ " + esc(done[r.id]) : st === "skip" ? "Skipped" : st === "miss" ? "Not ticked" : ""}</span></li>`; }).join("")}</ul>` : none("No routine items.");
+      return `<li class="cd-${st}"><span class="tm">${esc(r.time)}</span><span class="cd-lbl">${routineIcon(r)}${esc(r.label)}</span><span class="cd-st">${st === "done" ? "✓ " + esc(done[r.id]) : st === "skip" ? "Skipped" : st === "miss" ? "Not ticked" : ""}</span></li>`; }).join("")}</ul>` : none("No routine items.");
   const todoHtml = I.todos.length ? `<ul class="cd-list">${I.todos.map(t => `<li class="${t.done ? "cd-done" : ""}"><span>${t.done ? "✓" : "○"}</span><span>${esc(t.title)}</span><span class="cd-st">${t.done ? "Done " + fmtTime(t.doneAt) : t.date < tk ? "Not done" : ""}</span></li>`).join("")}</ul>` : none("No to-dos for this day.");
   const workBits = [];
   I.finished.forEach(t => workBits.push(`<li data-task="${esc(t.id)}"><span class="st done">Finished</span><span>${esc(t.title)}</span></li>`));
   I.due.filter(t => t.status !== "done").forEach(t => workBits.push(`<li data-task="${esc(t.id)}"><span class="urg ${esc(t.urgency)}">Due</span><span>${esc(t.title)} <span class="muted small">· ${esc(STATUS_LABEL[t.status])} ${+t.progress || 0}%</span></span></li>`));
-  I.updates.filter(x => !I.finished.includes(x.t)).forEach(x => workBits.push(`<li data-task="${esc(x.t.id)}"><span class="tag">${esc(catName(x.t.category))}</span><span><b>${esc(x.t.title)}</b>: ${x.e.map(e => esc(e.note)).join("; ")}</span></li>`));
+  I.updates.filter(x => !I.finished.includes(x.t)).forEach(x => workBits.push(`<li data-task="${esc(x.t.id)}">${catTag(x.t.category)}<span><b>${esc(x.t.title)}</b>: ${x.e.map(e => esc(e.note)).join("; ")}</span></li>`));
   I.added.filter(t => !I.updates.some(x => x.t === t) && !I.finished.includes(t) && !I.due.includes(t)).forEach(t => workBits.push(`<li data-task="${esc(t.id)}"><span class="tag">New</span><span>${esc(t.title)}</span></li>`));
   const workHtml = workBits.length ? `<ul class="cd-list cd-work">${workBits.join("")}</ul>` : none("No work activity or deadlines.");
   const r = I.refl;
@@ -542,7 +599,7 @@ function startData(){
   let loaded = 0; const mark = () => { if (++loaded >= 5) { S.ready = true; } render(); };
   const sub = (coll, key) => { let first = true; db.collection(coll).onSnapshot(s => { S[key] = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); } else render(); }, fail); };
   sub("tasks", "tasks"); sub("todos", "todos"); sub("routine", "routine");
-  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (f1) { f1 = false; mark(); } else render(); }, fail);
+  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(90).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
   watchChecks = () => { const k = viewKey(); if (k === watchedDay) return; watchedDay = k; if (unsubCheck) unsubCheck(); unsubCheck = db.doc("checks/" + k).onSnapshot(s => { const d = s.exists ? s.data() : {}; S.day[k] = { done: d.done || {}, skip: d.skip || {}, extra: d.extra || [] }; render(); }, fail); };
@@ -552,6 +609,8 @@ function startData(){
 
 // ---------- workplace line on reports
 $("#org").addEventListener("change", () => { S.org = $("#org").value.trim(); saveCats(); toast(S.org ? "Saved. Reports will show this line." : "Removed from reports"); });
+
+$("#uname").addEventListener("change", () => { S.name = $("#uname").value.trim(); saveCats(); render(); toast("Saved"); });
 
 // ---------- backup
 $("#bk-export").onclick = () => {
