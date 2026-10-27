@@ -648,7 +648,8 @@ const AUTH_MSG = {
 };
 function showAuth(mode){
   $("#auth").hidden = false; document.body.classList.add("locked");
-  $("#auth-setup").hidden = mode !== "setup"; $("#auth-form").hidden = mode === "setup";
+  $("#auth-loading").hidden = mode !== "loading";
+  $("#auth-setup").hidden = mode !== "setup"; $("#auth-form").hidden = mode !== "signin";
 }
 function hideAuth(){ $("#auth").hidden = true; document.body.classList.remove("locked"); }
 const authErr = e => { $("#auth-err").textContent = AUTH_MSG[e && e.code] || ("Something went wrong: " + (e && (e.code || e.message))); };

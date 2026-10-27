@@ -369,11 +369,13 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
   nav.tabs a{padding:6px 11px}
   .now{padding:16px}
 }
+.spin{display:inline-block;width:14px;height:14px;margin-right:8px;vertical-align:-2px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:99px;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 .hero-plan{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
 @media (prefers-reduced-motion:reduce){.task:hover{transform:none}}
 </style>
 </head>
-<body>
+<body class="locked">
 
 <header class="top">
   <div class="wrap">
@@ -517,13 +519,14 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
 <div class="toast" id="toast" hidden></div>
 
 
-<div id="auth" class="authwrap" hidden>
+<div id="auth" class="authwrap">
   <div class="authcard">
     <img src="icon-192.png" alt="" width="56" height="56" style="border-radius:14px">
     <h1>Daybook</h1>
     <p class="muted small" style="margin:0">Routine, to-dos, work tasks and reflections. Synced on your phone and PC.</p>
+    <p id="auth-loading" class="muted small" style="margin:0" role="status"><span class="spin"></span>Opening your Daybook…</p>
     <div id="auth-setup" hidden><p class="banner" style="margin:0">Almost there. Paste your Firebase settings into <b>firebase-config.js</b> (setup step 4), upload it, then reload this page.</p></div>
-    <form id="auth-form" autocomplete="on">
+    <form id="auth-form" autocomplete="on" hidden>
       <label class="f">Email<input type="email" id="a-email" autocomplete="username" required></label>
       <label class="f">Password<input type="password" id="a-pass" autocomplete="current-password" minlength="6" required></label>
       <p id="auth-err" class="small" style="margin:0;color:var(--crit);min-height:1.2em" role="alert"></p>
@@ -533,6 +536,6 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=4"></script>
+<script type="module" src="app.js?v=5"></script>
 </body>
 </html>
