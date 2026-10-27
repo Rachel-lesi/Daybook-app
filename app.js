@@ -36,7 +36,54 @@ function write(path, fn){ // one write at a time per document
   queues[path] = (queues[path]||Promise.resolve()).then(fn).catch(e => { console.error(e); toast(e && e.code==="quota_exceeded" ? "Storage is full. Delete old items to add more." : "Couldn't save. Check your connection and try again."); });
   return queues[path];
 }
-function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2200); }
+function toast(msg, undo){ const t=$("#toast"); t.textContent=msg; if(undo){ const b=document.createElement("button"); b.type="button"; b.className="t-undo"; b.textContent="Undo"; b.onclick=()=>{ t.hidden=true; undo(); }; t.append(b); } t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,undo?5000:2200); }
+
+// ---------- swipe left on a task card to delete (phone)
+const SW = { card: null, x0: 0, y0: 0, base: 0, dx: 0, mode: "", open: null, swiped: 0 };
+const swSet = (c, x, anim) => { c.classList.toggle("sw-anim", !!anim); c.style.setProperty("--sx", x + "px"); c.classList.toggle("sw-on", x < 0); };
+function swClose(){ if (SW.open) { swSet(SW.open, 0, true); SW.open = null; } }
+function swipeDelete(id){
+  const t = S.tasks.find(x => x.id === id); if (!t) return; const copy = strip(t);
+  if (S.timer && S.timer.ref === id) stopTimer(false);
+  del("tasks", id); SW.open = null;
+  toast("Task deleted", () => { put("tasks", id, copy); toast("Task restored"); });
+}
+document.addEventListener("touchstart", e => {
+  const c = e.target.closest && e.target.closest("div.task[data-task]");
+  if (SW.open && SW.open !== c) { swClose(); SW.swiped = Date.now(); }
+  if (!c || e.touches.length > 1) { SW.card = null; return; }
+  SW.card = c; SW.x0 = e.touches[0].clientX; SW.y0 = e.touches[0].clientY; SW.base = SW.open === c ? -88 : 0; SW.dx = 0; SW.mode = "";
+}, { passive: true });
+document.addEventListener("touchmove", e => {
+  const c = SW.card; if (!c) return;
+  const dx = e.touches[0].clientX - SW.x0, dy = e.touches[0].clientY - SW.y0;
+  if (!SW.mode) { if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy) * 1.2) SW.mode = "x"; else if (Math.abs(dy) > 8) { SW.mode = "y"; SW.card = null; return; } else return; }
+  if (e.cancelable) e.preventDefault();
+  SW.dx = dx; const w = c.offsetWidth, x = Math.min(0, Math.max(-w, SW.base + dx));
+  swSet(c, x, false); c.classList.toggle("sw-far", x < -w * 0.55);
+}, { passive: false });
+document.addEventListener("touchend", () => {
+  const c = SW.card; SW.card = null; if (!c || SW.mode !== "x") return;
+  SW.swiped = Date.now(); const w = c.offsetWidth, x = Math.min(0, SW.base + SW.dx); c.classList.remove("sw-far");
+  if (x < -w * 0.55) { swSet(c, -w, true); setTimeout(() => swipeDelete(c.dataset.task), 180); }
+  else if (x < -44) { swSet(c, -88, true); SW.open = c; }
+  else { swSet(c, 0, true); if (SW.open === c) SW.open = null; }
+});
+document.addEventListener("touchcancel", () => { const c = SW.card; SW.card = null; if (c && SW.mode === "x") swSet(c, SW.open === c ? -88 : 0, true); });
+document.addEventListener("click", e => {
+  const a = e.target.closest && e.target.closest(".sw-act");
+  if (a) { e.preventDefault(); e.stopPropagation(); swipeDelete(a.closest("[data-task]").dataset.task); return; }
+  const c = e.target.closest && e.target.closest("div.task[data-task]");
+  if (Date.now() - SW.swiped < 400 || (SW.open && (c === SW.open || !c))) { if (c || SW.open) { e.preventDefault(); e.stopPropagation(); } swClose(); SW.swiped = 0; }
+}, true);
+
+// ---------- keep the page behind a pop-up window still (stops the window drifting on iPhone)
+(() => { let y = 0, n = 0;
+  const lock = () => { if (n++) return; y = window.scrollY; const b = document.body.style; b.position = "fixed"; b.top = -y + "px"; b.left = "0"; b.right = "0"; b.width = "100%"; };
+  const unlock = () => { if (!n || --n) return; const b = document.body.style; b.position = b.top = b.left = b.right = b.width = ""; window.scrollTo(0, y); };
+  const show = HTMLDialogElement.prototype.showModal;
+  HTMLDialogElement.prototype.showModal = function () { const was = this.open; show.call(this); if (!was && !this.__lk) { this.__lk = 1; lock(); this.addEventListener("close", () => { this.__lk = 0; unlock(); }, { once: true }); } };
+})();
 
 // ---------- data ops (db or in-memory fallback)
 function newId(){ return db ? db.collection("tasks").doc().id : Math.random().toString(36).slice(2,12); }
@@ -60,6 +107,7 @@ function saveCats(){ if(!db){ render(); return; } write("settings/main", () => d
 // ---------- look & feel helpers
 const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
 const ICON = {
+  trash: '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/>',
   meal: '<path d="M4 3v7a2 2 0 0 0 2 2h1v9"/><path d="M8 3v6"/><path d="M6 3v6"/><path d="M18 21V3c-2 1-3 3.5-3 7v4h3"/>',
   supplement: '<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-40 12 12)"/><path d="m9.2 9.6 5.2 4.6"/>',
   break: '<path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 2.5v2.5M12 2.5v2.5"/>',
@@ -311,7 +359,7 @@ function taskCard(t){
   const running = S.timer && S.timer.type==="task" && S.timer.ref===t.id;
   const mins = taskMins(t.id);
   return `<div class="task ${t.status==="done"?"isdone":""}" data-u="${esc(t.urgency)}" data-task="${esc(t.id)}" role="button" tabindex="0">
-    <span class="stripe"></span><span class="body">
+    <span class="sw-act" aria-hidden="true">${SVG(ICON.trash)}<span>Delete</span></span><span class="stripe"></span><span class="body">
       <span class="ttl-row"><span class="ttl">${esc(t.title)}</span>${t.status!=="done"?`<button type="button" class="tbtn ${running?"on":""}" data-timer="${esc(t.id)}" aria-label="${running?"Stop timer":"Start timer"} for ${esc(t.title)}">${SVG(running?ICON.stop:ICON.play)}<span ${running?"data-live":""}>${running?clock(timerElapsed()):(mins?fmtMins(mins):"")}</span></button>`:(mins?`<span class="tdone-time">${SVG(ICON.timer)}${fmtMins(mins)}</span>`:"")}</span>
       <span class="line"><span class="urg ${esc(t.urgency)}">${esc(t.urgency)}</span>${catTag(t.category)}
         <span class="st ${esc(t.status)}">${esc(STATUS_LABEL[t.status]||t.status)}</span>
@@ -438,7 +486,8 @@ const newSubId = () => "s" + Date.now().toString(36) + Math.random().toString(36
 function openTask(id){
   const t=S.tasks.find(x=>x.id===id); if(!t) return;
   editing={...t,log:[...(t.log||[])],subtasks:(t.subtasks||[]).map(s=>({...s})),links:(t.links||[]).map(l=>({...l}))};
-  confirmDel=false; drawTask(); if(!$("#dlg").open) $("#dlg").showModal();
+  confirmDel=false; drawTask(); const d=$("#dlg");
+  if(!d.open){ const touch=matchMedia("(hover: none)").matches; d.toggleAttribute("autofocus", touch); if(touch) d.tabIndex=-1; d.showModal(); if(touch) d.focus({preventScroll:true}); d.scrollTop=0; }
 }
 function autoProgress(){
   const s=editing.subtasks; if(!s.length) return;
