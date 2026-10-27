@@ -1,6 +1,6 @@
 // Keeps Daybook opening instantly and working offline.
 // Bump VERSION whenever you upload changed files so devices pick them up.
-const VERSION = "daybook-v15";
+const VERSION = "daybook-v16";
 const SHELL = ["./", "./index.html", "./app.js", "./firebase-config.js", "./seed.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {

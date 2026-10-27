@@ -1314,6 +1314,36 @@ $("#rt-edit").addEventListener("click", e=>{
   if(d){ const row=d.closest("[data-rid]"); const r=S.routine.find(y=>y.id===row.dataset.rid); let days=r.days?[...r.days]:[0,1,2,3,4,5,6]; const i=+d.dataset.day; days=days.includes(i)?days.filter(v=>v!==i):[...days,i].sort(); saveRt({...r,days}); }
   if(x){ del("routine", x.dataset.delrt); }
 });
+// ---------- clear all / restore starter routine (only this account's routine)
+async function batchRoutine(ops){ // ops: [["delete", id] | ["set", id, data]]
+  if (!db || !FS) { ops.forEach(([op, id, d]) => op === "delete" ? del("routine", id) : put("routine", id, d)); return; }
+  for (let i = 0; i < ops.length; i += 400) { const b = writeBatch(FS); ops.slice(i, i + 400).forEach(([op, id, d]) => { const ref = doc(FS, "users/" + UID + "/routine/" + id); op === "delete" ? b.delete(ref) : b.set(ref, d); }); await b.commit(); }
+}
+function showRtConfirm(kind){
+  const box = $("#rt-confirm"), n = S.routine.length, alarms = S.routine.filter(r => r.alarm).length;
+  if (!kind) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML = kind === "clear"
+    ? `<p><b>Delete all ${n} routine item${n === 1 ? "" : "s"}?</b> This clears your daily routine${alarms ? `, including ${alarms} alarm${alarms === 1 ? "" : "s"}` : ""}, so you can build your own from scratch. Your tasks, to-dos, reflections and courses stay. This can't be undone.</p>
+       <p class="small muted">Tip: tap <b>Download backup</b> in Account &amp; backup first if you might want it back.</p>
+       <div class="row"><button class="btn sm solid-danger" type="button" data-rtc="clear">Yes, clear all</button><button class="btn sm" type="button" data-rtc="cancel">Cancel</button></div>`
+    : `<p><b>Add the starter routine?</b> This adds ${Object.keys(SEED.routine).length} general weekday and weekend items (wake up, meals, breaks, reflection, sleep) that you can edit.${n ? ` Your current ${n} item${n === 1 ? "" : "s"} stay${n === 1 ? "s" : ""} too.` : ""}</p>
+       <div class="row"><button class="btn sm primary" type="button" data-rtc="restore">Add starter routine</button><button class="btn sm" type="button" data-rtc="cancel">Cancel</button></div>`;
+  box.scrollIntoView({ block: "nearest", behavior: "smooth" });
+}
+$("#rt-clear").onclick = () => { if (!S.routine.length) { toast("Your routine is already empty"); return; } showRtConfirm("clear"); };
+$("#rt-restore").onclick = () => showRtConfirm("restore");
+$("#rt-confirm").addEventListener("click", async e => {
+  const b = e.target.closest("[data-rtc]"); if (!b) return;
+  const act = b.dataset.rtc;
+  if (act === "cancel") { showRtConfirm(null); return; }
+  b.disabled = true;
+  try {
+    if (act === "clear") { const n = S.routine.length; await batchRoutine(S.routine.map(r => ["delete", r.id])); toast(`Cleared ${n} routine item${n === 1 ? "" : "s"}. Add your own with "Add routine item".`); }
+    else { const items = Object.values(SEED.routine).map(r => ["set", newId(), { ...r, ...(r.alarm ? fireFields(r) : {}) }]); await batchRoutine(items); toast("Starter routine added"); }
+    showRtConfirm(null);
+  } catch (err) { console.error(err); toast("Couldn't update your routine. Check your connection and try again."); b.disabled = false; }
+});
 $("#rt-add").onclick=()=>{ put("routine", newId(), {time:"12:00",label:"New item",kind:"other",days: S.rtFilter==="wd"?[1,2,3,4,5]:S.rtFilter==="we"?[0,6]:[0,1,2,3,4,5,6]}); toast("Item added. Edit its time and name below."); };
 $("#addonce").addEventListener("submit", e=>{ e.preventDefault(); const l=$("#ao-l").value.trim(), t=$("#ao-t").value||"12:00"; if(!l){ toast("Type what's happening first"); return; }
   const k=viewKey(), dd=dayDoc(k); saveDay(k, {...dd, extra:[...(dd.extra||[]), {id:newId(), time:t, label:l, kind:"other"}]}); $("#ao-l").value=""; toast("Added for "+fmtDate(k)); });

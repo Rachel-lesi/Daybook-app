@@ -818,6 +818,14 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 .qa-tip{margin:0;font-size:.74rem;color:var(--muted)}
 .qa-tip code{font-family:var(--f-mono);font-size:.72rem;background:var(--sunk);padding:1px 5px;border-radius:5px}
 @media (max-width:560px){ .qa-row{grid-template-columns:62px minmax(0,1fr)} .qa-tip{display:none} .qc{padding:5px 11px} }
+
+/* ===== Routine clear / restore ===== */
+.rt-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:8px}
+.rt-actions-r{display:flex;flex-wrap:wrap;gap:6px}
+.rt-confirm{margin-top:8px;padding:14px 16px;display:grid;gap:10px;border-color:color-mix(in srgb,var(--crit) 45%,var(--line));background:var(--crit-soft)}
+.rt-confirm p{margin:0}
+.rt-confirm .row{display:flex;flex-wrap:wrap;gap:8px}
+.btn.solid-danger{background:var(--crit);border-color:var(--crit);color:#fff}
 </style>
 </head>
 <body class="locked">
@@ -1045,7 +1053,8 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
       </div>
       <div class="seg" id="rt-filter" style="margin-bottom:8px"></div>
       <div class="panel" id="rt-edit"></div>
-      <div style="margin-top:8px"><button class="btn sm" type="button" id="rt-add">Add routine item</button></div>
+      <div class="rt-actions"><button class="btn sm" type="button" id="rt-add">Add routine item</button><span class="rt-actions-r"><button class="btn sm ghost" type="button" id="rt-restore">Restore starter routine</button><button class="btn sm ghost danger" type="button" id="rt-clear">Clear all</button></span></div>
+      <div class="panel rt-confirm" id="rt-confirm" hidden></div>
     </div>
     <div class="rt-side">
     <div>
@@ -1106,6 +1115,6 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=15"></script>
+<script type="module" src="app.js?v=16"></script>
 </body>
 </html>
