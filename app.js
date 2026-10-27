@@ -584,7 +584,8 @@ function saveTask(){
 }
 
 // ---------- overview
-S.ovRange=7;
+S.ovRange=7; S.ovOpen=null;
+document.addEventListener("keydown", e=>{ const li=e.target.closest&&e.target.closest(".od-list li[role=button]"); if(li&&e.target===li&&(e.key==="Enter"||e.key===" ")){ e.preventDefault(); li.click(); } });
 function rangeKeys(n){ const out=[]; const d=new Date(); d.setDate(d.getDate()-(n-1)); for(let i=0;i<n;i++){ out.push(dkey(d)); d.setDate(d.getDate()+1); } return out; }
 function startKey(){
   const c=[...S.tasks.map(t=>isoDay(t.createdAt)), ...S.todos.map(t=>isoDay(t.createdAt)), ...Object.keys(S.refl), ...Object.keys(S.day).filter(k=>k<=todayKey()), ...Object.keys(S.health||{}).filter(k=>k<=todayKey()), ...(S.exp||[]).map(e=>e.date)].filter(Boolean).sort();
@@ -621,15 +622,32 @@ function renderOverview(){
   const refls=Object.values(S.refl).filter(r=>inR(r.date));
   const moods=refls.filter(r=>r.mood).map(r=>r.mood);
   const open=S.tasks.filter(t=>t.status!=="done");
-  const tile=(v,l,s)=>`<div class="tile"><span>${l}</span><b>${v}</b>${s?`<small>${s}</small>`:""}</div>`;
+  const tile=(v,l,s,id)=>`<button type="button" class="tile ${S.ovOpen===id?"is-open":""}" data-ovt="${id}" aria-expanded="${S.ovOpen===id}"><span>${l}</span><b>${v}</b>${s?`<small>${s}</small>`:""}<i class="tile-more" aria-hidden="true">${S.ovOpen===id?"Hide":"Details"} ›</i></button>`;
   $("#ov-tiles").innerHTML = [
-    tile(tasksDone.length,"Work tasks done",`${open.length} still open`),
-    tile(updates,"Task updates logged",""),
-    tile(todosDone,"To-dos done",""),
-    tile(schedTot?Math.round(doneTot/schedTot*100)+"%":"–","Routine kept",`${doneTot} of ${schedTot} items`),
-    tile(`${refls.length}<span style="font-size:.9rem;text-transform:none;letter-spacing:0">/${weekdays||0}</span>`,"Reflections","written vs workdays"),
-    tile(moods.length?(moods.reduce((a,b)=>a+b,0)/moods.length).toFixed(1):"–","Avg energy",moods.length?"out of 5":"rate it in Reflection")
+    tile(tasksDone.length,"Work tasks done",`${open.length} still open`,"tasks"),
+    tile(updates,"Task updates logged","","updates"),
+    tile(todosDone,"To-dos done","","todos"),
+    tile(schedTot?Math.round(doneTot/schedTot*100)+"%":"–","Routine kept",`${doneTot} of ${schedTot} items`,"routine"),
+    tile(`${refls.length}<span style="font-size:.9rem;text-transform:none;letter-spacing:0">/${weekdays||0}</span>`,"Reflections","written vs workdays","refl"),
+    tile(moods.length?(moods.reduce((a,b)=>a+b,0)/moods.length).toFixed(1):"–","Avg energy",moods.length?"out of 5":"rate it in Reflection","mood")
   ].join("");
+  // details for the tapped tile
+  const day = k => `<span class="od-d">${esc(fmtDate(k).replace(/^\w+, /, ""))}</span>`;
+  const list = (rows, empty) => rows.length ? `<ul class="od-list">${rows.join("")}</ul>` : `<p class="small muted" style="margin:0">${empty}</p>`;
+  const D = {
+    tasks: () => ["Work tasks done", list(tasksDone.slice().sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||"")).map(t=>`<li data-task="${esc(t.id)}" role="button" tabindex="0">${day(isoDay(t.doneAt))}<span class="od-b"><b>${esc(t.title)}</b>${t.impact?`<span class="od-s">${esc(t.impact)}</span>`:""}</span>${catTag(t.category)}</li>`), "No work tasks finished in this period.")],
+    updates: () => { const L=[]; S.tasks.forEach(t=>(t.log||[]).forEach(l=>{ if(inR(isoDay(l.at))) L.push({t,l}); })); L.sort((a,b)=>(b.l.at||"").localeCompare(a.l.at||""));
+      const G=new Map(); L.forEach(x=>{ if(!G.has(x.t.id)) G.set(x.t.id,{t:x.t,last:x.l.at,notes:[]}); G.get(x.t.id).notes.push(x.l.note||""); });
+      return ["Task updates logged", list([...G.values()].map(g=>`<li data-task="${esc(g.t.id)}" role="button" tabindex="0">${day(isoDay(g.last))}<span class="od-b"><b>${esc(g.t.title)}</b><span class="od-s">${g.notes.slice(0,3).map(esc).join(" · ")}${g.notes.length>3?` · +${g.notes.length-3} more`:""}</span></span><span class="od-n">${g.notes.length}</span></li>`), "No updates logged in this period.")]; },
+    todos: () => ["To-dos done", list(S.todos.filter(t=>t.done&&inR(isoDay(t.doneAt))).sort((a,b)=>(b.doneAt||"").localeCompare(a.doneAt||"")).map(t=>`<li>${day(isoDay(t.doneAt))}<span class="od-b">${esc(t.title)}</span></li>`), "No to-dos ticked off in this period.")],
+    routine: () => ["Routine kept, day by day", list(keys.map((k,i)=>[k,rPct[i]]).filter(([,p])=>p!==null).reverse().map(([k,p])=>{ const dd=dayDoc(k), its=routineFor(k).filter(r=>!(dd.skip||{})[r.id]), miss=its.filter(r=>!(dd.done||{})[r.id]&&(k<tk||r.time<=pad(new Date().getHours())+":"+pad(new Date().getMinutes())));
+      return `<li data-ovday="${k}" role="button" tabindex="0">${day(k)}<span class="od-b"><span class="bar od-bar"><i style="width:${p}%;background:${p>=80?"var(--ok)":p>=50?"var(--med)":"var(--crit)"}"></i></span>${miss.length?`<span class="od-s">Missed: ${miss.slice(0,4).map(r=>esc(r.label)).join(", ")}${miss.length>4?` +${miss.length-4}`:""}</span>`:`<span class="od-s">All done</span>`}</span><span class="od-n">${p}%</span></li>`; }), "No routine data yet.")],
+    refl: () => ["Reflections", list(refls.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<li data-calrefl="${esc(r.date)}" role="button" tabindex="0">${day(r.date)}<span class="od-b">${esc(((r.did||r.learned||r.improve||"").trim().split("\n")[0]).slice(0,140))||'<span class="muted">(empty)</span>'}</span>${r.mood?`<span class="od-n">${r.mood}/5</span>`:""}</li>`), "No reflections written in this period.")],
+    mood: () => ["Energy by day", list(refls.filter(r=>r.mood).sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<li data-calrefl="${esc(r.date)}" role="button" tabindex="0">${day(r.date)}<span class="od-b"><span class="od-dots">${[1,2,3,4,5].map(i=>`<i class="${i<=r.mood?"on":""}"></i>`).join("")}</span></span><span class="od-n">${r.mood}/5</span></li>`), "Rate your energy in Reflection to see it here.")]
+  };
+  const det = S.ovOpen && D[S.ovOpen] ? D[S.ovOpen]() : null;
+  $("#ov-detail").hidden = !det;
+  $("#ov-detail").innerHTML = det ? `<div class="sechead"><h2>${det[0]}</h2><span class="meta">${n===7?"Last 7 days":"Last 30 days"} · <button type="button" class="linkbtn" data-ovt="${S.ovOpen}">Close</button></span></div>${det[1]}` : "";
   const labels=keys.map((k,i)=>({full:fmtDate(k), short:n<=7?DAYS[keyDow(k)].slice(0,2):k.slice(8), show: n<=7 || i%5===0 || i===n-1}));
   $("#ov-rchart").innerHTML = barChart(rPct, labels, 100, v=>Math.round(v)+"%", "var(--accent)");
   const wmax=Math.max(4, ...wAct.map(v=>v||0)); const wm=Math.ceil(wmax/2)*2;
@@ -2218,6 +2236,8 @@ document.addEventListener("click", e=>{
   const sk=e.target.closest("[data-skip]"); if(sk){ const k=viewKey(), dd=dayDoc(k), s={...(dd.skip||{})}; if(s[sk.dataset.skip]) delete s[sk.dataset.skip]; else s[sk.dataset.skip]=true; saveDay(k,{...dd,skip:s}); return; }
   const dx=e.target.closest("[data-delextra]"); if(dx){ const k=viewKey(), dd=dayDoc(k); saveDay(k,{...dd,extra:(dd.extra||[]).filter(x=>x.id!==dx.dataset.delextra)}); return; }
   const ov=e.target.closest("[data-ovr]"); if(ov){ S.ovRange=+ov.dataset.ovr; renderOverview(); return; }
+  const ot=e.target.closest("[data-ovt]"); if(ot){ S.ovOpen = S.ovOpen===ot.dataset.ovt ? null : ot.dataset.ovt; renderOverview(); if(S.ovOpen && matchMedia("(max-width:700px)").matches) $("#ov-detail").scrollIntoView({block:"nearest",behavior:"smooth"}); return; }
+  const od=e.target.closest("[data-ovday]"); if(od){ S.calSel=od.dataset.ovday; const [y,m]=od.dataset.ovday.split("-").map(Number); S.calY=y; S.calM=m-1; location.hash="#work-calendar"; return; }
   const rf=e.target.closest("[data-rtf]"); if(rf){ S.rtFilter=rf.dataset.rtf; renderRoutine(); return; }
   const ps=e.target.closest("[data-preset]"); if(ps){ const r=S.routine.find(y=>y.id===ps.closest("[data-rid]").dataset.rid); const days={all:[0,1,2,3,4,5,6],wd:[1,2,3,4,5],we:[0,6]}[ps.dataset.preset]; if(r) saveRt({...r,days}); return; }
   const rd=e.target.closest("[data-rdate]"); if(rd){ rDate=rd.dataset.rdate; rDirty=false; if(S.main==="journal"&&S.sub!=="reflection"){ location.hash="#journal"; } else { renderReflect(); window.scrollTo({top:0}); } }
