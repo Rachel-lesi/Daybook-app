@@ -52,7 +52,7 @@ const strip = o => { const c={...o}; delete c.id; return c; };
 
 // ---------- categories
 const DEFAULT_CATS = [{name:"SQL / Database",tag:"sql"},{name:"Excel / Reporting",tag:"excel"},{name:"Python / Automation",tag:"python"},{name:"Admin / Documentation",tag:"admin"}];
-function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||""})); }
+function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null})); }
 
 // ---------- look & feel helpers
 const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -71,6 +71,7 @@ const ICON = {
   water: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
   chores: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/>',
   plan: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><path d="m9 15 2 2 4-4"/>',
+  bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>'
@@ -228,7 +229,7 @@ function renderToday(){
   $("#timeline").innerHTML = items.length ? items.map(r=>{ const sk=!!skip[r.id];
     return `<li class="${done[r.id]?"done":""} ${sk?"skipped":""} ${r.time<nowHM?"past":""} ${next&&next.id===r.id?"next":""}">
     <span class="tm">${esc(r.time)}</span><input type="checkbox" data-check="${esc(r.id)}" ${done[r.id]?"checked":""} ${sk?"disabled":""} aria-label="Done: ${esc(r.label)}">
-    <span class="lbl">${routineIcon(r)}<span>${esc(r.label)}${sk?'<span class="pill">Skipped</span>':""}${r.extra?'<span class="pill">This day only</span>':""}</span></span>
+    <span class="lbl">${routineIcon(r)}<span>${esc(r.label)}${r.alarm&&!r.extra?`<span class="tl-bell" title="Alarm ${+r.before?(+r.before)+" min before":"at the time"}">${SVG(ICON.bell)}</span>`:""}${sk?'<span class="pill">Skipped</span>':""}${r.extra?'<span class="pill">This day only</span>':""}</span></span>
     <span class="kind">${esc((KINDS.find(x=>x[0]===r.kind)||["","Other"])[1])}</span>
     ${r.extra ? `<button class="x" type="button" data-delextra="${esc(r.id)}" aria-label="Remove ${esc(r.label)}">✕</button>`
       : `<button class="x small" type="button" data-skip="${esc(r.id)}">${sk?"Undo":"Skip"}</button>`}</li>`; }).join("")
@@ -501,9 +502,48 @@ $("#r-copy").onclick=async()=>{
   catch{ const ta=document.createElement("textarea"); ta.value=text; ta.style.minHeight="200px"; $("#r-auto").after(ta); ta.select(); toast("Select all and copy the text below"); }
 };
 
+// ---------- calendar alarms
+const BYDAY = ["SU","MO","TU","WE","TH","FR","SA"];
+const alarmItems = () => S.routine.filter(r => r.alarm).sort((a,b)=>a.time.localeCompare(b.time));
+function alarmHash(){ const str=JSON.stringify(alarmItems().map(r=>[r.id,r.time,r.label,(r.days||[]).slice().sort(),+r.before||0])); let h=0; for(const ch of str) h=(h*31+ch.charCodeAt(0))>>>0; return h.toString(36); }
+const icsEsc = t => String(t).replace(/\\/g,"\\\\").replace(/[,;]/g,m=>"\\"+m).replace(/\n/g,"\\n");
+function buildICS(){
+  const now=new Date(), stamp=now.toISOString().replace(/[-:]/g,"").replace(/\.\d+/,"");
+  const L=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Daybook//Routine alarms//EN","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:Daybook"];
+  for(const r of alarmItems()){
+    const days=(r.days&&r.days.length?r.days:[0,1,2,3,4,5,6]);
+    const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()); while(!days.includes(d.getDay())) d.setDate(d.getDate()+1);
+    const [hh,mm]=r.time.split(":"), ds=dkey(d).replace(/-/g,"")+"T"+hh+mm+"00";
+    const end=new Date(d.getFullYear(),d.getMonth(),d.getDate(),+hh,+mm+15), de=dkey(end).replace(/-/g,"")+"T"+pad(end.getHours())+pad(end.getMinutes())+"00";
+    L.push("BEGIN:VEVENT","UID:"+r.id+"@daybook","DTSTAMP:"+stamp,"DTSTART:"+ds,"DTEND:"+de,
+      "RRULE:FREQ=WEEKLY;BYDAY="+days.slice().sort().map(i=>BYDAY[i]).join(","),
+      "SUMMARY:"+icsEsc(r.label),"DESCRIPTION:"+icsEsc("From your Daybook routine"),"TRANSP:TRANSPARENT",
+      "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(r.label),"TRIGGER:-PT"+(+r.before||0)+"M","END:VALARM","END:VEVENT");
+  }
+  L.push("END:VCALENDAR"); return L.join("\r\n")+"\r\n";
+}
+function renderAlarmPanel(){
+  const n=alarmItems().length, synced=S.calSync, changed=n && (!synced || synced.hash!==alarmHash());
+  $("#cal-sync-status").innerHTML = !n ? "No alarms yet. Tap <b>Alarm off</b> on any routine item below to switch it on."
+    : changed ? `<span class="warn-dot"></span><b>${n} alarm${n>1?"s":""}</b> · changed since your last sync. Tap Sync to update your phone.`
+    : `<span class="ok-dot"></span><b>${n} alarm${n>1?"s":""}</b> · in sync (last synced ${esc(fmtDate(isoDay(synced.at)))} ${fmtTime(synced.at)})`;
+  $("#cal-sync").disabled = !n;
+}
+$("#cal-sync").addEventListener("click", async () => {
+  const ics=buildICS(), name="daybook-alarms.ics";
+  const file=new File([ics], name, {type:"text/calendar"});
+  let done=false;
+  try { if (navigator.canShare && navigator.canShare({files:[file]}) && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) { await navigator.share({files:[file], title:"Daybook alarms"}); done=true; } } catch(e){ if(e && e.name==="AbortError") return; }
+  if(!done){ const url=URL.createObjectURL(file); const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),5000); }
+  S.calSync={hash:alarmHash(), at:nowISO()}; saveCats(); renderAlarmPanel();
+  toast("Calendar file ready. Open it to add your alarms.");
+});
+$("#cal-help-btn").addEventListener("click", () => { const h=$("#cal-help"); h.hidden=!h.hidden; $("#cal-help-btn").textContent=h.hidden?"How it works":"Hide steps"; });
+
 // ---------- routine editor
 const daysLabel = d => { const s=(d||[0,1,2,3,4,5,6]).slice().sort().join(""); return s==="0123456"?"Every day":s==="12345"?"Weekdays":s==="06"?"Weekend":null; };
 function renderRoutine(){
+  renderAlarmPanel();
   const all=S.routine.slice().sort((a,b)=>a.time.localeCompare(b.time));
   const has = (r,set) => (r.days||[0,1,2,3,4,5,6]).some(d=>set.includes(d));
   const rows = S.rtFilter==="wd" ? all.filter(r=>has(r,[1,2,3,4,5])) : S.rtFilter==="we" ? all.filter(r=>has(r,[0,6])) : all;
@@ -514,13 +554,16 @@ function renderRoutine(){
     <select data-f="kind" aria-label="Type" id="rt-k-${esc(r.id)}">${KINDS.map(([k,l])=>`<option value="${k}" ${k===r.kind?"selected":""}>${l}</option>`).join("")}</select>
     <button class="x" type="button" data-delrt="${esc(r.id)}" aria-label="Delete">✕</button>
     <div class="days">${DAYS.map((d,i)=>`<button type="button" data-day="${i}" aria-pressed="${!r.days||r.days.includes(i)}">${d.slice(0,2)}</button>`).join("")}</div>
+    <div class="rt-alarm"><button type="button" class="bell" data-alarm="${esc(r.id)}" aria-pressed="${!!r.alarm}" aria-label="Alarm for ${esc(r.label)}">${SVG(ICON.bell)}<span>${r.alarm?"Alarm on":"Alarm off"}</span></button>
+      <select data-f="before" aria-label="When to alert" id="rt-b-${esc(r.id)}" ${r.alarm?"":"disabled"}>${[[0,"At the time"],[5,"5 min before"],[10,"10 min before"],[15,"15 min before"],[30,"30 min before"],[60,"1 hour before"]].map(([v,l])=>`<option value="${v}" ${(+r.before||0)===v?"selected":""}>${l}</option>`).join("")}</select></div>
     <div class="presets"><span class="small muted" style="padding:2px 4px">${esc(daysLabel(r.days)||"Custom days")} ·</span>${[["all","Every day"],["wd","Weekdays"],["we","Weekend"]].filter(([,l])=>l!==daysLabel(r.days)).map(([k,l])=>`<button type="button" data-preset="${k}">${l}</button>`).join("")}</div>
   </div>`).join(""):`<div class="empty">${S.ready?"No routine items here yet.":"Loading…"}</div>`;
   $("#cat-edit").innerHTML = S.cats.map(c=>`<span class="chip">${esc(c.name)} <span class="muted" style="font-family:var(--f-mono)">#${esc(c.tag)}</span> <button class="x" type="button" data-delcat="${esc(c.tag)}" aria-label="Remove ${esc(c.name)}">✕</button></span>`).join("");
 }
 function saveRt(r){ put("routine", r.id, strip(r)); }
-$("#rt-edit").addEventListener("change", e=>{ const row=e.target.closest("[data-rid]"); if(!row||!e.target.dataset.f) return; const r=S.routine.find(x=>x.id===row.dataset.rid); if(!r) return; const c={...r,[e.target.dataset.f]:e.target.value}; saveRt(c); });
+$("#rt-edit").addEventListener("change", e=>{ const row=e.target.closest("[data-rid]"); if(!row||!e.target.dataset.f) return; const r=S.routine.find(x=>x.id===row.dataset.rid); if(!r) return; const f=e.target.dataset.f; const c={...r,[f]: f==="before" ? +e.target.value : e.target.value}; saveRt(c); });
 $("#rt-edit").addEventListener("click", e=>{
+  const bl=e.target.closest("[data-alarm]"); if(bl){ const r=S.routine.find(y=>y.id===bl.dataset.alarm); if(r) saveRt({...r, alarm:!r.alarm, before: r.before ?? 5}); return; }
   const d=e.target.closest("[data-day]"); const x=e.target.closest("[data-delrt]");
   if(d){ const row=d.closest("[data-rid]"); const r=S.routine.find(y=>y.id===row.dataset.rid); let days=r.days?[...r.days]:[0,1,2,3,4,5,6]; const i=+d.dataset.day; days=days.includes(i)?days.filter(v=>v!==i):[...days,i].sort(); saveRt({...r,days}); }
   if(x){ del("routine", x.dataset.delrt); }
@@ -599,7 +642,7 @@ function startData(){
   let loaded = 0; const mark = () => { if (++loaded >= 5) { S.ready = true; leaveSplash(); } render(); };
   const sub = (coll, key) => { let first = true; db.collection(coll).onSnapshot(s => { S[key] = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); } else render(); }, fail); };
   sub("tasks", "tasks"); sub("todos", "todos"); sub("routine", "routine");
-  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
+  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(90).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
   watchChecks = () => { const k = viewKey(); if (k === watchedDay) return; watchedDay = k; if (unsubCheck) unsubCheck(); unsubCheck = db.doc("checks/" + k).onSnapshot(s => { const d = s.exists ? s.data() : {}; S.day[k] = { done: d.done || {}, skip: d.skip || {}, extra: d.extra || [] }; render(); }, fail); };

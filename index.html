@@ -172,7 +172,7 @@ dialog::backdrop{background:rgba(10,20,16,.45)}
 .mood button{border:1px solid var(--line);background:var(--bg);border-radius:8px;width:40px;height:36px;font-family:var(--f-mono)}
 .mood button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .saved{font-size:.78rem;color:var(--muted)}
-.rt{display:grid;grid-template-columns:90px 1fr 120px auto;gap:8px;align-items:center;padding:8px 12px;border-top:1px solid var(--line)}
+.rt{display:grid;grid-template-columns:118px 1fr 130px auto;gap:8px;align-items:center;padding:8px 12px;border-top:1px solid var(--line)}
 .rt:first-child{border-top:0}
 .rt input,.rt select{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:6px 8px;width:100%;min-width:0}
 .days{display:flex;gap:3px;grid-column:2 / -1}
@@ -402,6 +402,27 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
   #v-routine{grid-template-columns:minmax(0,1.4fr) minmax(320px,1fr);column-gap:28px;align-items:start}
 }
 @media (min-width:1000px) and (max-width:1180px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* ===== Alarms ===== */
+.alarmbox{padding:14px 16px;display:grid;gap:10px;margin-bottom:12px;background:linear-gradient(135deg,var(--hero-a),var(--hero-b))}
+.ab-top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.ab-txt{min-width:0}
+.ab-txt h3{font-family:var(--f-display);font-size:1rem;margin:0 0 2px}
+.ab-txt p{margin:0}
+.ab-btns{display:flex;gap:6px;flex-wrap:wrap}
+#cal-help{margin:0;padding-left:20px;display:grid;gap:6px;color:var(--ink)}
+.warn-dot,.ok-dot{display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:6px;vertical-align:1px}
+.warn-dot{background:var(--high)} .ok-dot{background:var(--ok)}
+.rt-alarm{grid-column:2 / -1;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.bell{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);color:var(--muted);border-radius:99px;padding:3px 10px 3px 8px;font-size:.8rem;font-weight:600}
+.bell svg{width:15px;height:15px}
+.bell[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.bell[aria-pressed="true"] svg{color:var(--accent)}
+.rt-alarm select{width:auto;font-size:.8rem;padding:3px 8px}
+.rt-alarm select:disabled{opacity:.5}
+.btn:disabled{opacity:.5;cursor:default}
+.tl-bell{display:inline-flex;color:var(--accent);margin-left:6px;vertical-align:-2px}
+.tl-bell svg{width:13px;height:13px}
 /* ===== Opening screen & sign-in background ===== */
 :root{--sp-base:#f3f7f6;--sp1:#bfead8;--sp2:#cfdcfb;--sp3:#f8dfcc;--sp-glow:rgba(15,138,102,.28)}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--sp-base:#0a0f11;--sp1:#0f4a3a;--sp2:#1b2b57;--sp3:#3b2a1d;--sp-glow:rgba(52,200,154,.25)}}
@@ -600,6 +621,19 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
   <section class="view" id="v-routine" hidden>
     <div>
       <div class="sechead"><h2>Daily routine</h2><span class="meta">Changes save automatically</span></div>
+      <div class="panel alarmbox">
+        <div class="ab-top">
+          <div class="ab-txt"><h3>Phone alarms</h3><p id="cal-sync-status" class="small muted"></p></div>
+          <div class="ab-btns"><button class="btn sm ghost" type="button" id="cal-help-btn">How it works</button><button class="btn sm primary" type="button" id="cal-sync">Sync to calendar</button></div>
+        </div>
+        <ol id="cal-help" class="small" hidden>
+          <li>Tap <b>Alarm off</b> on any routine item below to switch its alarm on, then choose when to be alerted.</li>
+          <li>In your iPhone's Calendar app, create a calendar called <b>Daybook</b> (Calendars → Add Calendar). This keeps your alarms in one place.</li>
+          <li>Open Daybook on your iPhone and tap <b>Sync to calendar</b>. Choose <b>Save to Files</b>, open <b>daybook-alarms.ics</b> in Files, tap <b>Add All</b> and pick the <b>Daybook</b> calendar.</li>
+          <li>After you change alarms, clear the old ones first so you don't get doubles: Calendar app → Calendars → ⓘ next to Daybook → <b>Delete Calendar</b>. Create it again, then sync.</li>
+          <li>Alerts use Calendar's notification sound. Check Settings → Notifications → Calendar if they're silent.</li>
+        </ol>
+      </div>
       <div class="seg" id="rt-filter" style="margin-bottom:8px"></div>
       <div class="panel" id="rt-edit"></div>
       <div style="margin-top:8px"><button class="btn sm" type="button" id="rt-add">Add routine item</button></div>
@@ -613,8 +647,8 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
       </div>
     </div>
     <div class="panel" style="padding:14px" >
-      <h2 style="margin-bottom:6px">Phone reminders</h2>
-      <p class="small muted" style="margin:0">Push reminders for meals, supplements, breaks, study, swimming and your evening reflection come from scheduled tasks in your Claude app. If you change a time here, ask Claude to move the matching reminder too.</p>
+      <h2 style="margin-bottom:6px">Claude reminders</h2>
+      <p class="small muted" style="margin:0">Separate from the alarms above, Claude can also send push reminders through the Claude app. Ask Claude to change or turn them off.</p>
     </div>
     <div class="panel" style="padding:14px;display:grid;gap:10px">
       <h2>Account &amp; backup</h2>
@@ -652,6 +686,6 @@ dialog{border-radius:18px;box-shadow:var(--shadow-lg)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=7"></script>
+<script type="module" src="app.js?v=8"></script>
 </body>
 </html>
