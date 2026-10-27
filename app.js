@@ -113,6 +113,8 @@ const ICON = {
   break: '<path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 2.5v2.5M12 2.5v2.5"/>',
   work: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/>',
   study: '<path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"/><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"/>',
+  edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  pin: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
   class: '<path d="m22 9-10-5L2 9l10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5"/>',
   health: '<path d="M19.5 13.5 12 21l-7.5-7.5A5 5 0 0 1 12 6a5 5 0 0 1 7.5 7.5z"/>',
   other: '<circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/>',
@@ -278,7 +280,7 @@ const VIEWS=["today","work","calendar","overview","growth","study","health","mon
 const NAV = {
   today:    { label: "Today", icon: "sun", subs: [["today", "Today", "today"]] },
   work:     { label: "Work", icon: "work", subs: [["tasks", "Tasks", "work"], ["calendar", "Calendar", "calendar"], ["skills", "Skills", "growth"]] },
-  study:    { label: "Study", icon: "class", subs: [["timetable", "Timetable", "study"], ["assignments", "Assignments", "study"], ["notes", "Notes", "study"], ["portfolio", "Portfolio", "study"], ["grades", "Grades", "study"], ["courses", "Courses", "growth"]] },
+  study:    { label: "Study", icon: "class", subs: [["timetable", "Timetable", "study"], ["calendar", "Calendar", "study"], ["assignments", "Assignments", "study"], ["notes", "Notes", "study"], ["portfolio", "Portfolio", "study"], ["grades", "Grades", "study"], ["courses", "Courses", "growth"]] },
   health:   { label: "Health", icon: "health", subs: [["body", "Body", "health"], ["mind", "Mind", "health"], ["cycle", "Cycle", "health"], ["log", "Health log", "health"]] },
   money:    { label: "Money", icon: "wallet", subs: [["expenses", "Expenses", "money"], ["shopping", "Shopping", "money"]] },
   journal:  { label: "Journal", icon: "book", subs: [["reflection", "Reflection", "reflect"], ["archive", "Archive", "reflect"], ["weekly", "Weekly report", "reflect"]] },
@@ -1019,7 +1021,6 @@ function dayEvents(k){
     const T = S.timer, task = T.type === "task" ? S.tasks.find(y => y.id === T.ref) : null;
     ev.push({ kind: "time", live: true, start: minsOfISO(T.start), dur: Math.max(1, timerElapsed() / 60), title: T.label, mins: Math.round(timerElapsed() / 60), cls: T.type === "task" ? "cat-" + catIdx(task ? task.category : "") : T.type === "course" ? "ev-course" : "ev-focus", ref: task ? task.id : null, via: T.mode });
   }
-  classesOn(k).forEach(c => ev.push({ kind: "class", start: toMin(c.start), dur: Math.max(15, toMin(c.end) - toMin(c.start)), title: subjLabel(c.subj), c }));
   S.tasks.filter(t => t.status === "done" && isoDay(t.doneAt) === k).forEach(t => ev.push({ kind: "tdone", start: minsOfISO(t.doneAt), dur: 20, title: t.title, cls: "cat-" + catIdx(t.category), ref: t.id }));
   S.todos.filter(t => t.done && isoDay(t.doneAt) === k).forEach(t => ev.push({ kind: "odone", start: minsOfISO(t.doneAt), dur: 20, title: t.title }));
   const rf = S.refl[k]; if (rf && rf.updatedAt && isoDay(rf.updatedAt) === k) ev.push({ kind: "refl", start: minsOfISO(rf.updatedAt), dur: 20, title: "Reflection", date: k });
@@ -1039,7 +1040,7 @@ function evHtml(e, k){
   const tall = e.h >= 40;
   if (e.kind === "rt") return `<button type="button" class="ev ev-rt s-${e.st}" style="${style}" data-cdate="${esc(k)}" title="${esc(e.r.time)} ${esc(e.title)} · ${STATE_TXT[e.st]}">${routineIcon(e.r)}<span class="ev-t">${esc(e.title)}</span></button>`;
   if (e.kind === "time") return `<div class="ev ev-time ${e.cls} ${e.live ? "live" : ""}" style="${style}" ${e.ref ? `data-task="${esc(e.ref)}"` : ""} title="${esc(e.title)} · ${fmtMins(e.mins)} (${hm(e.start)}–${hm(e.start + e.dur)})"><span class="ev-t">${SVG(ICON.timer)}${esc(e.title)}</span>${tall ? `<span class="ev-s">${e.live ? "Running · " : ""}${fmtMins(e.mins)} · ${hm(e.start)}–${hm(e.start + e.dur)}${e.via === "focus" ? " · focus" : ""}</span>` : ""}</div>`;
-  if (e.kind === "class") return `<div class="ev ev-class ${subjCls(e.c.subj)}" style="${style}" title="${esc((subj(e.c.subj) || {}).name || e.title)} · ${fmt12(e.c.start)}–${fmt12(e.c.end)}${e.c.room ? " · " + esc(e.c.room) : ""}"><span class="ev-t">${SVG(ICON.class)}${esc(e.title)}</span>${tall ? `<span class="ev-s">${esc((CLS_TYPES.find(x => x[0] === e.c.type) || ["", ""])[1])}${e.c.room ? " · " + esc(e.c.room) : ""}</span>` : ""}</div>`;
+  if (e.kind === "class") return `<div class="ev ev-class ${subjCls(e.c.subj)}" style="${style}" title="${esc((subj(e.c.subj) || {}).name || e.title)} · ${fmt12(e.c.start)}–${fmt12(e.c.end)}${clsLoc(e.c) ? " · " + esc(clsLoc(e.c)) : ""}"><span class="ev-t">${SVG(ICON.class)}${esc(e.title)}</span>${tall ? `<span class="ev-s">${esc((CLS_TYPES.find(x => x[0] === e.c.type) || ["", ""])[1])}${clsLoc(e.c) ? " · " + esc(clsLoc(e.c)) : ""}</span>` : ""}</div>`;
   if (e.kind === "tdone") return `<div class="ev ev-done ${e.cls}" style="${style}" data-task="${esc(e.ref)}" title="Finished at ${hm(e.start)}: ${esc(e.title)}"><span class="ev-t">${SVG(ICON.star)}${esc(e.title)}</span></div>`;
   if (e.kind === "odone") return `<div class="ev ev-todo" style="${style}" title="To-do done at ${hm(e.start)}: ${esc(e.title)}"><span class="ev-t">✓ ${esc(e.title)}</span></div>`;
   if (e.kind === "refl") return `<button type="button" class="ev ev-refl" style="${style}" data-calrefl="${esc(e.date)}" title="Reflection written at ${hm(e.start)}"><span class="ev-t">${SVG(ICON.note)}Reflection</span></button>`;
@@ -1057,7 +1058,7 @@ function renderSchedule(){
   const hours = []; for (let m = lo; m < hi; m += 60) hours.push(`<span style="top:${((m - lo) * ppm).toFixed(1)}px">${m === lo ? "" : pad(Math.floor(m / 60)) + ":00"}</span>`);
   const nowM = new Date().getHours() * 60 + new Date().getMinutes();
   const dues = k => S.tasks.filter(t => t.due === k && t.status !== "done");
-  const adues = k => S.asg.filter(a => a.due === k && !["submitted", "graded"].includes(a.status));
+  const adues = k => [];
   const anyDue = keys.some(k => dues(k).length || adues(k).length);
   const totals = k => { const m = S.time.filter(x => x.date === k).reduce((a, x) => a + (+x.mins || 0), 0); const its = routineFor(k).filter(r => !(dayDoc(k).skip || {})[r.id]); const dn = its.filter(r => (dayDoc(k).done || {})[r.id]).length; return { m, dn, n: its.length }; };
   box.innerHTML = `
@@ -1546,7 +1547,8 @@ function dueText(a){
   if (d === 1) return [`Due tomorrow${a.time ? " " + fmt12(a.time) : ""}`, "soon"];
   return [`Due ${fmtDate(a.due)}${a.time ? " " + fmt12(a.time) : ""} · in ${d} days`, d <= 7 ? "week" : ""];
 }
-function classesOn(k){ const wd = keyDow(k); const ids = new Set(S.subjects.filter(s => (s.sem || "") === (S.curSem || "")).map(s => s.id)); return S.classes.filter(c => +c.day === wd && ids.has(c.subj)).sort((a, b) => a.start.localeCompare(b.start)); }
+function inSem(k){ if (!S.semStart) return true; const w = semWeek(k); return w >= 1 && w <= S.semWeeks; }
+function classesOn(k){ if (!inSem(k)) return []; const wd = keyDow(k); const ids = new Set(S.subjects.filter(s => (s.sem || "") === (S.curSem || "")).map(s => s.id)); return S.classes.filter(c => +c.day === wd && ids.has(c.subj)).sort((a, b) => a.start.localeCompare(b.start)); }
 function nextClass(){
   const now = new Date(), tk = todayKey(), nowM = now.getHours() * 60 + now.getMinutes();
   for (let i = 0; i < 8; i++) { const k = addDays(tk, i); const cs = classesOn(k).filter(c => i > 0 || toMin(c.end) > nowM); if (cs.length) return { c: cs[0], k, i, live: i === 0 && toMin(cs[0].start) <= nowM }; }
@@ -1570,20 +1572,20 @@ function renderStudy(){
         <details class="st-sem"><summary class="small">${S.curSem ? esc(S.curSem) + " · " : ""}Semester settings</summary><div class="st-semf"><label class="f" style="grid-column:1/-1">Semester name<input id="st-semname" value="${esc(S.curSem)}" placeholder="e.g. Year 2 Sem 1"></label><label class="f">Starts (week 1 Monday)<input type="date" id="st-semstart" value="${esc(S.semStart)}"></label><label class="f">Weeks<input type="number" min="1" max="30" id="st-semweeks" value="${S.semWeeks}"></label></div></details></div>
       <div class="st-next">${N ? `<span class="small muted">${N.live ? "Happening now" : N.i === 0 ? "Next class today" : N.i === 1 ? "Next class tomorrow" : "Next class " + DAYS[keyDow(N.k)]}</span>
         <b><span class="tag ${subjCls(N.c.subj)}">${esc(subjLabel(N.c.subj))}</span> ${esc((subj(N.c.subj) || {}).name || "")}</b>
-        <span class="small">${esc((CLS_TYPES.find(x => x[0] === N.c.type) || ["", ""])[1])} · ${fmt12(N.c.start)}–${fmt12(N.c.end)}${N.c.room ? " · " + esc(N.c.room) : ""}</span>` : `<span class="small muted">No classes this week yet. Add your subjects and classes below.</span>`}</div>
+        <span class="small">${esc((CLS_TYPES.find(x => x[0] === N.c.type) || ["", ""])[1])} · ${fmt12(N.c.start)}–${fmt12(N.c.end)}${clsLoc(N.c) ? " · " + esc(clsLoc(N.c)) : ""}</span>` : `<span class="small muted">No classes this week yet. Add your subjects and classes below.</span>`}</div>
     </div>
     ${all.length ? `<div class="tt-scroll"><div class="tt" style="--cols:${days.length}">
       <div class="tt-hd"></div>${days.map(d => `<div class="tt-hd ${d === todayDow ? "today" : ""}">${DAYS[d]}</div>`).join("")}
       <div class="sch-times" style="height:${H}px">${hours.join("")}</div>
       ${days.map(d => `<div class="sch-col tt-col ${d === todayDow ? "is-today" : ""}" style="height:${H}px;--hr:${60 * ppm}px">${classesOn(addDays(tk, (d - todayDow + 7) % 7)).map(c => { const top = (toMin(c.start) - lo) * ppm, h = Math.max((toMin(c.end) - toMin(c.start)) * ppm, 24), s = subj(c.subj);
-          return `<button type="button" class="ev tt-ev ${subjCls(c.subj)}" style="top:${top}px;height:${h}px;left:2px;width:calc(100% - 4px)" data-cls-edit="${esc(c.id)}" title="${esc(s ? s.name : "")} · ${fmt12(c.start)}–${fmt12(c.end)}"><span class="ev-t">${esc(subjLabel(c.subj))}</span>${h > 34 ? `<span class="ev-s">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${c.room ? " · " + esc(c.room) : ""}</span>` : ""}${h > 50 ? `<span class="ev-s">${fmt12(c.start)}–${fmt12(c.end)}</span>` : ""}</button>`; }).join("")}</div>`).join("")}
+          return `<button type="button" class="ev tt-ev ${subjCls(c.subj)}" style="top:${top}px;height:${h}px;left:2px;width:calc(100% - 4px)" data-cls-edit="${esc(c.id)}" title="${esc(s ? s.name : "")} · ${fmt12(c.start)}–${fmt12(c.end)}"><span class="ev-t">${esc(subjLabel(c.subj))}</span>${h > 34 ? `<span class="ev-s">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${clsLoc(c) ? " · " + esc(clsLoc(c)) : ""}</span>` : ""}${h > 50 ? `<span class="ev-s">${fmt12(c.start)}–${fmt12(c.end)}</span>` : ""}</button>`; }).join("")}</div>`).join("")}
     </div></div>` : ""}`;
   // subjects + class form
   const e = S.stEdit && S.classes.find(c => c.id === S.stEdit);
   const past = S.subjects.filter(s => !isCur(s));
   $("#st-subj").innerHTML = `
-    ${curSubjects().length ? `<ul class="subj-list">${curSubjects().map(s => `<li><span class="tag ${subjCls(s.id)}">${esc(s.code || "—")}</span><span class="hl-b"><b>${esc(s.name)}</b>${s.lecturer ? `<span class="small muted"> · ${esc(s.lecturer)}</span>` : ""}<span class="small muted"> · ${S.classes.filter(c => c.subj === s.id).length} class${S.classes.filter(c => c.subj === s.id).length === 1 ? "" : "es"}/week</span></span><button type="button" class="x" data-subj-del="${esc(s.id)}" aria-label="Delete subject">${S.subjDel === s.id ? "Delete?" : "✕"}</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Start by adding your subjects for this semester.</p>`}
-    ${S.subjForm ? `<form id="subj-form" class="st-form" autocomplete="off"><input id="sj-code" class="inp" placeholder="Code, e.g. BIT2023" style="max-width:150px"><input id="sj-name" class="inp" placeholder="Subject name, e.g. Data Mining" required><input id="sj-lect" class="inp" placeholder="Lecturer (optional)"><div class="row"><button class="btn sm primary" type="submit">Add subject</button><button class="btn sm" type="button" data-subj-form="0">Done</button></div></form>`
+    ${curSubjects().length ? `<ul class="subj-list">${curSubjects().map(s => S.subjEdit === s.id ? `<li class="se-li"><form id="subj-edit-form" class="st-form" autocomplete="off"><div class="grid2"><label class="f">Code<input id="se-code" value="${esc(s.code || "")}"></label><label class="f">Name<input id="se-name" value="${esc(s.name)}" required></label><label class="f">Lecturer<input id="se-lect" value="${esc(s.lecturer || "")}"></label><label class="f">Usual location<input id="se-loc" value="${esc(s.location || "")}" placeholder="e.g. Block D, DK3"></label></div><div class="row"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" data-subj-cancel>Cancel</button></div></form></li>` : `<li><span class="tag ${subjCls(s.id)}">${esc(s.code || "—")}</span><span class="hl-b" data-subj-edit="${esc(s.id)}" role="button" tabindex="0" title="Edit subject"><b>${esc(s.name)}</b>${s.lecturer ? `<span class="small muted"> · ${esc(s.lecturer)}</span>` : ""}${s.location ? `<span class="small muted"> · ${esc(s.location)}</span>` : ""}<span class="small muted"> · ${S.classes.filter(c => c.subj === s.id).length} class${S.classes.filter(c => c.subj === s.id).length === 1 ? "" : "es"}/week</span></span><button type="button" class="x" data-subj-edit="${esc(s.id)}" aria-label="Edit subject">${SVG(ICON.edit)}</button><button type="button" class="x" data-subj-del="${esc(s.id)}" aria-label="Delete subject">${S.subjDel === s.id ? "Delete?" : "✕"}</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Start by adding your subjects for this semester.</p>`}
+    ${S.subjForm ? `<form id="subj-form" class="st-form" autocomplete="off"><input id="sj-code" class="inp" placeholder="Code, e.g. BIT2023" style="max-width:150px"><input id="sj-name" class="inp" placeholder="Subject name, e.g. Data Mining" required><input id="sj-lect" class="inp" placeholder="Lecturer (optional)"><input id="sj-loc" class="inp" placeholder="Usual location, e.g. Block D, DK3 (optional)"><div class="row"><button class="btn sm primary" type="submit">Add subject</button><button class="btn sm" type="button" data-subj-form="0">Done</button></div></form>`
       : `<button type="button" class="btn sm" data-subj-form="1">+ Add subject</button>`}
     ${past.length ? `<details class="small"><summary>Past semesters (${past.length} subject${past.length === 1 ? "" : "s"})</summary><ul class="subj-list">${past.map(s => `<li><span class="tag ${subjCls(s.id)}">${esc(s.code || "—")}</span><span class="hl-b">${esc(s.name)} <span class="muted">· ${esc(s.sem || "")}${s.grade ? " · " + esc(s.grade) : ""}</span></span><span></span></li>`).join("")}</ul></details>` : ""}
     ${S.subjects.length ? (S.clsForm || e ? `<form id="cls-form" class="st-form" autocomplete="off"><div class="small"><b>${e ? "Edit class" : "Add a weekly class"}</b></div>
@@ -1591,7 +1593,7 @@ function renderStudy(){
       <label class="f">Day<select id="cl-day">${[1,2,3,4,5,6,0].map(d => `<option value="${d}" ${e && +e.day === d ? "selected" : ""}>${DAYS[d]}</option>`).join("")}</select></label>
       <label class="f">Starts<input type="time" id="cl-start" value="${e ? e.start : "09:00"}"></label><label class="f">Ends<input type="time" id="cl-end" value="${e ? e.end : "11:00"}"></label></div>
       <div class="qa-chips cwrap">${CLS_TYPES.map(([v, l]) => `<button type="button" class="qc" data-cls-type="${v}" aria-pressed="${(e ? e.type : S.clsType) === v}">${l}</button>`).join("")}</div>
-      <input id="cl-room" class="inp" placeholder="Room / link, e.g. DK3 or Zoom" value="${esc(e ? e.room || "" : "")}">
+      <input id="cl-room" class="inp" placeholder="${(() => { const l = (subj(e ? e.subj : (S.subjects[S.subjects.length - 1] || {}).id) || {}).location; return l ? "Location (blank = " + esc(l) + ")" : "Location, e.g. DK3, Lab 2 or Zoom link"; })()}" value="${esc(e ? e.room || "" : "")}">
       <div class="row"><button class="btn sm primary" type="submit">${e ? "Save" : "Add class"}</button><button class="btn sm" type="button" data-cls-form="0">Cancel</button>${e ? `<button class="btn sm ghost danger" type="button" data-cls-del="${esc(e.id)}">Delete class</button>` : ""}</div></form>`
       : `<button type="button" class="btn sm primary" data-cls-form="1">+ Add class to timetable</button>`) : ""}`;
   // ----- assignments
@@ -1619,7 +1621,7 @@ function renderStudy(){
           ${a.status === "graded" ? `<label class="f">Mark (%)<input type="number" min="0" max="100" step="0.1" data-asg-mark="${esc(a.id)}" value="${esc(a.mark ?? "")}" placeholder="e.g. 85"></label>` : ""}
           ${open ? asgDetail(a) : `<button type="button" class="btn sm ghost" data-asg-open="${esc(a.id)}">Notes, files & what you learned</button>`}</div>` : ""}</div>`; }).join("")}</div>`
       : `<div class="empty">${S.asgFilter === "todo" ? "Nothing due. Nice!" : "No assignments here yet."}</div>`}`;
-  renderNotes(); renderPortfolio();
+  renderNotes(); renderPortfolio(); renderStudyCal();
   // ----- grades
   const rows = curSubjects().map(s => { const gr = GRADES.find(g => g[0] === s.grade); const cr = +s.credits || 0;
     const ga = S.asg.filter(a => a.subj === s.id && a.status === "graded" && a.mark !== "" && a.mark != null && +a.weight);
@@ -1649,7 +1651,7 @@ function studyTodayHtml(){
   const tk = todayKey(), nowM = new Date().getHours() * 60 + new Date().getMinutes();
   const cs = classesOn(tk), due = S.asg.filter(a => !["submitted", "graded"].includes(a.status) && a.due && a.due <= addDays(tk, 3)).sort((a, b) => (a.due + (a.time || "")).localeCompare(b.due + (b.time || "")));
   if (!cs.length && !due.length) return `<p class="small muted" style="margin:0">No classes today and nothing due in the next 3 days.</p>`;
-  return `${cs.length ? `<ul class="hlist">${cs.map(c => `<li class="${toMin(c.end) < nowM ? "past" : ""}"><span class="hl-t">${fmt12(c.start)}</span><span class="tag ${subjCls(c.subj)}">${esc(subjLabel(c.subj))}</span><span class="hl-b">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${c.room ? " · " + esc(c.room) : ""}</span><span></span></li>`).join("")}</ul>` : ""}
+  return `${cs.length ? `<ul class="hlist">${cs.map(c => `<li class="${toMin(c.end) < nowM ? "past" : ""}"><span class="hl-t">${fmt12(c.start)}</span><span class="tag ${subjCls(c.subj)}">${esc(subjLabel(c.subj))}</span><span class="hl-b">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${clsLoc(c) ? " · " + esc(clsLoc(c)) : ""}</span><span></span></li>`).join("")}</ul>` : ""}
     ${due.length ? `<div class="small muted" style="margin-top:4px">Due soon</div><ul class="hlist">${due.map(a => { const [dt, cls] = dueText(a); return `<li><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="hl-b">${esc(a.title)}</span><span class="asg-due ${cls} small">${esc(dt.replace(/ · in \d+ days/, ""))}</span><span></span></li>`; }).join("")}</ul>` : ""}`;
 }
 let studyNotesT = null;
@@ -1674,8 +1676,8 @@ document.addEventListener("keydown", e => { const m = e.target.closest && e.targ
 document.addEventListener("submit", e => {
   const f = e.target; if (!f.closest || !f.closest("#v-study")) return; e.preventDefault();
   if (f.id === "subj-form") { const n = $("#sj-name").value.trim(); if (!n) return;
-    put("subjects", newId(), { sem: S.curSem || "", code: $("#sj-code").value.trim().toUpperCase(), name: n, lecturer: $("#sj-lect").value.trim(), color: S.subjects.length % 6, credits: "", grade: "", createdAt: nowISO() });
-    toast("Subject added"); setTimeout(() => { if ($("#sj-code")) { $("#sj-code").value = ""; $("#sj-name").value = ""; $("#sj-lect").value = ""; $("#sj-code").focus(); } }, 50); }
+    put("subjects", newId(), { sem: S.curSem || "", code: $("#sj-code").value.trim().toUpperCase(), name: n, lecturer: $("#sj-lect").value.trim(), location: $("#sj-loc").value.trim(), color: S.subjects.length % 6, credits: "", grade: "", createdAt: nowISO() });
+    toast("Subject added"); setTimeout(() => { if ($("#sj-code")) { $("#sj-code").value = ""; $("#sj-name").value = ""; $("#sj-lect").value = ""; $("#sj-loc").value = ""; $("#sj-code").focus(); } }, 50); }
   else if (f.id === "cls-form") { const sj = $("#cl-subj").value; if (!sj) { toast("Choose a subject"); return; }
     const st = $("#cl-start").value, en = $("#cl-end").value; if (!st || !en || en <= st) { toast("End time must be after start time"); return; }
     const rec = { subj: sj, day: +$("#cl-day").value, start: st, end: en, type: S.clsType, room: $("#cl-room").value.trim() };
@@ -1831,6 +1833,84 @@ document.addEventListener("change", e => {
     renderStudy(); toast(S.curSem ? `Current semester: ${S.curSem}` : "Semester name cleared"); }
 });
 
+// ---------- study calendar (classes, tests and deadlines; kept apart from the work calendar)
+S.scMode = "week"; S.scSel = todayKey(); S.subjEdit = null;
+const clsLoc = c => (c && (c.room || (subj(c.subj) || {}).location)) || "";
+const monKey = k => addDays(k, -((keyDow(k) + 6) % 7));
+const asgOpenOn = k => S.asg.filter(a => a.due === k && !["submitted", "graded"].includes(a.status)).sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+const asgAllOn = k => S.asg.filter(a => a.due === k).sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
+const BIG = ["test", "exam", "midterm", "final", "quiz"];
+function scDue(a, short){ const ty = (ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1], done = ["submitted", "graded"].includes(a.status);
+  const tag = short ? "span" : "button";
+  return `<${tag} ${short ? "" : `type="button" data-sc-asg="${esc(a.id)}"`} class="sc-due ${subjCls(a.subj)} ${BIG.includes(a.type) ? "big" : ""} ${done ? "done" : ""}" title="${esc(subjLabel(a.subj))} · ${esc(ty)}: ${esc(a.title)}${a.time ? " · " + fmt12(a.time) : ""}${done ? " · done" : ""}">${done ? "✓ " : BIG.includes(a.type) ? "! " : ""}${esc(subjLabel(a.subj))}${short ? "" : `<span class="sd-t"> · ${esc(a.title)}</span>`}</${tag}>`; }
+function renderStudyCal(){
+  const box = $("#st-cal"); if (!box) return;
+  const tk = todayKey(), sel = S.scSel || tk, week = S.scMode === "week";
+  const wk = semWeek(monKey(sel));
+  const semTxt = wk === null ? "" : wk < 1 ? "Before semester" : wk > S.semWeeks ? "After semester" : `Week ${wk}`;
+  let label, body;
+  if (week) {
+    const m0 = monKey(sel), keys = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(m0, i));
+    const cls = keys.map(k => classesOn(k)), dues = keys.map(asgAllOn);
+    const showWe = cls[5].length || cls[6].length || dues[5].length || dues[6].length;
+    const cols = showWe ? keys.map((k, i) => i) : [0, 1, 2, 3, 4];
+    let lo = 8 * 60, hi = 18 * 60; cls.flat().forEach(c => { lo = Math.min(lo, Math.floor(toMin(c.start) / 60) * 60); hi = Math.max(hi, Math.ceil(toMin(c.end) / 60) * 60); });
+    const ppm = 0.9, H = (hi - lo) * ppm, nowM = new Date().getHours() * 60 + new Date().getMinutes();
+    const hours = []; for (let m = lo; m < hi; m += 60) hours.push(`<span style="top:${((m - lo) * ppm).toFixed(1)}px">${m === lo ? "" : fmt12(pad(Math.floor(m / 60)) + ":00")}</span>`);
+    label = `${semTxt ? semTxt + " · " : ""}${longRange(keys[0], keys[6])}`;
+    const anyDue = cols.some(i => dues[i].length);
+    body = `<div class="tt-scroll"><div class="tt sc-week" style="--cols:${cols.length}">
+      <div class="tt-hd"></div>${cols.map(i => `<button type="button" class="tt-hd sc-hd ${keys[i] === tk ? "today" : ""}" data-sc-day="${keys[i]}"><span>${DAYS[keyDow(keys[i])]}</span><b>${+keys[i].slice(8)}</b></button>`).join("")}
+      ${anyDue ? `<div class="sc-lbl">Due</div>${cols.map(i => `<div class="sc-dues">${dues[i].map(a => scDue(a)).join("")}</div>`).join("")}` : ""}
+      <div class="sch-times" style="height:${H}px">${hours.join("")}</div>
+      ${cols.map(i => `<div class="sch-col tt-col ${keys[i] === tk ? "is-today" : ""}" style="height:${H}px;--hr:${60 * ppm}px">${cls[i].map(c => { const top = (toMin(c.start) - lo) * ppm, h = Math.max((toMin(c.end) - toMin(c.start)) * ppm, 24), s = subj(c.subj), loc = clsLoc(c);
+        return `<button type="button" class="ev tt-ev sc-ev ${subjCls(c.subj)}" style="top:${top}px;height:${h}px;left:2px;width:calc(100% - 4px)" data-sc-cls="${esc(c.id)}" title="${esc(s ? s.name : "")} · ${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])} · ${fmt12(c.start)}–${fmt12(c.end)}${loc ? " · " + esc(loc) : ""}"><span class="ev-t">${esc(subjLabel(c.subj))}</span>${h > 30 && loc ? `<span class="ev-s ev-loc">${SVG(ICON.pin)}${esc(loc)}</span>` : ""}${h > 46 ? `<span class="ev-s">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}</span>` : ""}${h > 62 ? `<span class="ev-s">${fmt12(c.start)}–${fmt12(c.end)}</span>` : ""}</button>`; }).join("")}
+        ${keys[i] === tk && nowM >= lo && nowM <= hi ? `<b class="sch-now" style="top:${((nowM - lo) * ppm).toFixed(1)}px"></b>` : ""}</div>`).join("")}
+    </div></div>
+    ${cls.flat().length ? "" : `<p class="small muted" style="margin:0">${S.classes.length ? "No classes this week." : "Add your classes in Timetable and they'll appear here every week."}</p>`}`;
+  } else {
+    const [y, mo] = sel.split("-").map(Number), first = dkey(new Date(y, mo - 1, 1)), nDays = new Date(y, mo, 0).getDate();
+    label = new Date(y, mo - 1, 1).toLocaleString("en-GB", { month: "long", year: "numeric" });
+    let h = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => `<span class="cal-dow">${d.slice(0, 1)}<span class="dow-rest">${d.slice(1)}</span></span>`).join("");
+    for (let i = 0; i < (keyDow(first) + 6) % 7; i++) h += `<span class="cal-blank"></span>`;
+    for (let d = 1; d <= nDays; d++) { const k = dkey(new Date(y, mo - 1, d)), cs = classesOn(k), ds = asgAllOn(k), w = keyDow(k) === 1 ? semWeek(k) : null;
+      h += `<div class="sc-day ${k === tk ? "is-today" : ""} ${isWeekend(keyDow(k)) ? "is-we" : ""}" data-sc-day="${k}" role="button" tabindex="0" aria-label="${esc(fmtDate(k))}">
+        <span class="sc-n">${d}${w && w >= 1 && w <= S.semWeeks ? `<small>W${w}</small>` : ""}</span>
+        ${cs.length ? `<span class="sc-dots">${cs.map(c => `<i class="${subjCls(c.subj)}"></i>`).join("")}</span>` : ""}
+        ${ds.slice(0, 3).map(a => scDue(a, true)).join("")}${ds.length > 3 ? `<span class="small muted">+${ds.length - 3}</span>` : ""}</div>`; }
+    body = `<div class="sc-month">${h}</div><div class="tl-legend"><span><i class="lg sc-lg-dot"></i>Class</span><span><b>!</b> or red: test, quiz or exam</span><span>Faded: submitted</span><span class="muted">Tap a day to see its week</span></div>`;
+  }
+  const up = S.asg.filter(a => a.due && a.due >= tk && !["submitted", "graded"].includes(a.status)).sort((a, b) => (a.due + (a.time || "")).localeCompare(b.due + (b.time || ""))).slice(0, 6);
+  box.innerHTML = `<div class="sch-head">
+      <div class="sch-title"><span class="muted small">${esc(label)}</span></div>
+      <div class="sch-ctrl"><button class="btn sm" type="button" data-sc-nav="-1" aria-label="Previous">‹</button><button class="btn sm ghost" type="button" data-sc-today>Today</button><button class="btn sm" type="button" data-sc-nav="1" aria-label="Next">›</button>
+        <div class="seg"><button type="button" data-sc-mode="week" aria-pressed="${week}">Week</button><button type="button" data-sc-mode="month" aria-pressed="${!week}">Month</button></div></div></div>
+    ${body}
+    ${up.length ? `<div class="sc-up"><div class="small muted" style="font-weight:600">Coming up</div><ul class="hlist">${up.map(a => { const n = Math.round((new Date(a.due + "T00:00") - new Date(tk + "T00:00")) / 864e5);
+      return `<li><span class="hl-t">${n === 0 ? "Today" : n === 1 ? "Tmrw" : n + " days"}</span><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="hl-b">${BIG.includes(a.type) ? "<b>" : ""}${esc(a.title)}${BIG.includes(a.type) ? "</b>" : ""} <span class="muted small">· ${esc(fmtDate(a.due))}${a.time ? " " + fmt12(a.time) : ""}</span></span><span></span></li>`; }).join("")}</ul></div>` : ""}`;
+}
+document.addEventListener("click", e => {
+  if (S.view !== "study") return;
+  const t = e.target.closest("[data-sc-nav],[data-sc-today],[data-sc-mode],[data-sc-day],[data-sc-cls],[data-sc-asg],[data-subj-edit],[data-subj-cancel]"); if (!t || !t.closest("#v-study")) return;
+  const d = t.dataset;
+  if (d.scNav) { const [y, m, dd] = S.scSel.split("-").map(Number); S.scSel = S.scMode === "week" ? addDays(S.scSel, 7 * +d.scNav) : dkey(new Date(y, m - 1 + +d.scNav, 1)); renderStudyCal(); }
+  else if (d.scToday !== undefined) { S.scSel = todayKey(); renderStudyCal(); }
+  else if (d.scMode) { S.scMode = d.scMode; renderStudyCal(); }
+  else if (d.scAsg) { e.stopPropagation(); S.asgOpen = d.scAsg; S.asgFilter = "all"; location.hash = "#study-assignments"; }
+  else if (d.scCls) { S.stEdit = d.scCls; S.clsForm = true; const c = S.classes.find(x => x.id === d.scCls); if (c) S.clsType = c.type; location.hash = "#study-timetable"; setTimeout(() => $("#cls-form") && $("#cls-form").scrollIntoView({ block: "center" }), 120); }
+  else if (d.scDay) { if (S.scMode === "month") { S.scSel = d.scDay; S.scMode = "week"; renderStudyCal(); } }
+  else if (d.subjEdit) { S.subjEdit = d.subjEdit; S.subjForm = false; renderStudy(); $("#se-name") && $("#se-name").focus(); }
+  else if (d.subjCancel !== undefined) { S.subjEdit = null; renderStudy(); }
+});
+document.addEventListener("keydown", e => { const m = e.target.closest && e.target.closest(".sc-day[data-sc-day]"); if (m && e.target === m && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); m.click(); } });
+document.addEventListener("submit", e => {
+  if (e.target.id !== "subj-edit-form") return; e.preventDefault();
+  const s = subj(S.subjEdit), n = $("#se-name").value.trim(); if (!s || !n) return;
+  put("subjects", s.id, { ...strip(s), code: $("#se-code").value.trim().toUpperCase(), name: n, lecturer: $("#se-lect").value.trim(), location: $("#se-loc").value.trim() });
+  S.subjEdit = null; toast("Subject updated");
+}, true);
+document.addEventListener("change", e => { if (e.target.id === "cl-subj" && $("#cl-room")) { const l = (subj(e.target.value) || {}).location; $("#cl-room").placeholder = l ? `Location (blank = ${l})` : "Location, e.g. DK3, Lab 2 or Zoom link"; } });
+
 // ---------- calendar
 S.calY = new Date().getFullYear(); S.calM = new Date().getMonth(); S.calSel = todayKey();
 const loadedMonths = new Set();
@@ -1864,7 +1944,7 @@ function renderCalendar(){
   for (let d = 1; d <= nDays; d++) {
     const k = dkey(new Date(y, m, d)), I = dayInfo(k), we = isWeekend(keyDow(k));
     const doneN = I.todosDone.length + I.finished.length;
-    const dueOpen = I.due.filter(t => t.status !== "done").length + S.asg.filter(a => a.due === k && !["submitted", "graded"].includes(a.status)).length;
+    const dueOpen = I.due.filter(t => t.status !== "done").length;
     const pc = I.pct;
     const bar = pc === null ? "" : `<span class="cal-bar"><i style="width:${pc}%;background:${pc >= 80 ? "var(--ok)" : pc >= 50 ? "var(--med)" : "var(--crit)"}"></i></span>`;
     const marks = (I.refl ? `<i class="mk mk-refl" title="Reflection written"></i>` : "") + (I.updates.length || I.finished.length || I.added.length ? `<i class="mk mk-work" title="Work activity"></i>` : "") + (dueOpen ? `<i class="mk mk-due" title="Task due"></i>` : "");

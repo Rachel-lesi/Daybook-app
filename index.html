@@ -1117,6 +1117,45 @@ dialog:focus{outline:none}
 }
 @keyframes sheet-up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){#dlg[open],.xdlg[open]{animation:none}}
+
+/* ===== Study calendar ===== */
+#st-cal{display:grid;gap:12px}
+.sc-hd{display:flex;flex-direction:column;align-items:center;gap:0;border-top:0;border-right:0;cursor:default;font:inherit;font-size:.72rem}
+.sc-hd b{font-size:1rem;color:var(--ink);letter-spacing:0}
+.sc-hd.today b{color:var(--accent)}
+.sc-lbl{font-size:.68rem;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--line)}
+.sc-dues{display:grid;gap:3px;align-content:start;padding:4px 2px;border-left:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+.sc-due{display:block;width:100%;text-align:left;font:inherit;font-size:.7rem;font-weight:600;line-height:1.25;padding:3px 6px;border-radius:6px;border:0;border-left:3px solid currentColor;background:color-mix(in srgb,currentColor 14%,var(--surface));cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-due.big{background:color-mix(in srgb,var(--crit) 14%,var(--surface));border-left-color:var(--crit)}
+.sc-due.done{opacity:.55;text-decoration:line-through}
+.sc-ev .ev-loc{display:flex;align-items:center;gap:3px;font-weight:600}
+.sc-ev .ev-loc svg{width:11px;height:11px;flex:none}
+.sc-month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.sc-day{min-height:78px;border:1px solid var(--line);border-radius:10px;padding:5px;display:flex;flex-direction:column;gap:3px;background:var(--surface);cursor:pointer;min-width:0}
+.sc-day.is-we{background:var(--bg)}
+.sc-day.is-today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sc-n{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;font-size:.85rem}
+.sc-n small{font-size:.62rem;color:var(--muted);font-weight:600}
+.sc-dots{display:flex;flex-wrap:wrap;gap:3px}
+.sc-dots i{width:7px;height:7px;border-radius:50%;background:currentColor}
+.sc-lg-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block}
+.sc-up{display:grid;gap:4px}
+.subj-list .hl-b[data-subj-edit]{cursor:pointer}
+.subj-list .x svg{width:14px;height:14px}
+.se-li{display:block!important}
+@media (max-width:640px){
+  .sc-day{min-height:58px;padding:3px}
+  .sc-day .sc-due{font-size:0;height:5px;padding:0;border:0;border-radius:3px;background:currentColor;opacity:.85}
+  .sc-day .sc-due.big{background:var(--crit)}
+  .sc-day .sc-due.done{opacity:.35;text-decoration:none}
+  .tt.sc-week{grid-template-columns:34px repeat(var(--cols),minmax(52px,1fr));min-width:0}
+  .sc-ev{padding:3px 4px!important}
+  #st-cal{padding-left:10px;padding-right:10px}
+  .sc-ev .ev-loc{white-space:normal;align-items:flex-start}
+  .sc-dues .sc-due{font-size:.62rem;padding:3px 4px}
+  .sc-dues .sd-t{display:none}
+  .sc-ev .ev-t{font-size:.66rem}
+}
 </style>
 </head>
 <body class="locked">
@@ -1388,6 +1427,10 @@ dialog:focus{outline:none}
       <div class="sechead"><h2>Subjects & classes</h2><span class="meta">This semester</span></div>
       <div class="panel hcard" id="st-subj"></div>
     </div>
+    <div data-part="calendar" data-wide>
+      <div class="sechead"><h2>Study calendar</h2><span class="meta">Classes, tests and deadlines · separate from work</span></div>
+      <div class="panel hcard" id="st-cal"></div>
+    </div>
     <div data-part="assignments" data-wide>
       <div class="sechead"><h2>Assignments</h2><span class="meta">Assignments, quizzes, projects and exams</span></div>
       <div class="panel hcard" id="st-asg"></div>
@@ -1576,6 +1619,6 @@ dialog:focus{outline:none}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=26"></script>
+<script type="module" src="app.js?v=27"></script>
 </body>
 </html>
