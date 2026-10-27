@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Daybook</title>
+<meta name="description" content="Daily routine, to-dos, internship work tasks and daily reflections.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16211d" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Daybook">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one sticky command header (name, tabs, quick-add), then a single focused column per view. */
+:root{
+  --bg:#f3f6f4; --surface:#ffffff; --sunk:#e7ede9; --line:#d3ddd7;
+  --ink:#13261f; --muted:#5b6f66; --accent:#0d7a5c; --accent-ink:#ffffff; --accent-soft:#d5ece3;
+  --crit:#c62f2f; --high:#d9701c; --med:#b8901a; --low:#6c7f88;
+  --crit-soft:#fbe4e2; --high-soft:#fcebdb; --med-soft:#f6efd3; --low-soft:#e6ecef;
+  --ok:#2f8a4f;
+  --f-display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1714; --surface:#16211d; --sunk:#1c2a25; --line:#2a3b35;
+  --ink:#e4eee9; --muted:#93a89f; --accent:#3cc492; --accent-ink:#06231a; --accent-soft:#183b30;
+  --crit:#ff6b62; --high:#f39a4d; --med:#e0bf4f; --low:#93a6af;
+  --crit-soft:#3a1a19; --high-soft:#3a2716; --med-soft:#352e14; --low-soft:#222d32; --ok:#5bc27f;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1714; --surface:#16211d; --sunk:#1c2a25; --line:#2a3b35;
+  --ink:#e4eee9; --muted:#93a89f; --accent:#3cc492; --accent-ink:#06231a; --accent-soft:#183b30;
+  --crit:#ff6b62; --high:#f39a4d; --med:#e0bf4f; --low:#93a6af;
+  --crit-soft:#3a1a19; --high-soft:#3a2716; --med-soft:#352e14; --low-soft:#222d32; --ok:#5bc27f;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:860px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-block:12px 4px}
+.brand h1{font-family:var(--f-display);font-weight:700;font-size:1.35rem;margin:0;letter-spacing:-.01em}
+.brand .date{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);white-space:nowrap}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+nav.tabs a{padding:8px 12px;text-decoration:none;color:var(--muted);font-weight:600;font-size:.92rem;border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-color:var(--accent)}
+nav.tabs .count{font-family:var(--f-mono);font-size:.72rem;background:var(--sunk);border-radius:99px;padding:1px 6px;margin-left:4px}
+.quick{padding-block:10px 12px;display:grid;gap:6px}
+.qrow{display:flex;gap:6px}
+.qmode{display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden;flex:none}
+.qmode button{border:0;background:transparent;padding:0 10px;font-size:.82rem;font-weight:600;color:var(--muted)}
+.qmode button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink)}
+#q{flex:1;min-width:0;width:0;border:1px solid var(--line);background:var(--bg);border-radius:var(--r);padding:10px 12px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:8px 14px;font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--crit)}
+.btn.sm{padding:4px 10px;font-size:.85rem}
+.qhint{font-size:.78rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:22px}
+.qhint code{font-family:var(--f-mono);font-size:.74rem;background:var(--sunk);padding:1px 5px;border-radius:5px}
+main{padding-block:18px 60px}
+section.view{display:grid;gap:22px}
+section.view > *,.quick > *{min-width:0}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.05rem;margin:0;letter-spacing:-.005em}
+.sechead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px}
+.sechead .meta{font-size:.8rem;color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.banner{background:var(--med-soft);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;font-size:.9rem}
+/* Now strip */
+.now{display:flex;gap:14px;align-items:center;padding:14px 16px;background:var(--accent-soft);border-radius:var(--r)}
+.now .t{font-family:var(--f-mono);font-size:1.4rem;font-weight:500}
+.now .l{font-weight:600}
+.now .s{font-size:.82rem;color:var(--muted)}
+/* routine timeline */
+ol.timeline{list-style:none;margin:0;padding:0}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.pager .mid{font-weight:600;text-align:center}
+.pager .mid small{display:block;font-weight:400;color:var(--muted);font-size:.78rem}
+.pager button:disabled{opacity:.35;cursor:default}
+.addonce{display:flex;gap:6px;padding:8px 12px;border-top:1px dashed var(--line)}
+.addonce input{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:6px 8px;min-width:0}
+.addonce input[type="time"]{flex:none;width:96px}
+.addonce #ao-l{flex:1}
+ol.timeline li.skipped .lbl{color:var(--muted)}
+ol.timeline li.skipped .tm{color:var(--muted)!important;text-decoration:line-through}
+.pill{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border:1px solid var(--line);border-radius:5px;padding:0 5px;margin-left:6px;white-space:nowrap}
+.presets{display:flex;flex-wrap:wrap;gap:4px;grid-column:2 / -1}
+.presets button{border:0;background:transparent;color:var(--accent);font-size:.78rem;font-weight:600;padding:2px 4px}
+ol.timeline li{display:grid;grid-template-columns:58px 22px 1fr auto auto;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--line)}
+ol.timeline li:first-child{border-top:0}
+ol.timeline .tm{font-family:var(--f-mono);font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+ol.timeline li.past:not(.done) .tm{color:var(--high)}
+ol.timeline li.next{background:var(--sunk)}
+ol.timeline li.done .lbl{color:var(--muted);text-decoration:line-through}
+.kind{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+input[type="checkbox"]{width:18px;height:18px;accent-color:var(--accent);margin:0}
+/* list rows */
+ul.rows{list-style:none;margin:0;padding:0}
+ul.rows li{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--line)}
+ul.rows li:first-child{border-top:0}
+ul.rows .grow{flex:1;min-width:0}
+ul.rows .sub{font-size:.78rem;color:var(--muted)}
+ul.rows li.done .grow > span:first-child{color:var(--muted);text-decoration:line-through}
+.x{border:0;background:transparent;color:var(--muted);padding:2px 6px;border-radius:6px}
+.x:hover{background:var(--sunk);color:var(--crit)}
+.empty{padding:16px;color:var(--muted);font-size:.9rem}
+/* task cards */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.stat{padding:10px 12px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line);text-align:left}
+.stat b{display:block;font-family:var(--f-mono);font-size:1.3rem;font-weight:500;font-variant-numeric:tabular-nums}
+.stat span{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.stat[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:3px 11px;font-size:.82rem;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tasks{display:grid;gap:8px}
+.task{display:grid;grid-template-columns:4px 1fr;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;text-align:left;padding:0;width:100%}
+.task .stripe{background:var(--low)}
+.task[data-u="critical"] .stripe{background:var(--crit)}
+.task[data-u="high"] .stripe{background:var(--high)}
+.task[data-u="medium"] .stripe{background:var(--med)}
+.task .body{padding:11px 14px;display:grid;gap:6px;min-width:0}
+.task .ttl{font-weight:600}
+.task.isdone .ttl{color:var(--muted);text-decoration:line-through}
+.task .line{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:.8rem;color:var(--muted)}
+.tag{font-size:.72rem;font-weight:600;padding:1px 8px;border-radius:99px;background:var(--sunk);color:var(--ink)}
+.urg{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:1px 7px;border-radius:5px}
+.urg.critical{background:var(--crit-soft);color:var(--crit)}
+.urg.high{background:var(--high-soft);color:var(--high)}
+.urg.medium{background:var(--med-soft);color:var(--med)}
+.urg.low{background:var(--low-soft);color:var(--low)}
+.st{font-weight:600}
+.st.blocked{color:var(--crit)}
+.st.done{color:var(--ok)}
+.bar{height:6px;background:var(--sunk);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.block{font-size:.83rem;background:var(--crit-soft);color:var(--ink);border-radius:6px;padding:5px 9px}
+.block b{color:var(--crit)}
+.overdue{color:var(--crit);font-weight:600}
+/* forms */
+label.f{display:grid;gap:4px;font-size:.8rem;font-weight:600;color:var(--muted)}
+label.f input,label.f select,label.f textarea{font-size:.95rem;font-weight:400;color:var(--ink);border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;width:100%}
+textarea{resize:vertical;min-height:70px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.seg button{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:5px 10px;font-size:.84rem;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+dialog{border:0;padding:0;border-radius:14px;background:var(--surface);color:var(--ink);width:min(620px,calc(100vw - 24px));max-height:calc(100dvh - 24px)}
+dialog::backdrop{background:rgba(10,20,16,.45)}
+.dlg{padding:18px;display:grid;gap:14px}
+.dlg h3{font-family:var(--f-display);margin:0;font-size:1.15rem}
+.dlgfoot{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center}
+.log{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:180px;overflow:auto}
+.log li{font-size:.84rem;display:grid;grid-template-columns:auto 1fr;gap:8px}
+.log time{font-family:var(--f-mono);font-size:.74rem;color:var(--muted);padding-top:2px}
+.refl{display:grid;gap:12px;padding:16px}
+.auto{background:var(--sunk);border-radius:8px;padding:10px 12px;font-size:.88rem}
+.auto ul{margin:4px 0 0;padding-left:18px}
+.mood{display:flex;gap:6px}
+.mood button{border:1px solid var(--line);background:var(--bg);border-radius:8px;width:40px;height:36px;font-family:var(--f-mono)}
+.mood button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.saved{font-size:.78rem;color:var(--muted)}
+.rt{display:grid;grid-template-columns:90px 1fr 120px auto;gap:8px;align-items:center;padding:8px 12px;border-top:1px solid var(--line)}
+.rt:first-child{border-top:0}
+.rt input,.rt select{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:6px 8px;width:100%;min-width:0}
+.days{display:flex;gap:3px;grid-column:2 / -1}
+.days button{border:1px solid var(--line);background:var(--bg);border-radius:6px;width:30px;height:26px;font-size:.72rem;font-weight:600;padding:0}
+.days button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:99px;font-size:.88rem;z-index:20}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;gap:2px}
+.tile b{font-family:var(--f-mono);font-weight:500;font-size:1.6rem;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile span{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile small{font-size:.78rem;color:var(--muted)}
+.ov2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ov2 > *{min-width:0}
+.chartbox{padding:12px 14px}
+.chartbox svg{width:100%;height:auto;display:block}
+.chartbox text{font-family:var(--f-mono);font-size:17px;fill:var(--muted)}
+.ovt{width:100%;border-collapse:collapse;font-size:.88rem}
+.ovt th{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;text-align:right;padding:8px 12px;border-bottom:1px solid var(--line)}
+.ovt th:first-child,.ovt td:first-child{text-align:left}
+.ovt td{padding:8px 12px;border-top:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+.ovt tr:first-child td{border-top:0}
+.hab{display:grid;grid-template-columns:110px 1fr 64px;gap:10px;align-items:center;padding:9px 14px;border-top:1px solid var(--line);font-size:.88rem}
+.hab:first-child{border-top:0}
+.hab .n{font-family:var(--f-mono);font-size:.8rem;text-align:right;color:var(--muted)}
+@media (max-width:700px){.ov2{grid-template-columns:1fr}}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+@media (max-width:560px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .grid2{grid-template-columns:1fr}
+  .rt{grid-template-columns:76px 1fr auto}
+  .rt select{grid-column:2}
+  .qmode button{padding:0 8px}
+  nav.tabs a{padding:8px 9px;font-size:.88rem}
+  ol.timeline li{grid-template-columns:50px 20px 1fr auto;padding:8px 12px}
+  ol.timeline .kind{display:none}
+}
+/* iPhone: 16px inputs stop Safari zooming in when you tap a field */
+@supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px!important}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+:root{padding-bottom:env(safe-area-inset-bottom,0px)}
+body.locked{overflow:hidden}
+.authwrap{position:fixed;inset:0;z-index:30;background:var(--bg);display:grid;place-items:center;overflow:auto;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.authcard{width:min(380px,100%);display:grid;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px}
+.authcard h1{font-family:var(--f-display);margin:0;font-size:1.6rem}
+#auth-form{display:grid;gap:10px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><h1>Daybook</h1><span class="date" id="today-label"></span></div>
+    <nav class="tabs" id="tabs">
+      <a href="#today" data-v="today">Today</a>
+      <a href="#work" data-v="work">Work <span class="count" id="c-work">0</span></a>
+      <a href="#overview" data-v="overview">Overview</a>
+      <a href="#reflect" data-v="reflect">Reflection</a>
+      <a href="#routine" data-v="routine">Routine</a>
+    </nav>
+    <form class="quick" id="quick" autocomplete="off">
+      <div class="qrow">
+        <div class="qmode" role="group" aria-label="Add as">
+          <button type="button" id="m-todo" aria-pressed="true">To-do</button>
+          <button type="button" id="m-work" aria-pressed="false">Work</button>
+        </div>
+        <input id="q" placeholder="Add… e.g. Fix stock report #excel !high @fri" aria-label="Quick add">
+        <button class="btn primary" type="submit">Add</button>
+      </div>
+      <div class="qhint" id="qhint"></div>
+    </form>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="banner" id="offline" hidden>You're offline. Keep going: your changes are saved on this device and sync when you reconnect.</div>
+  <div class="banner" id="rules" hidden style="background:var(--crit-soft)">Your data can't be read or saved. Check the Firestore rules (setup step 3), then reload.</div>
+
+  <section class="view" id="v-today" hidden>
+    <div class="now" id="now"></div>
+    <div>
+      <div class="sechead"><h2 id="rt-title">Routine</h2><span class="meta" id="rt-meta"></span></div>
+      <div class="pager" id="daypager"></div>
+      <div class="panel"><ol class="timeline" id="timeline"></ol>
+        <form class="addonce" id="addonce" autocomplete="off"><input type="time" id="ao-t" value="14:00" aria-label="Time"><input id="ao-l" placeholder="Add just for this day, e.g. Dentist, family dinner" aria-label="One-off item"><button class="btn sm" type="submit">Add</button></form>
+      </div>
+    </div>
+    <div>
+      <div class="sechead"><h2>To-do</h2><span class="meta" id="todo-meta"></span></div>
+      <div class="panel"><ul class="rows" id="todos"></ul></div>
+    </div>
+    <div>
+      <div class="sechead"><h2>Work focus</h2><a class="meta" href="#work">All tasks</a></div>
+      <div class="tasks" id="focus"></div>
+    </div>
+    <div>
+      <div class="sechead"><h2>Done today</h2><span class="meta" id="done-meta"></span></div>
+      <div class="panel"><ul class="rows" id="donetoday"></ul></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-work" hidden>
+    <div class="stats" id="stats"></div>
+    <div class="chips" id="catchips"></div>
+    <div class="tasks" id="tasklist"></div>
+  </section>
+
+  <section class="view" id="v-overview" hidden>
+    <div class="sechead" style="margin:0;align-items:center"><div><h2>Overview</h2><span class="meta" id="ov-since"></span></div><div class="seg" id="ov-range"></div></div>
+    <div class="tiles" id="ov-tiles"></div>
+    <div class="ov2">
+      <div class="panel chartbox"><div class="sechead"><h2>Routine completion</h2><span class="meta">% of scheduled items ticked</span></div><div id="ov-rchart"></div></div>
+      <div class="panel chartbox"><div class="sechead"><h2>Work activity</h2><span class="meta">updates logged + tasks finished</span></div><div id="ov-wchart"></div></div>
+    </div>
+    <div class="ov2">
+      <div><div class="sechead"><h2>Work by category</h2></div><div class="panel" style="overflow-x:auto"><table class="ovt" id="ov-cats"></table></div></div>
+      <div><div class="sechead"><h2>Daily life habits</h2><span class="meta">done / scheduled</span></div><div class="panel" id="ov-habits"></div></div>
+    </div>
+    <div class="ov2">
+      <div><div class="sechead"><h2>Needs attention</h2></div><div class="panel"><ul class="rows" id="ov-attn"></ul></div></div>
+      <div><div class="sechead"><h2>Recent learnings</h2><a class="meta" href="#reflect">Reflection</a></div><div class="panel"><ul class="rows" id="ov-learn"></ul></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-reflect" hidden>
+    <div class="panel refl">
+      <div class="sechead" style="margin:0"><h2>Daily reflection</h2>
+        <input type="date" id="r-date" aria-label="Reflection date" style="border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:5px 8px"></div>
+      <div class="auto" id="r-auto"></div>
+      <label class="f">What I did<textarea id="r-did" placeholder="Main things I worked on and finished"></textarea></label>
+      <label class="f">What I learned<textarea id="r-learned" placeholder="New skill, SQL trick, how a process at the plant works…"></textarea></label>
+      <label class="f">Mistakes<textarea id="r-mistakes" placeholder="What went wrong, honestly"></textarea></label>
+      <label class="f">How I'll improve<textarea id="r-improve" placeholder="One concrete change for tomorrow"></textarea></label>
+      <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Energy today (1 low – 5 great)</span><div class="mood" id="r-mood"></div></div>
+      <div class="dlgfoot"><span class="saved" id="r-saved"></span>
+        <div style="display:flex;gap:8px"><button class="btn" type="button" id="r-copy">Copy as report</button><button class="btn primary" type="button" id="r-save">Save</button></div></div>
+    </div>
+    <div>
+      <div class="sechead"><h2>Past reflections</h2></div>
+      <div class="panel"><ul class="rows" id="r-history"></ul></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-routine" hidden>
+    <div>
+      <div class="sechead"><h2>Daily routine</h2><span class="meta">Changes save automatically</span></div>
+      <div class="seg" id="rt-filter" style="margin-bottom:8px"></div>
+      <div class="panel" id="rt-edit"></div>
+      <div style="margin-top:8px"><button class="btn sm" type="button" id="rt-add">Add routine item</button></div>
+    </div>
+    <div>
+      <div class="sechead"><h2>Work categories</h2><span class="meta">Use the short tag after # in quick add</span></div>
+      <div class="panel" style="padding:12px;display:grid;gap:10px">
+        <div class="chips" id="cat-edit"></div>
+        <form id="cat-form" class="qrow"><input id="cat-new" placeholder="New category, e.g. Power BI / Dashboards" style="flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px"><button class="btn sm" type="submit">Add</button></form>
+      </div>
+    </div>
+    <div class="panel" style="padding:14px" >
+      <h2 style="margin-bottom:6px">Phone reminders</h2>
+      <p class="small muted" style="margin:0">Push reminders for meals, supplements, breaks, study, swimming and your evening reflection come from scheduled tasks in your Claude app. If you change a time here, ask Claude to move the matching reminder too.</p>
+    </div>
+    <div class="panel" style="padding:14px;display:grid;gap:10px">
+      <h2>Account &amp; backup</h2>
+      <p class="small muted" style="margin:0">Signed in as <b id="acct-email"></b>. Your data syncs across every device you sign in on.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button class="btn sm" type="button" id="bk-export">Download backup</button>
+        <label class="btn sm" for="bk-import" style="cursor:pointer">Restore from backup</label><input type="file" id="bk-import" accept="application/json,.json" hidden>
+        <button class="btn sm ghost danger" type="button" id="signout">Sign out</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlg"><form class="dlg" id="tf" method="dialog"></form></dialog>
+<div class="toast" id="toast" hidden></div>
+
+
+<div id="auth" class="authwrap" hidden>
+  <div class="authcard">
+    <img src="icon-192.png" alt="" width="56" height="56" style="border-radius:14px">
+    <h1>Daybook</h1>
+    <p class="muted small" style="margin:0">Routine, to-dos, work tasks and reflections. Synced on your phone and PC.</p>
+    <div id="auth-setup" hidden><p class="banner" style="margin:0">Almost there. Paste your Firebase settings into <b>firebase-config.js</b> (setup step 4), upload it, then reload this page.</p></div>
+    <form id="auth-form" autocomplete="on">
+      <label class="f">Email<input type="email" id="a-email" autocomplete="username" required></label>
+      <label class="f">Password<input type="password" id="a-pass" autocomplete="current-password" minlength="6" required></label>
+      <p id="auth-err" class="small" style="margin:0;color:var(--crit);min-height:1.2em" role="alert"></p>
+      <button class="btn primary" type="submit">Sign in</button>
+      <button class="btn" type="button" id="a-create">Create account</button>
+      <button class="btn ghost sm" type="button" id="a-forgot">Forgot password?</button>
+    </form>
+  </div>
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
