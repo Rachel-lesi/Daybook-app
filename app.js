@@ -596,7 +596,7 @@ function dataProblem(e){
 // ---------- live data
 function startData(){
   const fail = dataProblem;
-  let loaded = 0; const mark = () => { if (++loaded >= 5) { S.ready = true; } render(); };
+  let loaded = 0; const mark = () => { if (++loaded >= 5) { S.ready = true; leaveSplash(); } render(); };
   const sub = (coll, key) => { let first = true; db.collection(coll).onSnapshot(s => { S[key] = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); } else render(); }, fail); };
   sub("tasks", "tasks"); sub("todos", "todos"); sub("routine", "routine");
   let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
@@ -661,15 +661,28 @@ if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").ca
 const setOnline = () => { $("#offline").hidden = navigator.onLine; };
 addEventListener("online", setOnline); addEventListener("offline", setOnline); setOnline();
 
+// ---------- opening screen
+const SPLASH_MIN = 1800;
+let splashReady = false, splashGone = false;
+function leaveSplash(now){
+  const sp = $("#splash"); if (!sp || splashGone) return;
+  splashReady = true; $("#sp-hint").textContent = "Tap to continue";
+  const wait = now ? 0 : Math.max(0, SPLASH_MIN - (Date.now() - (window.__splashStart || 0)));
+  clearTimeout(leaveSplash._t);
+  leaveSplash._t = setTimeout(() => { if (splashGone) return; splashGone = true; sp.classList.add("out"); setTimeout(() => sp.remove(), 650); }, wait);
+}
+$("#splash")?.addEventListener("click", () => { if (splashReady) leaveSplash(true); });
+setTimeout(() => leaveSplash(), 8000); // never keep the opening screen longer than this
+
 const notConfigured = !firebaseConfig || !firebaseConfig.apiKey || /PASTE/i.test(firebaseConfig.apiKey);
-if (notConfigured) { showAuth("setup"); }
+if (notConfigured) { showAuth("setup"); leaveSplash(); }
 else {
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   try { FS = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); }
   catch (e) { FS = getFirestore(app); }
   onAuthStateChanged(auth, async user => {
-    if (!user) { if (db) { location.reload(); return; } showAuth("signin"); return; }
+    if (!user) { if (db) { location.reload(); return; } showAuth("signin"); leaveSplash(); return; }
     hideAuth(); $("#acct-email").textContent = user.email || "";
     UID = user.uid; db = mkdb(FS, UID);
     try { await seedIfEmpty(); } catch (e) { dataProblem(e); }
