@@ -233,6 +233,46 @@ function routineFor(k){ const wd=keyDow(k); const dd=dayDoc(k);
   return [...S.routine.filter(r=>!r.days||r.days.includes(wd)), ...(dd.extra||[]).map(x=>({...x,extra:true}))].sort((a,b)=>a.time.localeCompare(b.time)); }
 function saveDay(k, dd){ S.day[k]=dd; if(db) write("checks/"+k, ()=>db.doc("checks/"+k).set({date:k,done:dd.done||{},skip:dd.skip||{},extra:dd.extra||[]})); renderToday(); }
 const DAYLBL = {"-1":"Yesterday","0":"Today","1":"Tomorrow"};
+// ---------- routine timeline in the summary card (day / week)
+try { S.tlMode = localStorage.getItem("daybook-tl") || "day"; } catch { S.tlMode = "day"; }
+const toMin = t => { const [h, m] = String(t || "0:0").split(":").map(Number); return h * 60 + m; };
+function itemState(r, k){
+  const dd = dayDoc(k), tk = todayKey();
+  if ((dd.skip || {})[r.id]) return "skip";
+  if ((dd.done || {})[r.id]) return "done";
+  if (k < startKey()) return "none";
+  if (k < tk) return "miss";
+  if (k === tk && toMin(r.time) < new Date().getHours() * 60 + new Date().getMinutes()) return "late";
+  return "todo";
+}
+const STATE_TXT = { done: "Done", miss: "Missed", late: "Not ticked yet", todo: "Upcoming", skip: "Skipped", none: "Before tracking" };
+function timelineHtml(){
+  const tk = todayKey(), week = weekKeys(0), mode = S.tlMode;
+  const keys = mode === "week" ? week : [tk];
+  const all = keys.flatMap(k => routineFor(k));
+  if (!all.length) return "";
+  let lo = Math.floor(Math.min(...all.map(r => toMin(r.time))) / 60) * 60, hi = Math.ceil((Math.max(...all.map(r => toMin(r.time))) + 1) / 60) * 60;
+  if (hi - lo < 120) hi = lo + 120;
+  const pos = m => ((m - lo) / (hi - lo) * 100).toFixed(2);
+  const nowM = new Date().getHours() * 60 + new Date().getMinutes(), nowIn = nowM >= lo && nowM <= hi;
+  const dots = k => routineFor(k).map(r => { const st = itemState(r, k); return `<i class="tl-dot s-${st}" style="left:${pos(toMin(r.time))}%" title="${esc(r.time)} ${esc(r.label)} · ${STATE_TXT[st]}"></i>`; }).join("");
+  const span = (hi - lo) / 60, step = span <= 8 ? 2 : span <= 14 ? 3 : 4;
+  const ticks = []; for (let m = lo; m <= hi; m += step * 60) ticks.push(`<span style="left:${pos(m)}%">${pad(Math.floor(m / 60) % 24)}:00</span>`);
+  const nowMark = (k) => k === tk && nowIn ? `<b class="tl-now" style="left:${pos(nowM)}%"></b>` : "";
+  const fill = (k) => k === tk ? `<span class="tl-fill" style="width:${nowIn ? pos(nowM) : (nowM > hi ? 100 : 0)}%"></span>` : k < tk ? `<span class="tl-fill past" style="width:100%"></span>` : "";
+  const count = k => { const its = routineFor(k).filter(r => !(dayDoc(k).skip || {})[r.id]); return `${its.filter(r => (dayDoc(k).done || {})[r.id]).length}/${its.length}`; };
+  const body = mode === "week"
+    ? `<div class="tl-week">${week.map(k => `<div class="tl-row ${k === tk ? "is-today" : ""} ${k > tk ? "is-future" : ""}"><span class="tl-day">${esc(DAYS[keyDow(k)])}</span><div class="tl-track">${fill(k)}${dots(k)}${nowMark(k)}</div><span class="tl-count">${k > tk || k < startKey() ? "" : count(k)}</span></div>`).join("")}
+       <div class="tl-row tl-axisrow"><span></span><div class="tl-axis">${ticks.join("")}</div><span></span></div></div>`
+    : `<div class="tl-track big">${fill(tk)}${dots(tk)}${nowMark(tk)}${nowIn ? `<em class="tl-nowlbl" style="left:${pos(nowM)}%">now</em>` : ""}</div><div class="tl-axis">${ticks.join("")}</div>`;
+  return `<div class="tl">
+    <div class="tl-head"><span class="tl-title">${mode === "week" ? "This week's routine" : "Today's routine"}</span>
+      <div class="seg tl-seg"><button type="button" data-tl="day" aria-pressed="${mode === "day"}">Day</button><button type="button" data-tl="week" aria-pressed="${mode === "week"}">Week</button></div></div>
+    ${body}
+    <div class="tl-legend"><span><i class="tl-dot s-done"></i>Done</span><span><i class="tl-dot s-todo"></i>Upcoming</span><span><i class="tl-dot s-late"></i>Not ticked</span><span><i class="tl-dot s-skip"></i>Skipped</span></div>
+  </div>`;
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-tl]"); if (!b) return; S.tlMode = b.dataset.tl; try { localStorage.setItem("daybook-tl", S.tlMode); } catch {} renderToday(); });
 function heroHtml(active, done, next, missed){
   const tk=todayKey(), dn=active.filter(r=>done[r.id]).length, pct=active.length?Math.round(dn/active.length*100):0;
   const todoLeft=S.todos.filter(t=>!t.done&&(!t.date||t.date<=tk)).length, open=S.tasks.filter(t=>t.status!=="done").length;
@@ -241,7 +281,7 @@ function heroHtml(active, done, next, missed){
     <div class="hero-sub">${esc(new Date().toLocaleDateString("en-GB",{weekday:"long"}))} · ${isWeekend(new Date().getDay())?"Weekend":"Weekday"} routine</div>
     ${next?`<div class="hero-next">${routineIcon(next)}<span><b>${esc(next.time)}</b> ${esc(next.label)}</span></div>`:`<div class="hero-next"><span>${!active.length?"No routine yet. Add items in the Routine tab.":dn===active.length?"Routine complete for today. Nice work.":"Nothing else scheduled today. Tick off anything you did."}</span></div>`}
     <div class="hero-stats"><span><b>${dn}/${active.length}</b> routine</span><span><b>${todoLeft}</b> to-do${todoLeft===1?"":"s"} left</span><span><b>${open}</b> task${open===1?"":"s"} open</span>${missed?`<span class="warn"><b>${missed}</b> not ticked</span>`:""}</div>
-  </div></div>`;
+  </div></div>${timelineHtml()}`;
 }
 function renderToday(){
   const tk=todayKey(), k=viewKey(), isToday=S.dayOff===0, dd=dayDoc(k), done=dd.done||{}, skip=dd.skip||{};

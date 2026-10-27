@@ -639,6 +639,44 @@ ol.timeline li.next{background:var(--pink-soft)}
 mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 .sp-bar i{background:linear-gradient(90deg,var(--accent),var(--pink))}
 .wk-doc h2{color:var(--accent)}
+
+/* ===== Routine timeline in the summary card ===== */
+.tl{margin-top:16px;padding-top:14px;border-top:1px solid color-mix(in srgb,var(--ink) 10%,transparent);display:grid;gap:8px}
+.tl-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tl-title{font-size:.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.tl-seg button{padding:3px 12px;font-size:.78rem;background:var(--surface)}
+.tl-track{position:relative;height:16px}
+.tl-track::before{content:"";position:absolute;left:0;right:0;top:50%;height:3px;margin-top:-1.5px;border-radius:99px;background:color-mix(in srgb,var(--ink) 12%,transparent)}
+.tl-track.big{height:26px;margin-top:4px}
+.tl-track.big::before{height:4px;margin-top:-2px}
+.tl-fill{position:absolute;left:0;top:50%;height:3px;margin-top:-1.5px;border-radius:99px;background:color-mix(in srgb,var(--accent) 45%,transparent)}
+.tl-track.big .tl-fill{height:4px;margin-top:-2px}
+.tl-fill.past{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.tl-dot{position:absolute;top:50%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;border-radius:50%;border:2px solid color-mix(in srgb,var(--ink) 35%,transparent);background:var(--surface);box-sizing:border-box}
+.tl-track.big .tl-dot{width:14px;height:14px;margin:-7px 0 0 -7px}
+.tl-dot.s-done{background:var(--accent);border-color:var(--accent)}
+.tl-dot.s-late,.tl-dot.s-miss{background:var(--pink-soft);border-color:#e0857b}
+.tl-dot.s-miss{background:#e0857b}
+.tl-dot.s-skip{border-style:dashed;opacity:.45}
+.tl-dot.s-none{opacity:.25}
+.tl-now{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;border-radius:2px;background:var(--pink-ink);z-index:2}
+.tl-track.big .tl-now{top:-3px;bottom:-3px}
+.tl-nowlbl{position:absolute;top:-17px;transform:translateX(-50%);font-style:normal;font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--pink-ink)}
+.tl-track.big{margin-top:14px}
+.tl-axis{position:relative;height:14px;font-family:var(--f-mono);font-size:.66rem;color:var(--muted)}
+.tl-axis span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.tl-axis span:first-child{transform:none}
+.tl-axis span:last-child{transform:translateX(-100%)}
+.tl-week{display:grid;gap:5px}
+.tl-row{display:grid;grid-template-columns:34px 1fr 34px;align-items:center;gap:10px}
+.tl-day{font-size:.75rem;font-weight:600;color:var(--muted)}
+.tl-count{font-family:var(--f-mono);font-size:.7rem;color:var(--muted);text-align:right}
+.tl-row.is-today .tl-day,.tl-row.is-today .tl-count{color:var(--accent);font-weight:700}
+.tl-row.is-today .tl-track::before{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+.tl-row.is-future{opacity:.65}
+.tl-legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.72rem;color:var(--muted)}
+.tl-legend span{display:inline-flex;align-items:center;gap:5px}
+.tl-legend .tl-dot{position:static;margin:0;width:10px;height:10px}
 </style>
 </head>
 <body class="locked">
@@ -918,6 +956,6 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=11"></script>
+<script type="module" src="app.js?v=12"></script>
 </body>
 </html>
