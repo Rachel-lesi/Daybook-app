@@ -1014,6 +1014,89 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
   .toast{bottom:calc(84px + env(safe-area-inset-bottom,0px))}
   .subtabs{padding-block:2px 4px}
 }
+
+/* ===== Study ===== */
+#v-study.sub{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,460px),1fr));gap:22px 28px;align-items:start}
+.st-top{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:10px}
+.st-week,.st-next{background:var(--bg);border-radius:12px;padding:10px 12px;display:grid;gap:3px;align-content:start}
+.st-week b{font-family:var(--f-display);font-size:1.3rem}
+.st-next b{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.st-sem summary{cursor:pointer;color:var(--muted)}
+.st-semf{display:grid;grid-template-columns:1fr 90px;gap:8px;margin-top:6px}
+.tt-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.tt{display:grid;grid-template-columns:52px repeat(var(--cols),minmax(90px,1fr));min-width:min(100%,520px)}
+.tt-hd{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);border-left:1px solid var(--line);padding:6px;text-align:center;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);z-index:2}
+.tt-hd:first-child{border-left:0}
+.tt-hd.today{color:var(--accent)}
+.tt-ev{border-left:3px solid currentColor}
+.tt-ev .ev-t,.tt-ev .ev-s,.ev-class .ev-t,.ev-class .ev-s{color:var(--ink)}
+.ev-class{border-left:3px solid currentColor}
+.ev-class .ev-t svg{color:currentColor}
+.subj-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.subj-list li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line)}
+.subj-list li:last-child{border-bottom:0}
+.st-form{display:grid;gap:8px;padding:12px;border:1px dashed var(--line);border-radius:12px}
+.st-form .row{display:flex;flex-wrap:wrap;gap:8px}
+.asg-row1{display:grid;grid-template-columns:minmax(0,200px) 1fr;gap:8px}
+.asg-row2{display:grid;grid-template-columns:1fr 110px 110px auto;gap:8px;align-items:end}
+.asg-filter{display:grid;gap:8px}
+.asg-list{display:grid;gap:8px}
+.asg{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden;box-shadow:var(--shadow)}
+.asg-main{display:grid;grid-template-columns:5px 1fr;cursor:pointer}
+.asg-stripe{background:currentColor}
+.asg-body{padding:10px 14px;display:grid;gap:5px;min-width:0}
+.asg-t{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.asg-w{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);white-space:nowrap}
+.asg .line{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center}
+.asg-due{font-size:.8rem;color:var(--muted)}
+.asg-due.over{color:var(--crit);font-weight:700} .asg-due.soon{color:var(--high);font-weight:700} .asg-due.week{color:var(--ink)} .asg-due.done{color:var(--ok)}
+.asg.st-submitted .asg-t b,.asg.st-graded .asg-t b{color:var(--muted)}
+.asg-mark{font-family:var(--f-mono);font-size:.82rem;font-weight:600;background:var(--c1s);color:var(--c1);border-radius:6px;padding:0 6px}
+.asg-st{padding:0 14px 10px 19px;flex-wrap:wrap}
+.asg-st button{font-size:.76rem;padding:3px 9px}
+.asg-more{padding:0 14px 12px 19px;display:grid;gap:8px}
+.gr-t td,.gr-t th{vertical-align:middle}
+.gr-in{border:1px solid var(--line);background:var(--bg);border-radius:7px;padding:4px 6px;width:72px}
+.tbl-wrap{overflow-x:auto}
+li.past{opacity:.55}
+@media (max-width:560px){
+  .st-top{grid-template-columns:1fr}
+  .asg-row1{grid-template-columns:1fr}
+  .asg-row2{grid-template-columns:1fr 1fr}
+  .asg-row2 .btn{grid-column:1 / -1}
+}
+@media (max-width:700px){ .bottomnav{grid-template-columns:repeat(7,minmax(0,1fr))} .bottomnav a{font-size:.6rem} .bottomnav a svg{width:21px;height:21px} }
+
+/* ===== Study notes & portfolio ===== */
+.st-form .row .seg{flex:none}
+.notes{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:10px}
+.note{border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:12px 14px;display:grid;gap:6px;align-content:start}
+.note.is-link{background:var(--surface)}
+.nt-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.note h4{margin:0;font-size:.98rem;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.note h4 svg{width:14px;height:14px;color:var(--muted)}
+.note h4 a{color:var(--accent)}
+.nt-body{white-space:pre-wrap;font-size:.88rem;line-height:1.5;overflow-wrap:anywhere}
+.nt-body.clip{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.nt-act{display:flex;gap:4px;justify-content:flex-end}
+.note .btn.ghost{justify-self:start}
+.lk{display:grid;gap:6px}
+.pf-prompt{display:grid;gap:8px;padding:10px 12px;border-radius:10px;background:var(--pink-soft)}
+.pf-skills{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+#st-pf .row{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#st-pf .row .btn{display:inline-flex;align-items:center;gap:6px}
+#st-pf .row .btn svg{width:13px;height:13px}
+.pf-sem{display:grid;gap:8px}
+.pf-sem h3{font-family:var(--f-display);font-size:1rem;margin:8px 0 0}
+.pf-item{border:1px solid var(--line);border-left:4px solid currentColor;border-radius:12px;background:var(--surface);padding:10px 14px;display:grid;gap:8px}
+.pf-item > *{color:var(--ink)}
+.pf-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;cursor:pointer}
+.pf-top .line{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;margin-top:3px}
+.pf-learn,.pf-notes{display:grid;gap:2px;white-space:pre-wrap;font-size:.9rem;line-height:1.5}
+.pf-learn.clip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pf-learn .small,.pf-notes .small{white-space:normal}
+.pf-tags{display:flex;flex-wrap:wrap;gap:4px}
+.pf-item .btn.ghost{justify-self:start}
 </style>
 </head>
 <body class="locked">
@@ -1184,6 +1267,10 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
       </div>
     </div>
     <div class="t-side">
+    <div id="today-study-wrap" hidden>
+      <div class="sechead"><h2>Classes & deadlines</h2><a class="meta" href="#study">Study</a></div>
+      <div class="panel hcard" id="today-study"></div>
+    </div>
     <div>
       <div class="sechead"><h2>Focus timer</h2><span class="meta">Pomodoro</span></div>
       <div class="panel focusbox" id="focusbox"></div>
@@ -1249,7 +1336,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 
   <section class="view" id="v-growth" hidden>
     <div class="g-col">
-      <div data-part="skills">
+      <div data-part="courses">
         <div class="sechead"><h2>Courses</h2><span class="meta">Google certificate and other study</span></div>
         <form id="course-form" class="panel course-form" autocomplete="off"><input id="course-name" class="inp" placeholder="Course name, e.g. Google Data Analytics Certificate"><label class="small muted cf-date">Target<input type="date" id="course-target" class="inp"></label><button class="btn sm primary" type="submit">Add course</button></form>
         <div id="courses" class="g-stack"></div>
@@ -1269,6 +1356,33 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
         <pre class="panel bullets" id="bullets"></pre>
         <p class="small muted" style="margin:6px 0 0">Tip: when you mark a task Done, fill in <b>Result / impact</b>, e.g. "Cut report time from 2 hours to 20 minutes". Those become your strongest bullets.</p>
       </div>
+    </div>
+  </section>
+
+  <section class="view" id="v-study" hidden>
+    <div data-part="timetable" data-wide>
+      <div class="sechead"><h2>Timetable</h2><span class="meta">Tap a class to edit it</span></div>
+      <div class="panel hcard" id="st-time"></div>
+    </div>
+    <div data-part="timetable" data-wide>
+      <div class="sechead"><h2>Subjects & classes</h2><span class="meta">This semester</span></div>
+      <div class="panel hcard" id="st-subj"></div>
+    </div>
+    <div data-part="assignments" data-wide>
+      <div class="sechead"><h2>Assignments</h2><span class="meta">Assignments, quizzes, projects and exams</span></div>
+      <div class="panel hcard" id="st-asg"></div>
+    </div>
+    <div data-part="notes" data-wide>
+      <div class="sechead"><h2>Notes & resources</h2><span class="meta">Lecture notes, slides, past papers, links</span></div>
+      <div class="panel hcard" id="st-notes"></div>
+    </div>
+    <div data-part="portfolio" data-wide>
+      <div class="sechead"><h2>Portfolio</h2><span class="meta">Everything you've completed, to revise and show later</span></div>
+      <div class="panel hcard" id="st-pf"></div>
+    </div>
+    <div data-part="grades" data-wide>
+      <div class="sechead"><h2>Grades</h2><span class="meta">GPA and CGPA</span></div>
+      <div class="panel hcard" id="st-grades"></div>
     </div>
   </section>
 
@@ -1442,6 +1556,6 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=23"></script>
+<script type="module" src="app.js?v=25"></script>
 </body>
 </html>

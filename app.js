@@ -41,7 +41,7 @@ function toast(msg){ const t=$("#toast"); t.textContent=msg; t.hidden=false; cle
 // ---------- data ops (db or in-memory fallback)
 function newId(){ return db ? db.collection("tasks").doc().id : Math.random().toString(36).slice(2,12); }
 function put(coll, id, data){
-  const list = coll==="tasks"?S.tasks:coll==="todos"?S.todos:coll==="routine"?S.routine:coll==="body"?S.body:coll==="conditions"?S.conds:coll==="courses"?S.courses:coll==="shop"?S.shop:coll==="expenses"?S.exp:null;
+  const list = coll==="tasks"?S.tasks:coll==="todos"?S.todos:coll==="routine"?S.routine:coll==="body"?S.body:coll==="conditions"?S.conds:coll==="courses"?S.courses:coll==="shop"?S.shop:coll==="expenses"?S.exp:coll==="subjects"?S.subjects:coll==="classes"?S.classes:coll==="assignments"?S.asg:coll==="snotes"?S.snotes:null;
   if(!db && list){ const i=list.findIndex(x=>x.id===id); const row={...data,id}; i>=0?list.splice(i,1,row):list.push(row); render(); return; }
   if(!db){ render(); return; }
   return write(coll+"/"+id, () => db.doc(coll+"/"+id).set(data));
@@ -55,7 +55,7 @@ const strip = o => { const c={...o}; delete c.id; return c; };
 
 // ---------- categories
 const DEFAULT_CATS = [{name:"SQL / Database",tag:"sql"},{name:"Excel / Reporting",tag:"excel"},{name:"Python / Automation",tag:"python"},{name:"Admin / Documentation",tag:"admin"}];
-function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false, cur:S.cur||"RM", budget:S.budget||0, shopHist:S.shopHist||[]})); }
+function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false, cur:S.cur||"RM", budget:S.budget||0, shopHist:S.shopHist||[], semStart:S.semStart||"", semWeeks:S.semWeeks||14, prevCgpa:S.prevCgpa||"", prevCredits:S.prevCredits||"", curSem:S.curSem||""})); }
 
 // ---------- look & feel helpers
 const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -225,19 +225,20 @@ $("#quick").addEventListener("submit", e => {
 });
 
 // ---------- routing
-const VIEWS=["today","work","calendar","overview","growth","health","money","reflect","routine"];
+const VIEWS=["today","work","calendar","overview","growth","study","health","money","reflect","routine"];
 // Main tabs → subtabs. Each subtab shows one page (view) and, where a page has several parts, only that part.
 const NAV = {
   today:    { label: "Today", icon: "sun", subs: [["today", "Today", "today"]] },
-  work:     { label: "Work", icon: "work", subs: [["tasks", "Tasks", "work"], ["calendar", "Calendar", "calendar"], ["skills", "Courses & skills", "growth"]] },
+  work:     { label: "Work", icon: "work", subs: [["tasks", "Tasks", "work"], ["calendar", "Calendar", "calendar"], ["skills", "Skills", "growth"]] },
+  study:    { label: "Study", icon: "class", subs: [["timetable", "Timetable", "study"], ["assignments", "Assignments", "study"], ["notes", "Notes", "study"], ["portfolio", "Portfolio", "study"], ["grades", "Grades", "study"], ["courses", "Courses", "growth"]] },
   health:   { label: "Health", icon: "health", subs: [["body", "Body", "health"], ["mind", "Mind", "health"], ["cycle", "Cycle", "health"], ["log", "Health log", "health"]] },
   money:    { label: "Money", icon: "wallet", subs: [["expenses", "Expenses", "money"], ["shopping", "Shopping", "money"]] },
   journal:  { label: "Journal", icon: "book", subs: [["reflection", "Reflection", "reflect"], ["archive", "Archive", "reflect"], ["weekly", "Weekly report", "reflect"]] },
   insights: { label: "Insights", icon: "chart", subs: [["overview", "Overview", "overview"], ["streaks", "Streaks", "growth"]] },
   settings: { label: "Settings", icon: "gear", subs: [["routine", "Routine & alarms", "routine"], ["categories", "Categories", "routine"], ["account", "Account", "routine"]] }
 };
-const MAIN_TABS = ["today", "work", "health", "money", "journal", "insights"];
-const ALIAS = { calendar: "work-calendar", overview: "insights", growth: "work-skills", reflect: "journal", routine: "settings" };
+const MAIN_TABS = ["today", "work", "study", "health", "money", "journal", "insights"];
+const ALIAS = { calendar: "work-calendar", overview: "insights", growth: "study-courses", reflect: "journal", routine: "settings" };
 function parseRoute(){
   let h = location.hash.slice(1) || "today"; h = ALIAS[h] || h;
   let [m, sub] = h.split("-"); if (!NAV[m]) m = "today";
@@ -290,6 +291,7 @@ function render(){
   if(S.view==="growth") renderGrowth();
   if(S.view==="health") renderHealth();
   if(S.view==="money") renderMoney();
+  if(S.view==="study") renderStudy();
   if(S.view==="reflect") renderReport();
   if(S.view==="today") renderFocus();
   tickTimer();
@@ -409,6 +411,7 @@ function renderToday(){
     <button class="x" type="button" data-deltodo="${esc(t.id)}" aria-label="Delete">✕</button></li>`;
   $("#todos").innerHTML = (open.length||later.length) ? open.map(row).join("") + (later.length?`<li class="sub" style="background:var(--sunk)">Later</li>`+later.map(row).join(""):"")
     : `<li class="empty">${S.ready?"Nothing to do. Add one in the box above.":"Loading…"}</li>`;
+  { const sh = studyTodayHtml(); $("#today-study-wrap").hidden = !sh; $("#today-study").innerHTML = sh; }
   const focus=sortTasks(S.tasks.filter(t=>t.status!=="done")).slice(0,3);
   $("#focus").innerHTML = focus.length?focus.map(taskCard).join(""):`<div class="panel empty">${S.ready?"No open work tasks. Switch the box above to Work to add one.":"Loading…"}</div>`;
   const doneT=S.todos.filter(t=>t.done&&isoDay(t.doneAt)===tk).map(t=>({l:t.title,s:"To-do",at:t.doneAt}));
@@ -921,9 +924,12 @@ function runSearch(){
   for (const t of S.tasks) { const hay = [t.title, t.desc, t.notes, t.bottleneck, t.impact, catName(t.category), ...(t.subtasks || []).map(s => s.text), ...(t.links || []).map(l => l.label + " " + l.url), ...(t.log || []).map(l => l.note)].join(" \n "); if (match(hay)) R.push({ g: "Work tasks", title: t.title, sub: `${STATUS_LABEL[t.status]} · ${catName(t.category)}${t.due ? " · due " + fmtDate(t.due) : ""}`, snip: match(t.title) ? "" : snippet(hay.replace(t.title, ""), q), act: `data-sr-task="${esc(t.id)}"` }); }
   for (const t of S.todos) if (match(t.title)) R.push({ g: "To-dos", title: t.title, sub: (t.done ? "Done · " : "") + (t.date ? fmtDate(t.date) : ""), act: `data-sr-date="${esc(t.date || todayKey())}"` });
   for (const r of Object.values(S.refl)) { const hay = [r.did, r.learned, r.mistakes, r.improve].join(" \n "); if (match(hay)) R.push({ g: "Reflections", title: fmtDate(r.date) + " " + r.date.slice(0, 4), sub: "", snip: snippet(hay, q), act: `data-sr-refl="${esc(r.date)}"` }); }
-  for (const c of S.courses) { const hay = [c.name, ...(c.modules || []).map(m => m.title)].join(" \n "); if (match(hay)) R.push({ g: "Courses", title: c.name, sub: `${(c.modules || []).filter(m => m.done).length}/${(c.modules || []).length} modules`, snip: match(c.name) ? "" : snippet(hay, q), act: `data-sr-view="growth"` }); }
+  for (const c of S.courses) { const hay = [c.name, ...(c.modules || []).map(m => m.title)].join(" \n "); if (match(hay)) R.push({ g: "Courses", title: c.name, sub: `${(c.modules || []).filter(m => m.done).length}/${(c.modules || []).length} modules`, snip: match(c.name) ? "" : snippet(hay, q), act: `data-sr-view="study-courses"` }); }
   for (const hd of Object.values(S.health)) (hd.moods || []).forEach(m => { const hay = [m.note, ...(m.feel || []), ...(m.why || [])].join(" "); if (m.note && match(hay)) R.push({ g: "Mood notes", title: fmtDate(hd.date) + " · " + MOODS[m.m - 1][1], sub: (m.feel || []).join(", "), snip: snippet(m.note, q), act: `data-sr-view="health-mind"` }); });
   for (const c of S.conds) { const hay = [c.title, c.notes].join(" \n "); if (match(hay)) R.push({ g: "Health", title: c.title, sub: `${fmtDate(c.start)} · ${c.status === "resolved" ? "recovered" : "ongoing"}`, snip: match(c.title) ? "" : snippet(hay, q), act: `data-sr-view="health-log"` }); }
+  for (const n of S.snotes) { const hay = [n.title, n.body, n.url, subjLabel(n.subj)].join(" \n "); if (match(hay)) R.push({ g: "Study notes", title: n.title, sub: `${subjLabel(n.subj)} · ${(NOTE_TAGS.find(t => t[0] === n.tag) || ["", "Note"])[1]}`, snip: match(n.title) ? "" : snippet(hay, q), act: `data-sr-view="study-notes"` }); }
+  for (const a of S.asg) { const hay = [a.title, a.notes, a.learned, (a.skills || []).join(" "), subjLabel(a.subj), (subj(a.subj) || {}).name].join(" \n "); if (match(hay)) R.push({ g: "Assignments", title: a.title, sub: `${subjLabel(a.subj)} · ${dueText(a)[0]}`, snip: match(a.title) ? "" : snippet(hay, q), act: `data-sr-view="study-assignments"` }); }
+  for (const sj of S.subjects) { const hay = [sj.code, sj.name, sj.lecturer].join(" "); if (match(hay)) R.push({ g: "Subjects", title: (sj.code ? sj.code + " · " : "") + sj.name, sub: sj.lecturer || "", act: `data-sr-view="study"` }); }
   for (const x of S.exp) { const hay = [x.note, expCat(x.cat)[1]].join(" "); if (match(hay)) R.push({ g: "Expenses", title: (x.note || expCat(x.cat)[1]) + " · " + money(x.amount), sub: fmtDate(x.date) + " · " + expCat(x.cat)[1], act: `data-sr-view="money"` }); }
   for (const i of S.shop) if (match(i.name)) R.push({ g: "Shopping list", title: i.name + (i.qty ? " × " + i.qty : ""), sub: i.done ? "In the basket" : "To buy", act: `data-sr-view="money-shopping"` });
   for (const r of S.routine) if (match(r.label)) R.push({ g: "Routine", title: r.label, sub: r.time + " · " + (daysLabel(r.days) || "Custom days"), act: `data-sr-view="routine"` });
@@ -964,6 +970,7 @@ function dayEvents(k){
     const T = S.timer, task = T.type === "task" ? S.tasks.find(y => y.id === T.ref) : null;
     ev.push({ kind: "time", live: true, start: minsOfISO(T.start), dur: Math.max(1, timerElapsed() / 60), title: T.label, mins: Math.round(timerElapsed() / 60), cls: T.type === "task" ? "cat-" + catIdx(task ? task.category : "") : T.type === "course" ? "ev-course" : "ev-focus", ref: task ? task.id : null, via: T.mode });
   }
+  classesOn(k).forEach(c => ev.push({ kind: "class", start: toMin(c.start), dur: Math.max(15, toMin(c.end) - toMin(c.start)), title: subjLabel(c.subj), c }));
   S.tasks.filter(t => t.status === "done" && isoDay(t.doneAt) === k).forEach(t => ev.push({ kind: "tdone", start: minsOfISO(t.doneAt), dur: 20, title: t.title, cls: "cat-" + catIdx(t.category), ref: t.id }));
   S.todos.filter(t => t.done && isoDay(t.doneAt) === k).forEach(t => ev.push({ kind: "odone", start: minsOfISO(t.doneAt), dur: 20, title: t.title }));
   const rf = S.refl[k]; if (rf && rf.updatedAt && isoDay(rf.updatedAt) === k) ev.push({ kind: "refl", start: minsOfISO(rf.updatedAt), dur: 20, title: "Reflection", date: k });
@@ -983,6 +990,7 @@ function evHtml(e, k){
   const tall = e.h >= 40;
   if (e.kind === "rt") return `<button type="button" class="ev ev-rt s-${e.st}" style="${style}" data-cdate="${esc(k)}" title="${esc(e.r.time)} ${esc(e.title)} · ${STATE_TXT[e.st]}">${routineIcon(e.r)}<span class="ev-t">${esc(e.title)}</span></button>`;
   if (e.kind === "time") return `<div class="ev ev-time ${e.cls} ${e.live ? "live" : ""}" style="${style}" ${e.ref ? `data-task="${esc(e.ref)}"` : ""} title="${esc(e.title)} · ${fmtMins(e.mins)} (${hm(e.start)}–${hm(e.start + e.dur)})"><span class="ev-t">${SVG(ICON.timer)}${esc(e.title)}</span>${tall ? `<span class="ev-s">${e.live ? "Running · " : ""}${fmtMins(e.mins)} · ${hm(e.start)}–${hm(e.start + e.dur)}${e.via === "focus" ? " · focus" : ""}</span>` : ""}</div>`;
+  if (e.kind === "class") return `<div class="ev ev-class ${subjCls(e.c.subj)}" style="${style}" title="${esc((subj(e.c.subj) || {}).name || e.title)} · ${fmt12(e.c.start)}–${fmt12(e.c.end)}${e.c.room ? " · " + esc(e.c.room) : ""}"><span class="ev-t">${SVG(ICON.class)}${esc(e.title)}</span>${tall ? `<span class="ev-s">${esc((CLS_TYPES.find(x => x[0] === e.c.type) || ["", ""])[1])}${e.c.room ? " · " + esc(e.c.room) : ""}</span>` : ""}</div>`;
   if (e.kind === "tdone") return `<div class="ev ev-done ${e.cls}" style="${style}" data-task="${esc(e.ref)}" title="Finished at ${hm(e.start)}: ${esc(e.title)}"><span class="ev-t">${SVG(ICON.star)}${esc(e.title)}</span></div>`;
   if (e.kind === "odone") return `<div class="ev ev-todo" style="${style}" title="To-do done at ${hm(e.start)}: ${esc(e.title)}"><span class="ev-t">✓ ${esc(e.title)}</span></div>`;
   if (e.kind === "refl") return `<button type="button" class="ev ev-refl" style="${style}" data-calrefl="${esc(e.date)}" title="Reflection written at ${hm(e.start)}"><span class="ev-t">${SVG(ICON.note)}Reflection</span></button>`;
@@ -1000,7 +1008,8 @@ function renderSchedule(){
   const hours = []; for (let m = lo; m < hi; m += 60) hours.push(`<span style="top:${((m - lo) * ppm).toFixed(1)}px">${m === lo ? "" : pad(Math.floor(m / 60)) + ":00"}</span>`);
   const nowM = new Date().getHours() * 60 + new Date().getMinutes();
   const dues = k => S.tasks.filter(t => t.due === k && t.status !== "done");
-  const anyDue = keys.some(k => dues(k).length);
+  const adues = k => S.asg.filter(a => a.due === k && !["submitted", "graded"].includes(a.status));
+  const anyDue = keys.some(k => dues(k).length || adues(k).length);
   const totals = k => { const m = S.time.filter(x => x.date === k).reduce((a, x) => a + (+x.mins || 0), 0); const its = routineFor(k).filter(r => !(dayDoc(k).skip || {})[r.id]); const dn = its.filter(r => (dayDoc(k).done || {})[r.id]).length; return { m, dn, n: its.length }; };
   box.innerHTML = `
   <div class="sch-head">
@@ -1012,7 +1021,7 @@ function renderSchedule(){
     <div class="sch-grid" style="--cols:${keys.length}">
       <div class="sch-hd sch-corner"></div>
       ${keys.map(k => { const t = totals(k); return `<button type="button" class="sch-hd ${k === tk ? "is-today" : ""} ${k === S.calSel && !day ? "is-sel" : ""}" data-cdate="${esc(k)}"><span class="sch-dow">${DAYS[keyDow(k)]}</span><span class="sch-num">${+k.slice(8)}</span><span class="sch-sum">${k <= tk && k >= startKey() ? `${t.dn}/${t.n}${t.m ? " · " + fmtMins(t.m) : ""}` : "&nbsp;"}</span></button>`; }).join("")}
-      ${anyDue ? `<div class="sch-ad-lbl">Due</div>${keys.map(k => `<div class="sch-ad">${dues(k).map(t => `<div class="ev-due cat-${catIdx(t.category)}" data-task="${esc(t.id)}" title="Due: ${esc(t.title)}">${esc(t.title)}</div>`).join("")}</div>`).join("")}` : ""}
+      ${anyDue ? `<div class="sch-ad-lbl">Due</div>${keys.map(k => `<div class="sch-ad">${dues(k).map(t => `<div class="ev-due cat-${catIdx(t.category)}" data-task="${esc(t.id)}" title="Due: ${esc(t.title)}">${esc(t.title)}</div>`).join("")}${adues(k).map(a => `<a class="ev-due ${subjCls(a.subj)}" href="#study-assignments" title="Due${a.time ? " " + fmt12(a.time) : ""}: ${esc(subjLabel(a.subj))} ${esc(a.title)}">${esc(subjLabel(a.subj))}: ${esc(a.title)}</a>`).join("")}</div>`).join("")}` : ""}
       <div class="sch-times" style="height:${H}px">${hours.join("")}</div>
       ${keys.map((k, i) => `<div class="sch-col ${k === tk ? "is-today" : ""} ${isWeekend(keyDow(k)) ? "is-we" : ""}" style="height:${H}px;--hr:${60 * ppm}px">
         ${layoutEvents(evs[i], lo, ppm).map(e => evHtml(e, k)).join("")}
@@ -1467,6 +1476,312 @@ document.addEventListener("submit", e => {
 // Enter in the amount box jumps to the description
 document.addEventListener("keydown", e => { if (e.target.id === "m-amt" && e.key === "Enter" && !$("#m-note").value.trim()) { e.preventDefault(); $("#m-note").focus(); } });
 
+// ---------- Study: subjects, timetable, assignments, grades
+S.subjects = []; S.classes = []; S.asg = []; S.semStart = ""; S.semWeeks = 14; S.prevCgpa = ""; S.prevCredits = "";
+S.stEdit = null; S.asgFilter = "todo"; S.asgSubj = ""; S.asgOpen = null; S.asgType = "assignment"; S.clsType = "lecture"; S.subjForm = false; S.clsForm = false;
+const CLS_TYPES = [["lecture","Lecture"],["tutorial","Tutorial"],["lab","Lab"],["online","Online"],["other","Other"]];
+const ASG_TYPES = [["assignment","Assignment"],["quiz","Quiz"],["test","Test"],["project","Project"],["report","Lab report"],["presentation","Presentation"],["exam","Exam"]];
+const ASG_ST = [["todo","Not started"],["doing","In progress"],["submitted","Submitted"],["graded","Graded"]];
+const GRADES = [["A",4],["A-",3.67],["B+",3.33],["B",3],["B-",2.67],["C+",2.33],["C",2],["C-",1.67],["D+",1.33],["D",1],["F",0]];
+const subj = id => S.subjects.find(s => s.id === id);
+const subjCls = id => { const s = subj(id); return "cat-" + (s ? (+s.color || 0) % 6 : 5); };
+const subjLabel = id => { const s = subj(id); return s ? (s.code || s.name) : "No subject"; };
+const fmt12 = t => { if (!t) return ""; let [h, m] = t.split(":").map(Number); const ap = h >= 12 ? "pm" : "am"; h = h % 12 || 12; return h + (m ? ":" + pad(m) : "") + ap; };
+function semWeek(k){ if (!S.semStart) return null; const n = Math.floor((new Date(k + "T00:00") - new Date(S.semStart + "T00:00")) / (7 * 864e5)) + 1; return n; }
+function dueText(a){
+  const tk = todayKey(); if (!a.due) return ["No due date", ""];
+  const d = Math.round((new Date(a.due + "T00:00") - new Date(tk + "T00:00")) / 864e5);
+  if (["submitted", "graded"].includes(a.status)) return [`Due ${fmtDate(a.due)}`, "done"];
+  if (d < 0) return [`Overdue by ${-d} day${d === -1 ? "" : "s"}`, "over"];
+  if (d === 0) return [`Due today${a.time ? " " + fmt12(a.time) : ""}`, "soon"];
+  if (d === 1) return [`Due tomorrow${a.time ? " " + fmt12(a.time) : ""}`, "soon"];
+  return [`Due ${fmtDate(a.due)}${a.time ? " " + fmt12(a.time) : ""} · in ${d} days`, d <= 7 ? "week" : ""];
+}
+function classesOn(k){ const wd = keyDow(k); const ids = new Set(S.subjects.filter(s => (s.sem || "") === (S.curSem || "")).map(s => s.id)); return S.classes.filter(c => +c.day === wd && ids.has(c.subj)).sort((a, b) => a.start.localeCompare(b.start)); }
+function nextClass(){
+  const now = new Date(), tk = todayKey(), nowM = now.getHours() * 60 + now.getMinutes();
+  for (let i = 0; i < 8; i++) { const k = addDays(tk, i); const cs = classesOn(k).filter(c => i > 0 || toMin(c.end) > nowM); if (cs.length) return { c: cs[0], k, i, live: i === 0 && toMin(cs[0].start) <= nowM }; }
+  return null;
+}
+function subjOptions(sel){ return `<option value="">Choose subject</option>` + S.subjects.map(s => `<option value="${esc(s.id)}" ${s.id === sel ? "selected" : ""}>${esc(s.code ? s.code + " · " : "")}${esc(s.name)}</option>`).join(""); }
+function renderStudy(){
+  if (S.view !== "study") return;
+  const tk = todayKey(), wk = semWeek(tk);
+  // ----- timetable
+  const N = nextClass();
+  const curIds = new Set(curSubjects().map(s => s.id)), curClasses = S.classes.filter(c => curIds.has(c.subj));
+  const days = [1,2,3,4,5].concat([6,0].filter(d => curClasses.some(c => +c.day === d)));
+  const all = curClasses; let lo = 8 * 60, hi = 18 * 60;
+  all.forEach(c => { lo = Math.min(lo, Math.floor(toMin(c.start) / 60) * 60); hi = Math.max(hi, Math.ceil(toMin(c.end) / 60) * 60); });
+  const ppm = 0.9, H = (hi - lo) * ppm, todayDow = new Date().getDay();
+  const hours = []; for (let m = lo; m < hi; m += 60) hours.push(`<span style="top:${((m - lo) * ppm).toFixed(1)}px">${m === lo ? "" : fmt12(pad(Math.floor(m / 60)) + ":00")}</span>`);
+  $("#st-time").innerHTML = `
+    <div class="st-top">
+      <div class="st-week">${wk && wk >= 1 && wk <= S.semWeeks ? `<b>Week ${wk}</b><span class="muted small"> of ${S.semWeeks}</span>` : wk && wk > S.semWeeks ? `<b>Semester ended</b>` : wk && wk < 1 ? `<b>Semester starts ${esc(fmtDate(S.semStart))}</b>` : `<span class="small muted">Set your semester start to see the week number.</span>`}
+        <details class="st-sem"><summary class="small">${S.curSem ? esc(S.curSem) + " · " : ""}Semester settings</summary><div class="st-semf"><label class="f" style="grid-column:1/-1">Semester name<input id="st-semname" value="${esc(S.curSem)}" placeholder="e.g. Year 2 Sem 1"></label><label class="f">Starts (week 1 Monday)<input type="date" id="st-semstart" value="${esc(S.semStart)}"></label><label class="f">Weeks<input type="number" min="1" max="30" id="st-semweeks" value="${S.semWeeks}"></label></div></details></div>
+      <div class="st-next">${N ? `<span class="small muted">${N.live ? "Happening now" : N.i === 0 ? "Next class today" : N.i === 1 ? "Next class tomorrow" : "Next class " + DAYS[keyDow(N.k)]}</span>
+        <b><span class="tag ${subjCls(N.c.subj)}">${esc(subjLabel(N.c.subj))}</span> ${esc((subj(N.c.subj) || {}).name || "")}</b>
+        <span class="small">${esc((CLS_TYPES.find(x => x[0] === N.c.type) || ["", ""])[1])} · ${fmt12(N.c.start)}–${fmt12(N.c.end)}${N.c.room ? " · " + esc(N.c.room) : ""}</span>` : `<span class="small muted">No classes this week yet. Add your subjects and classes below.</span>`}</div>
+    </div>
+    ${all.length ? `<div class="tt-scroll"><div class="tt" style="--cols:${days.length}">
+      <div class="tt-hd"></div>${days.map(d => `<div class="tt-hd ${d === todayDow ? "today" : ""}">${DAYS[d]}</div>`).join("")}
+      <div class="sch-times" style="height:${H}px">${hours.join("")}</div>
+      ${days.map(d => `<div class="sch-col tt-col ${d === todayDow ? "is-today" : ""}" style="height:${H}px;--hr:${60 * ppm}px">${classesOn(addDays(tk, (d - todayDow + 7) % 7)).map(c => { const top = (toMin(c.start) - lo) * ppm, h = Math.max((toMin(c.end) - toMin(c.start)) * ppm, 24), s = subj(c.subj);
+          return `<button type="button" class="ev tt-ev ${subjCls(c.subj)}" style="top:${top}px;height:${h}px;left:2px;width:calc(100% - 4px)" data-cls-edit="${esc(c.id)}" title="${esc(s ? s.name : "")} · ${fmt12(c.start)}–${fmt12(c.end)}"><span class="ev-t">${esc(subjLabel(c.subj))}</span>${h > 34 ? `<span class="ev-s">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${c.room ? " · " + esc(c.room) : ""}</span>` : ""}${h > 50 ? `<span class="ev-s">${fmt12(c.start)}–${fmt12(c.end)}</span>` : ""}</button>`; }).join("")}</div>`).join("")}
+    </div></div>` : ""}`;
+  // subjects + class form
+  const e = S.stEdit && S.classes.find(c => c.id === S.stEdit);
+  const past = S.subjects.filter(s => !isCur(s));
+  $("#st-subj").innerHTML = `
+    ${curSubjects().length ? `<ul class="subj-list">${curSubjects().map(s => `<li><span class="tag ${subjCls(s.id)}">${esc(s.code || "—")}</span><span class="hl-b"><b>${esc(s.name)}</b>${s.lecturer ? `<span class="small muted"> · ${esc(s.lecturer)}</span>` : ""}<span class="small muted"> · ${S.classes.filter(c => c.subj === s.id).length} class${S.classes.filter(c => c.subj === s.id).length === 1 ? "" : "es"}/week</span></span><button type="button" class="x" data-subj-del="${esc(s.id)}" aria-label="Delete subject">${S.subjDel === s.id ? "Delete?" : "✕"}</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Start by adding your subjects for this semester.</p>`}
+    ${S.subjForm ? `<form id="subj-form" class="st-form" autocomplete="off"><input id="sj-code" class="inp" placeholder="Code, e.g. BIT2023" style="max-width:150px"><input id="sj-name" class="inp" placeholder="Subject name, e.g. Data Mining" required><input id="sj-lect" class="inp" placeholder="Lecturer (optional)"><div class="row"><button class="btn sm primary" type="submit">Add subject</button><button class="btn sm" type="button" data-subj-form="0">Done</button></div></form>`
+      : `<button type="button" class="btn sm" data-subj-form="1">+ Add subject</button>`}
+    ${past.length ? `<details class="small"><summary>Past semesters (${past.length} subject${past.length === 1 ? "" : "s"})</summary><ul class="subj-list">${past.map(s => `<li><span class="tag ${subjCls(s.id)}">${esc(s.code || "—")}</span><span class="hl-b">${esc(s.name)} <span class="muted">· ${esc(s.sem || "")}${s.grade ? " · " + esc(s.grade) : ""}</span></span><span></span></li>`).join("")}</ul></details>` : ""}
+    ${S.subjects.length ? (S.clsForm || e ? `<form id="cls-form" class="st-form" autocomplete="off"><div class="small"><b>${e ? "Edit class" : "Add a weekly class"}</b></div>
+      <div class="grid2"><label class="f">Subject<select id="cl-subj">${subjOptions(e ? e.subj : (S.subjects[S.subjects.length - 1] || {}).id)}</select></label>
+      <label class="f">Day<select id="cl-day">${[1,2,3,4,5,6,0].map(d => `<option value="${d}" ${e && +e.day === d ? "selected" : ""}>${DAYS[d]}</option>`).join("")}</select></label>
+      <label class="f">Starts<input type="time" id="cl-start" value="${e ? e.start : "09:00"}"></label><label class="f">Ends<input type="time" id="cl-end" value="${e ? e.end : "11:00"}"></label></div>
+      <div class="qa-chips cwrap">${CLS_TYPES.map(([v, l]) => `<button type="button" class="qc" data-cls-type="${v}" aria-pressed="${(e ? e.type : S.clsType) === v}">${l}</button>`).join("")}</div>
+      <input id="cl-room" class="inp" placeholder="Room / link, e.g. DK3 or Zoom" value="${esc(e ? e.room || "" : "")}">
+      <div class="row"><button class="btn sm primary" type="submit">${e ? "Save" : "Add class"}</button><button class="btn sm" type="button" data-cls-form="0">Cancel</button>${e ? `<button class="btn sm ghost danger" type="button" data-cls-del="${esc(e.id)}">Delete class</button>` : ""}</div></form>`
+      : `<button type="button" class="btn sm primary" data-cls-form="1">+ Add class to timetable</button>`) : ""}`;
+  // ----- assignments
+  let list = S.asg.slice();
+  if (S.asgSubj) list = list.filter(a => a.subj === S.asgSubj);
+  if (S.asgFilter === "todo") list = list.filter(a => !["submitted", "graded"].includes(a.status));
+  else if (S.asgFilter === "done") list = list.filter(a => ["submitted", "graded"].includes(a.status));
+  list.sort((a, b) => (S.asgFilter === "done" ? -1 : 1) * ((a.due || "9999") + (a.time || "")).localeCompare((b.due || "9999") + (b.time || "")));
+  const openN = S.asg.filter(a => !["submitted", "graded"].includes(a.status)).length;
+  $("#st-asg").innerHTML = `
+    ${S.subjects.length ? `<form id="asg-form" class="st-form" autocomplete="off">
+      <div class="asg-row1"><select id="as-subj" class="inp">${subjOptions(S.asgSubj || "")}</select><input id="as-title" class="inp" placeholder="Title, e.g. Assignment 2: Clustering report" required></div>
+      <div class="qa-chips cwrap">${ASG_TYPES.map(([v, l]) => `<button type="button" class="qc" data-asg-type="${v}" aria-pressed="${S.asgType === v}">${l}</button>`).join("")}</div>
+      <div class="asg-row2"><label class="f">Due date<input type="date" id="as-due" value="${addDays(tk, 7)}"></label><label class="f">Time<input type="time" id="as-time" value="23:59"></label><label class="f">Weight %<input type="number" id="as-weight" min="0" max="100" placeholder="e.g. 20"></label><button class="btn primary" type="submit">Add</button></div></form>`
+      : `<p class="small muted" style="margin:0">Add your subjects in Timetable first, then track assignments here.</p>`}
+    <div class="asg-filter"><div class="seg">${[["todo", `To do (${openN})`], ["done", "Submitted & graded"], ["all", "All"]].map(([v, l]) => `<button type="button" data-asg-f="${v}" aria-pressed="${S.asgFilter === v}">${l}</button>`).join("")}</div>
+      ${S.subjects.length > 1 ? `<div class="qa-chips cwrap"><button type="button" class="qc" data-asg-s="" aria-pressed="${!S.asgSubj}">All subjects</button>${S.subjects.map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-asg-s="${esc(s.id)}" aria-pressed="${S.asgSubj === s.id}">${esc(s.code || s.name)}</button>`).join("")}</div>` : ""}</div>
+    ${list.length ? `<div class="asg-list">${list.map(a => { const [dt, cls] = dueText(a), open = S.asgOpen === a.id;
+      return `<div class="asg ${cls} st-${esc(a.status)}"><div class="asg-main" data-asg-open="${esc(a.id)}" role="button" tabindex="0">
+        <span class="asg-stripe ${subjCls(a.subj)}"></span>
+        <div class="asg-body"><div class="asg-t"><b>${esc(a.title)}</b>${a.weight ? `<span class="asg-w">${esc(a.weight)}%</span>` : ""}</div>
+          <div class="line"><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="small">${esc((ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1])}</span><span class="asg-due ${cls}">${esc(dt)}</span>${a.status === "graded" && a.mark !== "" && a.mark != null ? `<span class="asg-mark">${esc(a.mark)}%</span>` : ""}</div></div></div>
+        <div class="seg asg-st">${ASG_ST.map(([v, l]) => `<button type="button" data-asg-st="${esc(a.id)}:${v}" aria-pressed="${a.status === v}">${l}</button>`).join("")}</div>
+        ${open || a.status === "graded" ? `<div class="asg-more">
+          ${a.status === "graded" ? `<label class="f">Mark (%)<input type="number" min="0" max="100" step="0.1" data-asg-mark="${esc(a.id)}" value="${esc(a.mark ?? "")}" placeholder="e.g. 85"></label>` : ""}
+          ${open ? asgDetail(a) : `<button type="button" class="btn sm ghost" data-asg-open="${esc(a.id)}">Notes, files & what you learned</button>`}</div>` : ""}</div>`; }).join("")}</div>`
+      : `<div class="empty">${S.asgFilter === "todo" ? "Nothing due. Nice!" : "No assignments here yet."}</div>`}`;
+  renderNotes(); renderPortfolio();
+  // ----- grades
+  const rows = curSubjects().map(s => { const gr = GRADES.find(g => g[0] === s.grade); const cr = +s.credits || 0;
+    const ga = S.asg.filter(a => a.subj === s.id && a.status === "graded" && a.mark !== "" && a.mark != null && +a.weight);
+    const wSum = ga.reduce((x, a) => x + +a.weight, 0), score = wSum ? ga.reduce((x, a) => x + (+a.mark) * (+a.weight), 0) / wSum : null;
+    return { s, gr, cr, score, wSum }; });
+  const counted = rows.filter(r => r.gr && r.cr), cr = counted.reduce((a, r) => a + r.cr, 0), pts = counted.reduce((a, r) => a + r.cr * r.gr[1], 0);
+  const gpa = cr ? pts / cr : null, pc = parseFloat(S.prevCgpa), pcr = parseFloat(S.prevCredits);
+  const pastG = S.subjects.filter(s => !isCur(s)).map(s => [GRADES.find(g => g[0] === s.grade), +s.credits || 0]).filter(([g, c]) => g && c);
+  const pastCr = pastG.reduce((a, [, c]) => a + c, 0), pastPts = pastG.reduce((a, [g, c]) => a + g[1] * c, 0);
+  const allCr = cr + pastCr + (pc >= 0 && pcr > 0 ? pcr : 0), allPts = pts + pastPts + (pc >= 0 && pcr > 0 ? pc * pcr : 0);
+  const cgpa = allCr ? allPts / allCr : null;
+  $("#st-grades").innerHTML = S.subjects.length ? `
+    <div class="m-sum"><div><span class="small muted">This semester GPA</span><b>${gpa !== null ? gpa.toFixed(2) : "–"}</b><span class="small muted">${cr} credit${cr === 1 ? "" : "s"} graded</span></div>
+      <div><span class="small muted">CGPA</span><b>${cgpa !== null ? cgpa.toFixed(2) : "–"}</b><span class="small muted">${allCr} credits in total${pastCr ? ` (incl. ${pastCr} from past semesters here)` : ""}</span></div></div>
+    <div class="tbl-wrap"><table class="ovt gr-t"><tr><th>Subject</th><th>Credits</th><th>Grade</th><th>Coursework so far</th></tr>
+      ${rows.map(r => `<tr><td><span class="tag ${subjCls(r.s.id)}">${esc(r.s.code || "—")}</span> ${esc(r.s.name)}</td>
+        <td><input type="number" min="0" max="12" class="gr-in" data-sj-cr="${esc(r.s.id)}" value="${esc(r.s.credits ?? "")}" placeholder="3"></td>
+        <td><select class="gr-in" data-sj-gr="${esc(r.s.id)}"><option value="">–</option>${GRADES.map(([g]) => `<option ${r.s.grade === g ? "selected" : ""}>${g}</option>`).join("")}</select></td>
+        <td>${r.score !== null ? `<b>${r.score.toFixed(1)}%</b> <span class="small muted">of ${r.wSum}% graded</span>` : `<span class="small muted">–</span>`}</td></tr>`).join("")}</table></div>
+    <p class="small muted" style="margin:0">Results from before you used Daybook:</p><div class="grid2"><label class="f">Previous CGPA<input type="number" step="0.01" min="0" max="4" id="st-pcgpa" value="${esc(S.prevCgpa)}" placeholder="e.g. 3.45"></label><label class="f">Previous credits completed<input type="number" min="0" id="st-pcr" value="${esc(S.prevCredits)}" placeholder="e.g. 60"></label></div>
+    <p class="small muted" style="margin:0">Uses the common 4.00 scale (A 4.00, A- 3.67, B+ 3.33 … F 0). Check your university's scale if it differs. Coursework is worked out from graded assignments with a weight.</p>`
+    : `<p class="small muted" style="margin:0">Add subjects in Timetable to work out your GPA.</p>`;
+}
+// Today card: classes today + assignments due soon
+function studyTodayHtml(){
+  if (!S.subjects.length && !S.asg.length) return "";
+  const tk = todayKey(), nowM = new Date().getHours() * 60 + new Date().getMinutes();
+  const cs = classesOn(tk), due = S.asg.filter(a => !["submitted", "graded"].includes(a.status) && a.due && a.due <= addDays(tk, 3)).sort((a, b) => (a.due + (a.time || "")).localeCompare(b.due + (b.time || "")));
+  if (!cs.length && !due.length) return `<p class="small muted" style="margin:0">No classes today and nothing due in the next 3 days.</p>`;
+  return `${cs.length ? `<ul class="hlist">${cs.map(c => `<li class="${toMin(c.end) < nowM ? "past" : ""}"><span class="hl-t">${fmt12(c.start)}</span><span class="tag ${subjCls(c.subj)}">${esc(subjLabel(c.subj))}</span><span class="hl-b">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${c.room ? " · " + esc(c.room) : ""}</span><span></span></li>`).join("")}</ul>` : ""}
+    ${due.length ? `<div class="small muted" style="margin-top:4px">Due soon</div><ul class="hlist">${due.map(a => { const [dt, cls] = dueText(a); return `<li><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="hl-b">${esc(a.title)}</span><span class="asg-due ${cls} small">${esc(dt.replace(/ · in \d+ days/, ""))}</span><span></span></li>`; }).join("")}</ul>` : ""}`;
+}
+let studyNotesT = null;
+document.addEventListener("click", e => {
+  if (S.view !== "study") return;
+  const t = e.target.closest("button,[data-asg-open]"); if (!t || !t.closest("#v-study")) return;
+  const d = t.dataset;
+  if (d.subjForm !== undefined) { S.subjForm = d.subjForm === "1"; renderStudy(); if (S.subjForm) $("#sj-code").focus(); }
+  else if (d.subjDel) { if (S.subjDel !== d.subjDel) { S.subjDel = d.subjDel; renderStudy(); } else { const id = d.subjDel; S.subjDel = null; batchColl("classes", S.classes.filter(c => c.subj === id).map(c => ["delete", c.id])); del("subjects", id); toast("Subject deleted"); } }
+  else if (d.clsForm !== undefined) { S.clsForm = d.clsForm === "1"; S.stEdit = null; renderStudy(); }
+  else if (d.clsType) { S.clsType = d.clsType; t.parentElement.querySelectorAll("[data-cls-type]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
+  else if (d.clsEdit) { S.stEdit = d.clsEdit; S.clsForm = true; const c = S.classes.find(x => x.id === d.clsEdit); if (c) S.clsType = c.type; renderStudy(); $("#cls-form") && $("#cls-form").scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  else if (d.clsDel) { del("classes", d.clsDel); S.stEdit = null; S.clsForm = false; toast("Class removed"); }
+  else if (d.asgType) { S.asgType = d.asgType; t.parentElement.querySelectorAll("[data-asg-type]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
+  else if (d.asgF) { S.asgFilter = d.asgF; renderStudy(); }
+  else if (d.asgS !== undefined) { S.asgSubj = d.asgS; renderStudy(); }
+  else if (d.asgOpen) { S.asgOpen = S.asgOpen === d.asgOpen ? null : d.asgOpen; renderStudy(); }
+  else if (d.asgSt) { const [id, st] = d.asgSt.split(":"); const a = S.asg.find(x => x.id === id); if (a) { put("assignments", id, { ...strip(a), status: st, doneAt: ["submitted", "graded"].includes(st) ? (a.doneAt || nowISO()) : "" }); if (st === "submitted" || st === "graded") { S.asgOpen = id; toast(st === "submitted" ? "Submitted. Well done! Add what you learned for your portfolio." : "Graded. Add your mark and what you learned."); } } }
+  else if (d.asgDel) { if (S.asgDel !== d.asgDel) { S.asgDel = d.asgDel; renderStudy(); } else { del("assignments", d.asgDel); S.asgDel = null; S.asgOpen = null; } }
+});
+document.addEventListener("keydown", e => { const m = e.target.closest && e.target.closest("[data-asg-open]"); if (m && (e.key === "Enter" || e.key === " ") && e.target === m) { e.preventDefault(); m.click(); } });
+document.addEventListener("submit", e => {
+  const f = e.target; if (!f.closest || !f.closest("#v-study")) return; e.preventDefault();
+  if (f.id === "subj-form") { const n = $("#sj-name").value.trim(); if (!n) return;
+    put("subjects", newId(), { sem: S.curSem || "", code: $("#sj-code").value.trim().toUpperCase(), name: n, lecturer: $("#sj-lect").value.trim(), color: S.subjects.length % 6, credits: "", grade: "", createdAt: nowISO() });
+    toast("Subject added"); setTimeout(() => { if ($("#sj-code")) { $("#sj-code").value = ""; $("#sj-name").value = ""; $("#sj-lect").value = ""; $("#sj-code").focus(); } }, 50); }
+  else if (f.id === "cls-form") { const sj = $("#cl-subj").value; if (!sj) { toast("Choose a subject"); return; }
+    const st = $("#cl-start").value, en = $("#cl-end").value; if (!st || !en || en <= st) { toast("End time must be after start time"); return; }
+    const rec = { subj: sj, day: +$("#cl-day").value, start: st, end: en, type: S.clsType, room: $("#cl-room").value.trim() };
+    put("classes", S.stEdit || newId(), rec); toast(S.stEdit ? "Class updated" : "Class added"); S.stEdit = null; }
+  else if (f.id === "asg-form") { const ti = $("#as-title").value.trim(), sj = $("#as-subj").value; if (!ti) return; if (!sj) { toast("Choose a subject"); return; }
+    put("assignments", newId(), { subj: sj, title: ti, type: S.asgType, due: $("#as-due").value, time: $("#as-time").value, weight: $("#as-weight").value ? +$("#as-weight").value : "", status: "todo", mark: "", notes: "", link: "", createdAt: nowISO(), doneAt: "" });
+    toast("Added"); }
+});
+document.addEventListener("change", e => {
+  const t = e.target; if (!t.closest || !t.closest("#v-study")) return;
+  if (t.id === "st-semstart") { S.semStart = t.value; saveCats(); renderStudy(); }
+  else if (t.id === "st-semweeks") { S.semWeeks = Math.max(1, +t.value || 14); saveCats(); renderStudy(); }
+  else if (t.id === "st-pcgpa") { S.prevCgpa = t.value; saveCats(); renderStudy(); }
+  else if (t.id === "st-pcr") { S.prevCredits = t.value; saveCats(); renderStudy(); }
+  else if (t.dataset.sjCr) { const s = subj(t.dataset.sjCr); if (s) put("subjects", s.id, { ...strip(s), credits: t.value === "" ? "" : +t.value }); }
+  else if (t.dataset.sjGr) { const s = subj(t.dataset.sjGr); if (s) put("subjects", s.id, { ...strip(s), grade: t.value }); }
+  else if (t.dataset.asgMark) { const a = S.asg.find(x => x.id === t.dataset.asgMark); if (a) put("assignments", a.id, { ...strip(a), mark: t.value === "" ? "" : +t.value }); }
+  else if (t.dataset.asgNotes) { const a = S.asg.find(x => x.id === t.dataset.asgNotes); if (a) put("assignments", a.id, { ...strip(a), notes: t.value }); }
+  else if (t.dataset.asgLink) { const a = S.asg.find(x => x.id === t.dataset.asgLink); if (a) put("assignments", a.id, { ...strip(a), link: t.value.trim() }); }
+});
+
+// ---------- Study notes & resources, links on assignments, portfolio
+S.snotes = []; S.curSem = ""; S.noteSubj = ""; S.noteKind = "note"; S.noteTag = "lecture"; S.noteEdit = null; S.noteOpen = null; S.noteDel = null;
+S.pfSubj = ""; S.pfSkill = ""; S.pfOpen = null;
+const NOTE_TAGS = [["lecture","Lecture notes"],["summary","Summary"],["formula","Formulas"],["tutorial","Tutorial"],["pastpaper","Past paper"],["slides","Slides"],["reading","Reading"],["tips","Tips"],["other","Other"]];
+const isCur = s => (s.sem || "") === (S.curSem || "");
+const curSubjects = () => S.subjects.filter(isCur);
+const linkUrl = u => /^https?:\/\//i.test(u) ? u : "https://" + u;
+const hostOf = u => { try { return new URL(linkUrl(u)).hostname.replace(/^www\./, ""); } catch { return u; } };
+function asgLinks(a){ const L = (a.links || []).slice(); if (a.link && !L.some(l => l.url === a.link)) L.unshift({ url: a.link, label: "" }); return L; }
+function linksEditor(kind, id, links){
+  return `<div class="f lk"><span class="small muted" style="font-weight:600">Files & links <span style="font-weight:400">· Google Drive, OneDrive, slides, briefs, submissions</span></span>
+    ${links.length ? `<ul class="links">${links.map((l, i) => `<li>${SVG(ICON.link)}<a href="${esc(linkUrl(l.url))}" target="_blank" rel="noopener">${esc(l.label || hostOf(l.url))}</a><button type="button" class="x" data-link-del="${kind}:${esc(id)}:${i}" aria-label="Remove link">✕</button></li>`).join("")}</ul>` : ""}
+    <div class="qrow rwrap"><input class="inp" data-link-url="${kind}:${esc(id)}" placeholder="Paste a link" inputmode="url"><input class="inp" data-link-label="${kind}:${esc(id)}" placeholder="Name (optional)" style="max-width:170px"><button class="btn sm" type="button" data-link-add="${kind}:${esc(id)}">Add link</button></div></div>`;
+}
+function asgDetail(a){
+  const done = ["submitted", "graded"].includes(a.status);
+  return `${done ? `<div class="pf-prompt"><label class="f">What did you learn? <span class="muted" style="font-weight:400">· saved to your Portfolio</span><textarea data-asg-learned="${esc(a.id)}" rows="3" placeholder="Key takeaways, what was hard, what you'd do differently, what you're proud of">${esc(a.learned || "")}</textarea></label>
+      <label class="f">Skills used <span class="muted" style="font-weight:400">· separate with commas</span><input data-asg-skills="${esc(a.id)}" value="${esc((a.skills || []).join(", "))}" placeholder="e.g. SQL, k-means clustering, report writing, teamwork"></label></div>` : ""}
+    <label class="f">Notes<textarea data-asg-notes="${esc(a.id)}" rows="4" placeholder="Requirements, rubric, group members, approach, feedback from lecturer…">${esc(a.notes || "")}</textarea></label>
+    ${linksEditor("asg", a.id, asgLinks(a))}
+    <div class="row"><button type="button" class="btn sm ghost danger" data-asg-del="${esc(a.id)}">${S.asgDel === a.id ? "Tap again to delete" : "Delete"}</button></div>`;
+}
+// ----- notes subtab
+function renderNotes(){
+  const box = $("#st-notes"); if (!box) return;
+  const subs = S.subjects;
+  if (!subs.length) { box.innerHTML = `<p class="small muted" style="margin:0">Add your subjects in Timetable first, then keep notes and resources for each one here.</p>`; return; }
+  if (S.noteSubj && !subj(S.noteSubj)) S.noteSubj = "";
+  const list = S.snotes.filter(n => !S.noteSubj || n.subj === S.noteSubj).sort((a, b) => (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || ""));
+  const ed = S.noteEdit && S.snotes.find(n => n.id === S.noteEdit);
+  const kind = ed ? ed.kind : S.noteKind, tag = ed ? ed.tag : S.noteTag;
+  const asgFor = S.noteSubj ? S.asg.filter(a => a.subj === S.noteSubj && (a.notes || asgLinks(a).length)) : [];
+  box.innerHTML = `
+    <div class="qa-chips cwrap"><button type="button" class="qc" data-note-subj="" aria-pressed="${!S.noteSubj}">All subjects</button>${[...curSubjects(), ...subs.filter(s => !isCur(s))].map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-note-subj="${esc(s.id)}" aria-pressed="${S.noteSubj === s.id}">${esc(s.code || s.name)}${isCur(s) ? "" : ` <span class="muted">· ${esc(s.sem || "past")}</span>`}</button>`).join("")}</div>
+    <form id="note-form" class="st-form" autocomplete="off">
+      <div class="row"><div class="seg">${[["note","Note"],["link","Link / file"]].map(([v, l]) => `<button type="button" data-note-kind="${v}" aria-pressed="${kind === v}">${l}</button>`).join("")}</div>
+        <select id="nt-subj" class="inp" style="max-width:240px">${subjOptions(ed ? ed.subj : S.noteSubj || (curSubjects()[0] || subs[0]).id)}</select></div>
+      <input id="nt-title" class="inp" placeholder="${kind === "link" ? "Name, e.g. Week 5 slides, Lab sheet 3" : "Title, e.g. Week 5: Decision trees"}" value="${esc(ed ? ed.title : "")}" required>
+      ${kind === "link" ? `<input id="nt-url" class="inp" inputmode="url" placeholder="Paste the link (Google Drive, OneDrive, Canva, YouTube, LMS…)" value="${esc(ed ? ed.url || "" : "")}">` : ""}
+      <textarea id="nt-body" class="inp" rows="${kind === "link" ? 2 : 6}" placeholder="${kind === "link" ? "What's in it? (optional)" : "Your notes: key points, definitions, examples, questions to ask…"}">${esc(ed ? ed.body || "" : "")}</textarea>
+      <div class="qa-chips cwrap">${NOTE_TAGS.map(([v, l]) => `<button type="button" class="qc" data-note-tag="${v}" aria-pressed="${tag === v}">${l}</button>`).join("")}</div>
+      <div class="row"><button class="btn sm primary" type="submit">${ed ? "Save changes" : kind === "link" ? "Save link" : "Save note"}</button>${ed ? `<button class="btn sm" type="button" data-note-cancel>Cancel</button>` : ""}</div>
+    </form>
+    ${list.length ? `<div class="notes">${list.map(n => { const open = S.noteOpen === n.id, long = (n.body || "").length > 220;
+      return `<article class="note ${n.kind === "link" ? "is-link" : ""}"><div class="nt-top"><span class="tag ${subjCls(n.subj)}">${esc(subjLabel(n.subj))}</span><span class="hl-tag">${esc((NOTE_TAGS.find(t => t[0] === n.tag) || ["", "Note"])[1])}</span><span class="small muted">${esc(fmtDate(isoDay(n.updatedAt || n.createdAt)))}</span></div>
+        <h4>${n.kind === "link" ? `${SVG(ICON.link)}<a href="${esc(linkUrl(n.url || ""))}" target="_blank" rel="noopener">${esc(n.title)}</a> <span class="small muted">${esc(hostOf(n.url || ""))}</span>` : esc(n.title)}</h4>
+        ${n.body ? `<div class="nt-body ${open || !long ? "" : "clip"}">${esc(n.body)}</div>${long ? `<button type="button" class="btn sm ghost" data-note-open="${esc(n.id)}">${open ? "Show less" : "Read more"}</button>` : ""}` : ""}
+        <div class="nt-act"><button type="button" class="btn sm ghost" data-note-edit="${esc(n.id)}">Edit</button><button type="button" class="btn sm ghost danger" data-note-del="${esc(n.id)}">${S.noteDel === n.id ? "Tap again to delete" : "Delete"}</button></div></article>`; }).join("")}</div>`
+      : `<p class="empty" style="margin:0">No notes${S.noteSubj ? " for this subject" : ""} yet.</p>`}
+    ${asgFor.length ? `<div class="small muted" style="margin-top:6px">From this subject's assignments</div><div class="notes">${asgFor.map(a => `<article class="note"><div class="nt-top"><span class="hl-tag">${esc((ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1])}</span><b>${esc(a.title)}</b></div>${a.notes ? `<div class="nt-body clip">${esc(a.notes)}</div>` : ""}${asgLinks(a).length ? `<ul class="links">${asgLinks(a).map(l => `<li>${SVG(ICON.link)}<a href="${esc(linkUrl(l.url))}" target="_blank" rel="noopener">${esc(l.label || hostOf(l.url))}</a><span></span></li>`).join("")}</ul>` : ""}</article>`).join("")}</div>` : ""}`;
+}
+// ----- portfolio subtab
+function pfItems(){ return S.asg.filter(a => ["submitted", "graded"].includes(a.status)).sort((a, b) => (b.doneAt || b.due || "").localeCompare(a.doneAt || a.due || "")); }
+function renderPortfolio(){
+  const box = $("#st-pf"); if (!box) return;
+  let items = pfItems();
+  const skills = {}; items.forEach(a => (a.skills || []).forEach(s => { const k = s.trim(); if (k) skills[k] = (skills[k] || 0) + 1; }));
+  if (S.pfSubj) items = items.filter(a => a.subj === S.pfSubj);
+  if (S.pfSkill) items = items.filter(a => (a.skills || []).some(s => s.trim().toLowerCase() === S.pfSkill.toLowerCase()));
+  const marks = pfItems().filter(a => a.status === "graded" && a.mark !== "" && a.mark != null).map(a => +a.mark);
+  const withLearn = pfItems().filter(a => (a.learned || "").trim()).length;
+  const bySem = {}; items.forEach(a => { const s = subj(a.subj); const k = (s && s.sem) || "Earlier work"; (bySem[k] = bySem[k] || []).push(a); });
+  const semKeys = Object.keys(bySem).sort((a, b) => (b === S.curSem) - (a === S.curSem) || b.localeCompare(a));
+  box.innerHTML = !pfItems().length ? `<p class="small muted" style="margin:0">When you mark an assignment <b>Submitted</b> or <b>Graded</b>, it's saved here with what you learned and the skills you used, so you can look back before exams and interviews.</p>` : `
+    <div class="minis"><div class="mini"><span>Completed</span><b>${pfItems().length}</b><small>assignments, tests & projects</small></div>
+      <div class="mini"><span>Average mark</span><b>${marks.length ? (marks.reduce((a, b) => a + b, 0) / marks.length).toFixed(1) + "%" : "–"}</b><small>${marks.length} graded</small></div>
+      <div class="mini"><span>Reflections</span><b>${withLearn}/${pfItems().length}</b><small>${withLearn < pfItems().length ? "add what you learned" : "all written"}</small></div></div>
+    ${Object.keys(skills).length ? `<div class="pf-skills"><span class="small muted">Skills:</span><button type="button" class="qc" data-pf-skill="" aria-pressed="${!S.pfSkill}">All</button>${Object.entries(skills).sort((a, b) => b[1] - a[1]).map(([s, n]) => `<button type="button" class="qc" data-pf-skill="${esc(s)}" aria-pressed="${S.pfSkill.toLowerCase() === s.toLowerCase()}">${esc(s)} <span class="muted">${n}</span></button>`).join("")}</div>` : ""}
+    <div class="qa-chips cwrap"><button type="button" class="qc" data-pf-subj="" aria-pressed="${!S.pfSubj}">All subjects</button>${S.subjects.filter(s => pfItems().some(a => a.subj === s.id)).map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-pf-subj="${esc(s.id)}" aria-pressed="${S.pfSubj === s.id}">${esc(s.code || s.name)}</button>`).join("")}</div>
+    <div class="row"><button class="btn sm" type="button" data-pf-export="word">${SVG(ICON.download)}Download Word</button><button class="btn sm" type="button" data-pf-export="pdf">Save as PDF</button><span class="small muted">Exports what's shown with the current filters.</span></div>
+    ${semKeys.map(sk => `<section class="pf-sem"><h3>${esc(sk)}${sk === S.curSem ? ` <span class="small muted">· current semester</span>` : ""}</h3>
+      ${bySem[sk].map(a => { const open = S.pfOpen === a.id, L = asgLinks(a);
+        return `<article class="pf-item ${subjCls(a.subj)}"><div class="pf-top" data-pf-open="${esc(a.id)}" role="button" tabindex="0">
+          <div><b>${esc(a.title)}</b><div class="line small"><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span>${esc((ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1])}</span><span class="muted">${esc(fmtDate(isoDay(a.doneAt) || a.due || ""))}</span>${a.weight ? `<span class="muted">${esc(a.weight)}%</span>` : ""}</div></div>
+          ${a.status === "graded" && a.mark !== "" && a.mark != null ? `<span class="asg-mark">${esc(a.mark)}%</span>` : `<span class="small muted">Submitted</span>`}</div>
+          ${(a.learned || "").trim() ? `<div class="pf-learn ${open ? "" : "clip"}"><span class="small muted">What I learned</span>${esc(a.learned)}</div>` : `<button type="button" class="btn sm ghost" data-pf-write="${esc(a.id)}">+ Add what you learned</button>`}
+          ${(a.skills || []).length ? `<div class="pf-tags">${a.skills.map(s => `<span class="feel-pill">${esc(s)}</span>`).join("")}</div>` : ""}
+          ${open ? `${a.notes ? `<div class="pf-notes"><span class="small muted">Notes</span>${esc(a.notes)}</div>` : ""}${L.length ? `<ul class="links">${L.map(l => `<li>${SVG(ICON.link)}<a href="${esc(linkUrl(l.url))}" target="_blank" rel="noopener">${esc(l.label || hostOf(l.url))}</a><span></span></li>`).join("")}</ul>` : ""}` : (a.notes || L.length ? `<button type="button" class="btn sm ghost" data-pf-open="${esc(a.id)}">Show notes & files</button>` : "")}
+        </article>`; }).join("")}</section>`).join("")}`;
+}
+function portfolioHTML(){
+  let items = pfItems(); if (S.pfSubj) items = items.filter(a => a.subj === S.pfSubj); if (S.pfSkill) items = items.filter(a => (a.skills || []).some(s => s.trim().toLowerCase() === S.pfSkill.toLowerCase()));
+  const bySem = {}; items.forEach(a => { const s = subj(a.subj); const k = (s && s.sem) || "Earlier work"; (bySem[k] = bySem[k] || []).push(a); });
+  const head = `<h1>Academic Portfolio</h1><p class="who">${esc([S.name, S.org].filter(Boolean).join(" · "))}${S.name || S.org ? "<br>" : ""}${items.length} piece${items.length === 1 ? "" : "s"} of work${S.pfSkill ? " · skill: " + esc(S.pfSkill) : ""}</p>`;
+  const body = Object.keys(bySem).sort().reverse().map(k => `<h2 class="xw">${esc(k)}</h2>` + bySem[k].map(a => { const s = subj(a.subj);
+    return `<div class="xd"><h3>${esc(a.title)}${a.status === "graded" && a.mark !== "" && a.mark != null ? ` <span class="xm">${esc(a.mark)}%</span>` : ""}</h3>
+      <p class="xf">${esc([s ? (s.code ? s.code + " " : "") + s.name : "", (ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1], a.weight ? a.weight + "% weight" : "", fmtDate(isoDay(a.doneAt) || a.due || "")].filter(Boolean).join(" · "))}</p>
+      ${(a.learned || "").trim() ? `<p class="xf"><b>What I learned:</b> ${esc(a.learned.trim()).replace(/\n/g, "<br>")}</p>` : ""}
+      ${(a.skills || []).length ? `<p class="xf"><b>Skills:</b> ${a.skills.map(esc).join(", ")}</p>` : ""}
+      ${a.notes ? `<p class="xf"><b>Notes:</b> ${esc(a.notes).replace(/\n/g, "<br>")}</p>` : ""}
+      ${asgLinks(a).length ? `<p class="xf"><b>Files:</b> ${asgLinks(a).map(l => `<a href="${esc(linkUrl(l.url))}">${esc(l.label || hostOf(l.url))}</a>`).join(" · ")}</p>` : ""}</div>`; }).join("")).join("");
+  return { title: "Academic Portfolio", html: head + (body || `<p class="none">Nothing to export.</p>`) };
+}
+function linkTarget(spec){ const [kind, id] = spec.split(":"); return kind === "asg" ? S.asg.find(x => x.id === id) : null; }
+document.addEventListener("click", e => {
+  if (S.view !== "study") return;
+  const t = e.target.closest("button,[data-pf-open]"); if (!t || !t.closest("#v-study")) return;
+  const d = t.dataset;
+  if (d.linkAdd) { const a = linkTarget(d.linkAdd); if (!a) return; const u = (document.querySelector(`[data-link-url="${d.linkAdd}"]`).value || "").trim(); if (!u) return;
+    const L = asgLinks(a); L.push({ url: u, label: (document.querySelector(`[data-link-label="${d.linkAdd}"]`).value || "").trim() }); put("assignments", a.id, { ...strip(a), links: L, link: "" }); toast("Link added"); }
+  else if (d.linkDel) { const [k, id, i] = d.linkDel.split(":"); const a = linkTarget(k + ":" + id); if (!a) return; const L = asgLinks(a); L.splice(+i, 1); put("assignments", a.id, { ...strip(a), links: L, link: "" }); }
+  else if (d.noteSubj !== undefined) { S.noteSubj = d.noteSubj; renderNotes(); }
+  else if (d.noteKind) { if (S.noteEdit) return; S.noteKind = d.noteKind; renderNotes(); $("#nt-title").focus(); }
+  else if (d.noteTag) { if (S.noteEdit) { const n = S.snotes.find(x => x.id === S.noteEdit); if (n) n.tag = d.noteTag; } S.noteTag = d.noteTag; t.parentElement.querySelectorAll("[data-note-tag]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
+  else if (d.noteOpen) { S.noteOpen = S.noteOpen === d.noteOpen ? null : d.noteOpen; renderNotes(); }
+  else if (d.noteEdit) { S.noteEdit = d.noteEdit; renderNotes(); $("#note-form").scrollIntoView({ block: "nearest", behavior: "smooth" }); $("#nt-title").focus(); }
+  else if (d.noteCancel !== undefined) { S.noteEdit = null; renderNotes(); }
+  else if (d.noteDel) { if (S.noteDel !== d.noteDel) { S.noteDel = d.noteDel; renderNotes(); } else { del("snotes", d.noteDel); S.noteDel = null; toast("Deleted"); } }
+  else if (d.pfOpen) { S.pfOpen = S.pfOpen === d.pfOpen ? null : d.pfOpen; renderPortfolio(); }
+  else if (d.pfSubj !== undefined) { S.pfSubj = d.pfSubj; renderPortfolio(); }
+  else if (d.pfSkill !== undefined) { S.pfSkill = d.pfSkill; renderPortfolio(); }
+  else if (d.pfWrite) { S.asgOpen = d.pfWrite; S.asgFilter = "done"; location.hash = "#study-assignments"; setTimeout(() => { const el = document.querySelector(`[data-asg-learned="${d.pfWrite}"]`); if (el) { el.scrollIntoView({ block: "center" }); el.focus(); } }, 120); }
+  else if (d.pfExport) { const X = portfolioHTML();
+    if (d.pfExport === "word") { const doc = `<html><head><meta charset="utf-8"><title>${esc(X.title)}</title><style>${EXPORT_CSS}</style></head><body>${X.html}</body></html>`; const url = URL.createObjectURL(new Blob(["﻿", doc], { type: "application/msword" })); const el = document.createElement("a"); el.href = url; el.download = "Academic-Portfolio.doc"; document.body.appendChild(el); el.click(); el.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000); toast("Word file downloaded"); }
+    else { $("#print-area").innerHTML = `<style>${EXPORT_CSS.replace(/body\{/, "#print-area{")}</style>${X.html}`; document.body.classList.add("printing-export"); const t0 = document.title; document.title = X.title; setTimeout(() => { window.print(); setTimeout(() => { document.body.classList.remove("printing-export"); document.title = t0; }, 600); }, 80); } }
+});
+document.addEventListener("keydown", e => { const m = e.target.closest && e.target.closest("[data-pf-open]"); if (m && m.getAttribute("role") === "button" && (e.key === "Enter" || e.key === " ") && e.target === m) { e.preventDefault(); m.click(); } if (e.target.dataset && e.target.dataset.linkUrl && e.key === "Enter") { e.preventDefault(); document.querySelector(`[data-link-add="${e.target.dataset.linkUrl}"]`).click(); } });
+document.addEventListener("submit", e => {
+  if (e.target.id !== "note-form") return; e.preventDefault();
+  const ti = $("#nt-title").value.trim(), sj = $("#nt-subj").value; if (!ti) { $("#nt-title").focus(); return; } if (!sj) { toast("Choose a subject"); return; }
+  const ed = S.noteEdit && S.snotes.find(n => n.id === S.noteEdit), kind = ed ? ed.kind : S.noteKind;
+  const url = $("#nt-url") ? $("#nt-url").value.trim() : ""; if (kind === "link" && !url) { toast("Paste the link first"); $("#nt-url").focus(); return; }
+  const rec = { subj: sj, kind, title: ti, body: $("#nt-body").value, url, tag: ed ? ed.tag || S.noteTag : S.noteTag, createdAt: ed ? ed.createdAt : nowISO(), updatedAt: nowISO() };
+  put("snotes", ed ? ed.id : newId(), rec); S.noteEdit = null; S.noteSubj = sj; toast(ed ? "Saved" : kind === "link" ? "Link saved" : "Note saved");
+});
+document.addEventListener("change", e => {
+  const t = e.target; if (!t.dataset) return;
+  if (t.dataset.asgLearned) { const a = S.asg.find(x => x.id === t.dataset.asgLearned); if (a) { put("assignments", a.id, { ...strip(a), learned: t.value }); toast("Saved to your portfolio"); } }
+  else if (t.dataset.asgSkills) { const a = S.asg.find(x => x.id === t.dataset.asgSkills); if (a) put("assignments", a.id, { ...strip(a), skills: t.value.split(",").map(x => x.trim()).filter(Boolean) }); }
+  else if (t.id === "st-semname") { const old = S.curSem; S.curSem = t.value.trim(); saveCats();
+    if (!old && S.curSem) batchColl("subjects", S.subjects.filter(s => !s.sem).map(s => ["set", s.id, { ...strip(s), sem: S.curSem }]));
+    renderStudy(); toast(S.curSem ? `Current semester: ${S.curSem}` : "Semester name cleared"); }
+});
+
 // ---------- calendar
 S.calY = new Date().getFullYear(); S.calM = new Date().getMonth(); S.calSel = todayKey();
 const loadedMonths = new Set();
@@ -1500,7 +1815,7 @@ function renderCalendar(){
   for (let d = 1; d <= nDays; d++) {
     const k = dkey(new Date(y, m, d)), I = dayInfo(k), we = isWeekend(keyDow(k));
     const doneN = I.todosDone.length + I.finished.length;
-    const dueOpen = I.due.filter(t => t.status !== "done").length;
+    const dueOpen = I.due.filter(t => t.status !== "done").length + S.asg.filter(a => a.due === k && !["submitted", "graded"].includes(a.status)).length;
     const pc = I.pct;
     const bar = pc === null ? "" : `<span class="cal-bar"><i style="width:${pc}%;background:${pc >= 80 ? "var(--ok)" : pc >= 50 ? "var(--med)" : "var(--crit)"}"></i></span>`;
     const marks = (I.refl ? `<i class="mk mk-refl" title="Reflection written"></i>` : "") + (I.updates.length || I.finished.length || I.added.length ? `<i class="mk mk-work" title="Work activity"></i>` : "") + (dueOpen ? `<i class="mk mk-due" title="Task due"></i>` : "");
@@ -1832,6 +2147,10 @@ function startData(){
   sub("tasks", "tasks"); sub("todos", "todos");
   { let first = true; db.collection("routine").onSnapshot(s => { S.routine = s.docs.map(d => ({ ...d.data(), id: d.id })); if (first) { first = false; mark(); refreshPush(true); } else render(); clearTimeout(syncFireFields._t); syncFireFields._t = setTimeout(syncFireFields, 1500); }, fail); }
   db.collection("health").orderBy("date", "desc").limit(400).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.health = o; render(); }, fail);
+  db.collection("subjects").onSnapshot(s => { S.subjects = s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")); render(); }, fail);
+  db.collection("classes").onSnapshot(s => { S.classes = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
+  db.collection("snotes").onSnapshot(s => { S.snotes = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
+  db.collection("assignments").onSnapshot(s => { S.asg = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("shop").onSnapshot(s => { S.shop = s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")); render(); }, fail);
   db.collection("expenses").orderBy("date", "desc").limit(3000).onSnapshot(s => { S.exp = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("body").onSnapshot(s => { S.body = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
@@ -1839,7 +2158,7 @@ function startData(){
   db.collection("courses").onSnapshot(s => { S.courses = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("time").orderBy("start", "desc").limit(1500).onSnapshot(s => { S.time = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.doc("settings/timer").onSnapshot(s => { const t = s.exists ? s.data() : null; const changed = JSON.stringify(t) !== JSON.stringify(S.timer); S.timer = t && t.start ? t : null; if (changed) render(); }, fail);
-  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (s.exists) { const sd = s.data(); if (sd.cur) S.cur = sd.cur; if (sd.budget) S.budget = sd.budget; if (Array.isArray(sd.shopHist)) S.shopHist = sd.shopHist; } if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
+  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (s.exists) { const sd = s.data(); if (sd.cur) S.cur = sd.cur; if (sd.budget) S.budget = sd.budget; if (Array.isArray(sd.shopHist)) S.shopHist = sd.shopHist; if (sd.semStart !== undefined) S.semStart = sd.semStart || ""; if (sd.semWeeks) S.semWeeks = sd.semWeeks; if (sd.prevCgpa !== undefined) S.prevCgpa = sd.prevCgpa; if (sd.prevCredits !== undefined) S.prevCredits = sd.prevCredits; if (sd.curSem !== undefined) S.curSem = sd.curSem || ""; } if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(1000).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
   watchChecks = () => { const k = viewKey(); if (k === watchedDay) return; watchedDay = k; if (unsubCheck) unsubCheck(); unsubCheck = db.doc("checks/" + k).onSnapshot(s => { const d = s.exists ? s.data() : {}; S.day[k] = { done: d.done || {}, skip: d.skip || {}, extra: d.extra || [] }; render(); }, fail); };
@@ -1856,7 +2175,7 @@ $("#uname").addEventListener("change", () => { S.name = $("#uname").value.trim()
 $("#bk-export").onclick = () => {
   const data = { app: "daybook", exportedAt: nowISO(), settings: { categories: S.cats },
     tasks: S.tasks, todos: S.todos, routine: S.routine, refl: S.refl, day: S.day,
-    courses: S.courses, time: S.time, health: S.health, body: S.body, conditions: S.conds, shop: S.shop, expenses: S.exp };
+    courses: S.courses, time: S.time, health: S.health, body: S.body, conditions: S.conds, shop: S.shop, expenses: S.exp, subjects: S.subjects, classes: S.classes, assignments: S.asg, snotes: S.snotes };
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
   const a = document.createElement("a"); a.href = url; a.download = "daybook-backup-" + todayKey() + ".json"; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000); toast("Backup downloaded");
@@ -1874,6 +2193,10 @@ $("#bk-import").onchange = async e => {
     (d.courses || []).forEach(t => ops.push(["courses/" + t.id, strip(t)]));
     (d.time || []).forEach(t => ops.push(["time/" + t.id, strip(t)]));
     (d.body || []).forEach(t => ops.push(["body/" + t.id, strip(t)]));
+    (d.snotes || []).forEach(t => ops.push(["snotes/" + t.id, strip(t)]));
+    (d.subjects || []).forEach(t => ops.push(["subjects/" + t.id, strip(t)]));
+    (d.classes || []).forEach(t => ops.push(["classes/" + t.id, strip(t)]));
+    (d.assignments || []).forEach(t => ops.push(["assignments/" + t.id, strip(t)]));
     (d.shop || []).forEach(t => ops.push(["shop/" + t.id, strip(t)]));
     (d.expenses || []).forEach(t => ops.push(["expenses/" + t.id, strip(t)]));
     (d.conditions || []).forEach(t => ops.push(["conditions/" + t.id, strip(t)]));
