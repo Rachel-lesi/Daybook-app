@@ -1055,8 +1055,9 @@ function weekData(off){
   const todosDone = S.todos.filter(t => t.done && inW(isoDay(t.doneAt))).length;
   let rs = 0, rd = 0; keys.filter(k => k <= todayKey() && S.day[k]).forEach(k => { const dd = dayDoc(k); routineFor(k).filter(r => !(dd.skip || {})[r.id]).forEach(r => { rs++; if ((dd.done || {})[r.id]) rd++; }); });
   const days = keys.map(k => ({ k, refl: S.refl[k], upd: S.tasks.map(t => ({ t, e: (t.log || []).filter(l => isoDay(l.at) === k && !/^(Task added|Progress \d|Status:)/.test(l.note)) })).filter(x => x.e.length) })).filter(d => d.refl || d.upd.length);
-  const learned = keys.map(k => S.refl[k]).filter(r => r && (r.learned || "").trim());
-  const mistakes = keys.map(k => S.refl[k]).filter(r => r && ((r.mistakes || "").trim() || (r.improve || "").trim()));
+  const wr = k => S.refl[k] ? { date: k, ...reflAreas(S.refl[k]).work } : null;
+  const learned = keys.map(wr).filter(r => r && (r.learned || "").trim());
+  const mistakes = keys.map(wr).filter(r => r && ((r.mistakes || "").trim() || (r.improve || "").trim()));
   const nk = weekKeys(off + 1), next = sortTasks(S.tasks.filter(t => t.status !== "done" && (!t.due || t.due <= nk[6])));
   return { keys, a, b, completed, active, updates, totalMins, byCat, todosDone, routinePct: rs ? Math.round(rd / rs * 100) : null, days, learned, mistakes, next, reflN: keys.filter(k => S.refl[k]).length };
 }
@@ -1068,7 +1069,7 @@ function reportSections(W){
     ["Summary", [`${W.completed.length} task${W.completed.length === 1 ? "" : "s"} completed · ${W.updates} progress update${W.updates === 1 ? "" : "s"} · ${W.totalMins ? fmtMins(W.totalMins) + " tracked" : "no time tracked"} · ${W.todosDone} to-do${W.todosDone === 1 ? "" : "s"} done${W.routinePct !== null ? ` · routine kept ${W.routinePct}%` : ""} · ${W.reflN} reflection${W.reflN === 1 ? "" : "s"}`]],
     ["Completed this week", W.completed.map(t => `[${catName(t.category)}] ${cleanT(t)}${t.impact ? ` — ${t.impact}` : ""}${taskMins(t.id) ? ` (${fmtMins(taskMins(t.id))})` : ""}`)],
     ["In progress", W.active.map(t => `[${catName(t.category)}] ${cleanT(t)} — ${STATUS_LABEL[t.status]}, ${+t.progress || 0}%${t.due ? `, due ${fmtDate(t.due)}` : ""}${t.bottleneck ? `. Bottleneck: ${t.bottleneck}` : ""}`)],
-    ["Daily log", W.days.map(d => { const parts = []; if (d.refl && (d.refl.did || "").trim()) parts.push(d.refl.did.trim()); d.upd.forEach(x => parts.push(`${cleanT(x.t)}: ${x.e.map(e => e.note).join("; ")}`)); return `${shortDay(d.k)}: ${parts.join(" | ") || "—"}`; })],
+    ["Daily log", W.days.map(d => { const parts = []; { const wd = (reflAreas(d.refl).work.did || "").trim(); if (d.refl && wd) parts.push(wd); } d.upd.forEach(x => parts.push(`${cleanT(x.t)}: ${x.e.map(e => e.note).join("; ")}`)); return `${shortDay(d.k)}: ${parts.join(" | ") || "—"}`; })],
     ["Key learnings", W.learned.map(r => `${shortDay(r.date)}: ${r.learned.trim()}`)],
     ["Mistakes & improvements", W.mistakes.map(r => `${shortDay(r.date)}: ${[(r.mistakes || "").trim().replace(/([^.!?])$/, "$1."), (r.improve || "").trim() ? "Next time: " + r.improve.trim() : ""].filter(Boolean).join(" ")}`)],
     ["Time by area", Object.entries(W.byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}: ${fmtMins(v)}`)],
@@ -1311,7 +1312,8 @@ function exportHTML(a, b, layout){
       if (d.upd.length || d.fin.length) body += `<p class="xf"><b>Work:</b></p><ul>${[...d.fin.map(t => `<li>Completed: [${esc(catName(t.category))}] ${esc(t.title)}${t.impact ? ` — ${esc(t.impact)}` : ""}</li>`), ...d.upd.filter(x => !d.fin.includes(x.t)).map(x => `<li>[${esc(catName(x.t.category))}] ${esc(x.t.title)}: ${esc(x.e.map(e => e.note).join("; "))}</li>`)].join("")}</ul>`;
       if (d.mins) body += `<p class="xf"><b>Time tracked:</b> ${fmtMins(d.mins)}</p>`;
     }
-    if (d.r) body += block("What I did", d.r.did) + block("What I learned", d.r.learned) + block("Mistakes", d.r.mistakes) + block("How I'll improve", d.r.improve);
+    if (d.r) { const A = reflAreas(d.r), used = R_AREAS.filter(([k]) => areaHas(A[k]));
+      used.forEach(([k, l]) => { if (used.length > 1 || k !== "work") body += `<p class="xf xa"><b>${esc(l)}</b></p>`; body += block("What I did", A[k].did || "") + block("What I learned", A[k].learned || "") + block("Mistakes", A[k].mistakes || "") + block("How I'll improve", A[k].improve || ""); }); }
     body += `</div>`;
   }
   if (!D.length) body = `<p class="none">Nothing recorded in this range.</p>`;
@@ -2476,21 +2478,50 @@ let rDate=todayKey(), rMood=0, rDirty=false;
 function workLogFor(day){
   return S.tasks.map(t=>({t,entries:(t.log||[]).filter(l=>isoDay(l.at)===day && l.note!=="Task added")})).filter(x=>x.entries.length || isoDay(x.t.createdAt)===day);
 }
+// ---------- reflection split into Work, Study & courses, Daily life
+const R_AREAS = [["work","Work"],["study","Study & courses"],["life","Daily life"]], R_F = ["did","learned","mistakes","improve"];
+const R_PH = {
+  work: { did: "Tasks you worked on and finished", learned: "New skill, SQL trick, how a process at the plant works…", mistakes: "What went wrong at work, honestly", improve: "One concrete change for work tomorrow" },
+  study: { did: "Classes, assignments, revision, course modules", learned: "Concepts that clicked, exam tips, course takeaways", mistakes: "Procrastinated, misread the brief, rushed…", improve: "How you'll study better tomorrow" },
+  life: { did: "Errands, exercise, cooking, people you saw, rest", learned: "About yourself, health, money, relationships", mistakes: "Habits that slipped", improve: "One small thing for tomorrow" } };
+let rArea = "work", rDraft = null;
+function reflAreas(r){ if (!r) return { work: {}, study: {}, life: {} }; if (r.areas) return { work: {}, study: {}, life: {}, ...r.areas }; return { work: { did: r.did || "", learned: r.learned || "", mistakes: r.mistakes || "", improve: r.improve || "" }, study: {}, life: {} }; }
+const areaHas = a => R_F.some(f => ((a || {})[f] || "").trim());
+function combineAreas(areas, f){ const parts = R_AREAS.map(([k, l]) => [l, (((areas[k] || {})[f]) || "").trim()]).filter(x => x[1]); return parts.length === 1 && parts[0][0] === "Work" ? parts[0][1] : parts.map(([l, v]) => `${l}: ${v}`).join("\n"); }
+function rFill(){ const a = rDraft[rArea] || {}; R_F.forEach(f => { const el = $("#r-" + f); el.value = a[f] || ""; el.placeholder = R_PH[rArea][f]; });
+  rFillTabs(); }
+function rSync(){ if (!rDraft) return; rDraft[rArea] = { ...(rDraft[rArea] || {}) }; R_F.forEach(f => rDraft[rArea][f] = $("#r-" + f).value); }
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-rarea]"); if (!b) return; rSync(); rArea = b.dataset.rarea; rFill(); rAuto(); });
+function rAuto(){
+  const k = rDate, head = t => `<b>${t} on ${esc(fmtDate(k))}</b>`;
+  if (rArea === "work") { const wl = workLogFor(k);
+    $("#r-auto").innerHTML = head("Pulled from your work tasks") + (wl.length ? `<ul>${wl.map(x=>`<li><b>${esc(x.t.title)}</b> <span class="muted">(${esc(catName(x.t.category))}, ${esc(STATUS_LABEL[x.t.status])} ${+x.t.progress||0}%)</span>${x.entries.length?": "+x.entries.map(e=>esc(e.note)).join("; "):" — added"}</li>`).join("")}</ul>` : `<div class="muted small">No work task updates logged on this day.</div>`); return; }
+  if (rArea === "study") { const L = [];
+    S.asg.filter(a => ["submitted","graded"].includes(a.status) && isoDay(a.doneAt) === k).forEach(a => L.push(`<li><b>${esc(a.title)}</b> <span class="muted">(${esc(subjLabel(a.subj))}, submitted)</span></li>`));
+    S.todos.filter(t => (t.kind === "study" || t.kind === "self") && t.done && isoDay(t.doneAt) === k).forEach(t => L.push(`<li>${esc(t.title)} <span class="muted">(${t.kind === "self" ? "self-study" : esc(subjLabel(t.subj))})</span></li>`));
+    S.courses.forEach(c => { const m = S.time.filter(x => x.type === "course" && x.ref === c.id && x.date === k).reduce((a, x) => a + (+x.mins || 0), 0), md = (c.modules || []).filter(x => x.done && isoDay(x.doneAt) === k); if (m || md.length) L.push(`<li><b>${esc(c.name)}</b> <span class="muted">${[m ? fmtMins(m) + " studied" : "", md.length ? md.length + " module" + (md.length > 1 ? "s" : "") + " done" : ""].filter(Boolean).join(", ")}</span></li>`); });
+    const cs = classesOn(k); if (cs.length) L.push(`<li>Classes: ${cs.map(c => `${esc(subjLabel(c.subj))}${attOf(c, k) ? ` <span class="muted">(${ATT_LBL[attOf(c, k)].toLowerCase()})</span>` : ""}`).join(", ")}</li>`);
+    $("#r-auto").innerHTML = head("Pulled from your study") + (L.length ? `<ul>${L.join("")}</ul>` : `<div class="muted small">Nothing logged for study on this day.</div>`); return; }
+  const dd = dayDoc(k), its = routineFor(k).filter(r => !(dd.skip || {})[r.id]), dn = its.filter(r => (dd.done || {})[r.id]).length, h = hDoc(k), mood = dayMood(k), sl = sleepMins(h.sleep);
+  const todos = S.todos.filter(t => !t.kind && t.done && isoDay(t.doneAt) === k), spent = S.exp.filter(x => x.date === k).reduce((a, x) => a + (+x.amount || 0), 0);
+  $("#r-auto").innerHTML = head("Your day") + `<ul>${its.length ? `<li>Routine: ${dn} of ${its.length} ticked</li>` : ""}${todos.length ? `<li>To-dos done: ${todos.map(t => esc(t.title)).join(", ")}</li>` : ""}${sl ? `<li>Slept ${fmtHM(sl)}</li>` : ""}${mood != null ? `<li>Mood ${(+mood).toFixed(1)}/5</li>` : ""}${h.water ? `<li>Water: ${h.water} cups</li>` : ""}${(h.meals || []).length ? `<li>Meals: ${h.meals.map(m => esc(m.text)).join(", ")}</li>` : ""}${spent ? `<li>Spent ${money(spent)}</li>` : ""}</ul>`;
+}
 function renderReflect(){
   $("#r-date").value=rDate;
   const r=S.refl[rDate]||{};
-  if(!rDirty){ $("#r-did").value=r.did||""; $("#r-learned").value=r.learned||""; $("#r-mistakes").value=r.mistakes||""; $("#r-improve").value=r.improve||""; rMood=r.mood||0; }
+  if(!rDirty || !rDraft){ rDraft=JSON.parse(JSON.stringify(reflAreas(S.refl[rDate]))); rMood=r.mood||0; } rFill();
   $("#r-mood").innerHTML=[1,2,3,4,5].map(n=>`<button type="button" data-mood="${n}" aria-pressed="${rMood===n}">${n}</button>`).join("");
   $("#r-saved").textContent = r.updatedAt?`Saved ${fmtTime(r.updatedAt)}`:"Not saved yet";
   $("#r-del").hidden = !S.refl[rDate]; if(!rDelAsk){ $("#r-del").textContent="Delete"; $("#r-del").classList.remove("armed"); }
-  const wl=workLogFor(rDate);
-  const doneTodos=S.todos.filter(t=>t.done&&isoDay(t.doneAt)===rDate);
+  rAuto(); renderArchive();
+}
+function _oldAuto(){ const wl=workLogFor(rDate), doneTodos=[];
   $("#r-auto").innerHTML = `<b>Pulled from your tasks for ${esc(fmtDate(rDate))}</b>` + (wl.length||doneTodos.length ? `<ul>${wl.map(x=>`<li><b>${esc(x.t.title)}</b> <span class="muted">(${esc(catName(x.t.category))}, ${esc(STATUS_LABEL[x.t.status])} ${+x.t.progress||0}%)</span>${x.entries.length?": "+x.entries.map(e=>esc(e.note)).join("; "):" — added"}</li>`).join("")}${doneTodos.map(t=>`<li>${esc(t.title)} <span class="muted">(to-do done)</span></li>`).join("")}</ul>` : `<div class="muted small">No task updates logged on this day. Updates you log on work tasks appear here automatically.</div>`);
   renderArchive();
 }
-["#r-did","#r-learned","#r-mistakes","#r-improve"].forEach(s=>$(s).addEventListener("input",()=>{ rDirty=true; $("#r-saved").textContent="Unsaved changes"; }));
-["#r-did","#r-learned","#r-mistakes","#r-improve"].forEach(s=>$(s).addEventListener("blur",()=>{ if(rDirty) saveRefl(true); }));
-$("#r-date").addEventListener("change",e=>{ rDelAsk=false; S.arcMonth=(e.target.value||todayKey()).slice(0,7);  if(rDirty) saveRefl(true); rDate=e.target.value||todayKey(); rDirty=false; renderReflect(); });
+["#r-did","#r-learned","#r-mistakes","#r-improve"].forEach(s=>$(s).addEventListener("input",()=>{ rDirty=true; rSync(); $("#r-areas [aria-pressed=true]") && rDraft && (areaHas(rDraft[rArea]) !== !!$("#r-areas [aria-pressed=true] .r-dot")) && rFillTabs(); $("#r-saved").textContent="Unsaved changes"; }));
+["#r-did","#r-learned","#r-mistakes","#r-improve"].forEach(s=>$(s).addEventListener("blur",e=>{ if(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest("#r-areas,#v-reflect .refl textarea")) return; if(rDirty) saveRefl(true); }));
+$("#r-date").addEventListener("change",e=>{ rDelAsk=false; S.arcMonth=(e.target.value||todayKey()).slice(0,7);  if(rDirty) saveRefl(true); rDate=e.target.value||todayKey(); rDirty=false; rDraft=null; renderReflect(); });
 $("#r-mood").addEventListener("click",e=>{ const b=e.target.closest("[data-mood]"); if(!b) return; rMood=+b.dataset.mood; rDirty=true; saveRefl(true); });
 $("#r-save").onclick=()=>saveRefl(false);
 let rDelAsk=false;
@@ -2505,8 +2536,10 @@ document.addEventListener("click", e=>{
   if(!rDelAsk){ rDelAsk=true; b.textContent="Tap again to delete"; b.classList.add("armed"); setTimeout(()=>{ rDelAsk=false; if($("#r-del")){ $("#r-del").textContent="Delete"; $("#r-del").classList.remove("armed"); } },3000); return; }
   deleteRefl(rDate);
 });
+function rFillTabs(){ const h = R_AREAS.map(([k, l]) => `<button type="button" data-rarea="${k}" aria-pressed="${rArea === k}">${l}${areaHas(rDraft[k]) ? ' <i class="r-dot"></i>' : ""}</button>`).join(""); if ($("#r-areas").innerHTML !== h) $("#r-areas").innerHTML = h; }
 function saveRefl(quiet){
-  const data={date:rDate,did:$("#r-did").value,learned:$("#r-learned").value,mistakes:$("#r-mistakes").value,improve:$("#r-improve").value,mood:rMood,updatedAt:nowISO()};
+  rSync(); const areas = JSON.parse(JSON.stringify(rDraft || reflAreas(null)));
+  const data={date:rDate,areas,did:combineAreas(areas,"did"),learned:combineAreas(areas,"learned"),mistakes:combineAreas(areas,"mistakes"),improve:combineAreas(areas,"improve"),mood:rMood,updatedAt:nowISO()};
   S.refl[rDate]=data; rDirty=false;
   if(db) write("reflections/"+rDate, ()=>db.doc("reflections/"+rDate).set(data));
   if(!quiet) toast("Reflection saved"); renderReflect();
@@ -2517,7 +2550,7 @@ $("#r-copy").onclick=async()=>{
   wl.forEach(x=>lines.push(`- [${catName(x.t.category)}] ${x.t.title} — ${STATUS_LABEL[x.t.status]}, ${+x.t.progress||0}%${x.entries.length?" ("+x.entries.map(e=>e.note).join("; ")+")":""}${x.t.bottleneck&&x.t.status!=="done"?" | Bottleneck: "+x.t.bottleneck:""}`));
   if(!wl.length) lines.push("- (no task updates logged)");
   const add=(h,v)=>{ if(v.trim()){ lines.push("",h+":",v.trim()); } };
-  add("What I did",$("#r-did").value); add("What I learned",$("#r-learned").value); add("Mistakes",$("#r-mistakes").value); add("How I'll improve",$("#r-improve").value);
+  rSync(); const W=(rDraft||{}).work||{}; add("What I did",W.did||""); add("What I learned",W.learned||""); add("Mistakes",W.mistakes||""); add("How I'll improve",W.improve||"");
   const text=lines.join("\n");
   try{ await navigator.clipboard.writeText(text); toast("Report copied"); }
   catch{ const ta=document.createElement("textarea"); ta.value=text; ta.style.minHeight="200px"; $("#r-auto").after(ta); ta.select(); toast("Select all and copy the text below"); }

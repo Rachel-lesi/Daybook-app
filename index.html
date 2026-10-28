@@ -1357,6 +1357,11 @@ label.f:has(.dhint){margin-bottom:18px}
 .nf-n{line-height:1.35}
 .ng-h{margin-top:6px;display:flex;gap:6px;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:4px}
 #st-notes{display:grid;gap:10px}
+
+/* ===== reflection areas ===== */
+.r-areas{display:flex;flex-wrap:wrap}
+.r-areas button{flex:1 1 auto}
+.r-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);vertical-align:2px;margin-left:2px}
 </style>
 </head>
 <body class="locked">
@@ -1723,6 +1728,7 @@ label.f:has(.dhint){margin-bottom:18px}
     <div data-part="reflection" class="panel refl">
       <div class="sechead" style="margin:0"><h2>Daily reflection</h2>
         <input type="date" id="r-date" aria-label="Reflection date" style="border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:5px 8px"></div>
+      <div class="seg r-areas" id="r-areas" role="tablist" aria-label="Reflection area"></div>
       <div class="auto" id="r-auto"></div>
       <label class="f">What I did<textarea id="r-did" placeholder="Main things I worked on and finished"></textarea></label>
       <label class="f">What I learned<textarea id="r-learned" placeholder="New skill, SQL trick, how a process at the plant works…"></textarea></label>
@@ -1841,6 +1847,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=45"></script>
+<script type="module" src="app.js?v=46"></script>
 </body>
 </html>
