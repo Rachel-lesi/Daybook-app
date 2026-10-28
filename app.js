@@ -2624,6 +2624,12 @@ function rAuto(){
   const todos = S.todos.filter(t => !t.kind && t.done && isoDay(t.doneAt) === k), spent = S.exp.filter(x => x.date === k).reduce((a, x) => a + (+x.amount || 0), 0);
   $("#r-auto").innerHTML = head("Your day") + `<ul>${its.length ? `<li>Routine: ${dn} of ${its.length} ticked</li>` : ""}${todos.length ? `<li>To-dos done: ${todos.map(t => esc(t.title)).join(", ")}</li>` : ""}${sl ? `<li>Slept ${fmtHM(sl)}</li>` : ""}${mood != null ? `<li>Mood ${(+mood).toFixed(1)}/5</li>` : ""}${h.water ? `<li>Water: ${h.water} cups</li>` : ""}${(h.meals || []).length ? `<li>Meals: ${h.meals.map(m => esc(m.text)).join(", ")}</li>` : ""}${spent ? `<li>Spent ${money(spent)}</li>` : ""}</ul>`;
 }
+function renderRWeek(){
+  const box = $("#r-week"); if (!box) return; const tk = todayKey(), m = addDays(rDate, -((keyDow(rDate) + 6) % 7)), keys = [0,1,2,3,4,5,6].map(i => addDays(m, i));
+  box.innerHTML = `<span class="small muted" style="font-weight:600">This week</span><div class="rw-days">${keys.map(k => { const A = reflAreas(S.refl[k]); return `<button type="button" class="rw-day ${k === rDate ? "is-sel" : ""} ${k > tk ? "is-fut" : ""}" ${k > tk ? "disabled" : `data-rwday="${k}"`}><span>${DAYS[keyDow(k)].slice(0, 2)}</span><b>${+k.slice(8)}</b><span class="rw-dots">${R_AREAS.map(([a]) => S.refl[k] && areaHas(A[a]) ? `<i class="d-${a}"></i>` : "").join("")}</span></button>`; }).join("")}</div>
+    <div class="rw-leg"><span><i style="background:var(--c0)"></i>Work</span><span><i style="background:var(--c2)"></i>Study</span><span><i style="background:var(--c3)"></i>Daily life</span></div>`;
+}
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-rwday]"); if (!b) return; if (rDirty) saveRefl(true); rDate = b.dataset.rwday; rDirty = false; rDraft = null; S.arcMonth = rDate.slice(0, 7); renderReflect(); });
 function renderReflect(){
   $("#r-date").value=rDate;
   const r=S.refl[rDate]||{};
@@ -2631,7 +2637,7 @@ function renderReflect(){
   $("#r-mood").innerHTML=[1,2,3,4,5].map(n=>`<button type="button" data-mood="${n}" aria-pressed="${rMood===n}">${n}</button>`).join("");
   $("#r-saved").textContent = r.updatedAt?`Saved ${fmtTime(r.updatedAt)}`:"Not saved yet";
   $("#r-del").hidden = !S.refl[rDate]; if(!rDelAsk){ $("#r-del").textContent="Delete"; $("#r-del").classList.remove("armed"); }
-  rAuto(); renderArchive();
+  rAuto(); renderRWeek(); $("#r-day").textContent = rDate === todayKey() ? "Today" : DAYS[keyDow(rDate)] + ", " + fmtDate(rDate).replace(/^\w+, /, ""); renderArchive();
 }
 function _oldAuto(){ const wl=workLogFor(rDate), doneTodos=[];
   $("#r-auto").innerHTML = `<b>Pulled from your tasks for ${esc(fmtDate(rDate))}</b>` + (wl.length||doneTodos.length ? `<ul>${wl.map(x=>`<li><b>${esc(x.t.title)}</b> <span class="muted">(${esc(catName(x.t.category))}, ${esc(STATUS_LABEL[x.t.status])} ${+x.t.progress||0}%)</span>${x.entries.length?": "+x.entries.map(e=>esc(e.note)).join("; "):" — added"}</li>`).join("")}${doneTodos.map(t=>`<li>${esc(t.title)} <span class="muted">(to-do done)</span></li>`).join("")}</ul>` : `<div class="muted small">No task updates logged on this day. Updates you log on work tasks appear here automatically.</div>`);
@@ -2661,7 +2667,7 @@ function saveRefl(quiet){
   const data={date:rDate,areas,did:combineAreas(areas,"did"),learned:combineAreas(areas,"learned"),mistakes:combineAreas(areas,"mistakes"),improve:combineAreas(areas,"improve"),mood:rMood,updatedAt:nowISO()};
   S.refl[rDate]=data; rDirty=false;
   if(db) write("reflections/"+rDate, ()=>db.doc("reflections/"+rDate).set(data));
-  if(!quiet){ toast("Reflection saved"); renderReflect(); } else { $("#r-saved").textContent=`Saved ${fmtTime(data.updatedAt)}`; $("#r-del").hidden=false; rDots(); renderArchive(); }
+  if(!quiet){ toast("Reflection saved"); renderReflect(); } else { $("#r-saved").textContent=`Saved ${fmtTime(data.updatedAt)}`; $("#r-del").hidden=false; rDots(); renderRWeek(); renderArchive(); }
 }
 $("#r-copy").onclick=async()=>{
   const wl=workLogFor(rDate);

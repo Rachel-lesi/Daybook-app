@@ -1377,6 +1377,38 @@ label.f:has(.dhint){margin-bottom:18px}
 .rep-open{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;text-align:left;font:inherit;color:inherit;border:0;background:none;padding:10px 12px;cursor:pointer}
 .rep-open > span:last-child{display:grid;gap:2px}
 .rep-open:hover b{color:var(--accent)}
+
+/* ===== reflection layout ===== */
+.refl{gap:14px}
+.r-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+.r-head h2{margin:0;font-size:1.15rem;white-space:nowrap}
+.r-day{font-size:.85rem;color:var(--muted);flex:1 1 auto}
+.r-head .dd-wrap{width:auto;flex:0 0 170px}
+.r-body{display:grid;gap:14px}
+.r-fields{display:grid;gap:12px}
+.r-fields textarea{min-height:92px}
+.r-side{display:grid;gap:12px;align-content:start}
+.r-side .auto{margin:0}
+.r-energy{display:grid;gap:6px}
+.r-week{display:grid;gap:6px}
+.r-week:empty{display:none}
+.rw-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.rw-day{display:grid;justify-items:center;gap:3px;padding:6px 2px;border:1px solid var(--line);border-radius:10px;background:var(--surface);font:inherit;color:inherit;cursor:pointer}
+.rw-day b{font-size:.9rem}
+.rw-day span{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.rw-day.is-sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.rw-day.is-fut{opacity:.45;cursor:default}
+.rw-dots{display:flex;gap:2px;min-height:6px}
+.rw-dots i{width:6px;height:6px;border-radius:50%}
+.rw-dots .d-work{background:var(--c0)}.rw-dots .d-study{background:var(--c2)}.rw-dots .d-life{background:var(--c3)}
+.rw-leg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.72rem;color:var(--muted)}
+.rw-leg i{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:1px}
+@media (min-width:900px){
+  .r-body{grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);align-items:start}
+  .r-fields{grid-template-columns:1fr 1fr}
+  #v-reflect .r-fields textarea{min-height:150px}
+  .r-side{position:sticky;top:12px}
+}
 </style>
 </head>
 <body class="locked">
@@ -1740,18 +1772,25 @@ label.f:has(.dhint){margin-bottom:18px}
   </section>
 
   <section class="view" id="v-reflect" hidden>
-    <div data-part="reflection" class="panel refl">
-      <div class="sechead" style="margin:0"><h2>Daily reflection</h2>
+    <div data-part="reflection" data-wide class="panel refl">
+      <div class="r-head"><h2>Daily reflection</h2><span class="r-day" id="r-day"></span>
         <input type="date" id="r-date" aria-label="Reflection date" style="border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:5px 8px"></div>
       <div class="seg r-areas" id="r-areas" role="tablist" aria-label="Reflection area"></div>
-      <div class="auto" id="r-auto"></div>
-      <label class="f">What I did<textarea id="r-did" placeholder="Main things I worked on and finished"></textarea></label>
-      <label class="f">What I learned<textarea id="r-learned" placeholder="New skill, SQL trick, how a process at the plant works…"></textarea></label>
-      <label class="f">Mistakes<textarea id="r-mistakes" placeholder="What went wrong, honestly"></textarea></label>
-      <label class="f">How I'll improve<textarea id="r-improve" placeholder="One concrete change for tomorrow"></textarea></label>
-      <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Energy today (1 low – 5 great)</span><div class="mood" id="r-mood"></div></div>
+      <div class="r-body">
+        <div class="r-fields">
+          <label class="f">What I did<textarea id="r-did" placeholder="Main things I worked on and finished"></textarea></label>
+          <label class="f">What I learned<textarea id="r-learned" placeholder="New skill, SQL trick, how a process at the plant works…"></textarea></label>
+          <label class="f">Mistakes<textarea id="r-mistakes" placeholder="What went wrong, honestly"></textarea></label>
+          <label class="f">How I'll improve<textarea id="r-improve" placeholder="One concrete change for tomorrow"></textarea></label>
+        </div>
+        <aside class="r-side">
+          <div class="auto" id="r-auto"></div>
+          <div class="f r-energy"><span class="small muted" style="font-weight:600">Energy today (1 low – 5 great)</span><div class="mood" id="r-mood"></div></div>
+          <div class="r-week" id="r-week"></div>
+        </aside>
+      </div>
       <div class="dlgfoot"><span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="saved" id="r-saved"></span><button class="btn sm ghost danger" type="button" id="r-del" hidden>Delete</button></span>
-        <div style="display:flex;gap:8px"><button class="btn" type="button" data-xopen="day:">Export</button><button class="btn" type="button" id="r-copy">Copy as report</button><button class="btn primary" type="button" id="r-save">Save</button></div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" data-xopen="day:">Export</button><button class="btn" type="button" id="r-copy">Copy as report</button><button class="btn primary" type="button" id="r-save">Save</button></div></div>
     </div>
     <div data-part="archive" data-wide>
       <div class="sechead"><h2>Reflection archive</h2><button class="btn sm" type="button" data-xopen="month:">Export…</button></div>
@@ -1870,6 +1909,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=50"></script>
+<script type="module" src="app.js?v=51"></script>
 </body>
 </html>
