@@ -39,6 +39,38 @@ function write(path, fn){ // one write at a time per document
 function toast(msg, undo){ const t=$("#toast"); t.textContent=msg; if(undo){ const b=document.createElement("button"); b.type="button"; b.className="t-undo"; b.textContent="Undo"; b.onclick=()=>{ t.hidden=true; undo(); }; t.append(b); } t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,undo?5000:2200); }
 
 document.addEventListener("click", e => { const x = e.target.closest && e.target.closest("[data-dlg-x]"); if (x) { e.preventDefault(); x.closest("dialog").close(); } });
+// ---------- dates typed and shown as dd/mm/yyyy everywhere (browsers set to US English show mm/dd)
+(() => {
+  const VD = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  const show = v => { const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(v || ""); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
+  const parse = t => { t = (t || "").trim(); let m = /^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{2}|\d{4})$/.exec(t) || /^(\d{2})(\d{2})(\d{2}|\d{4})$/.exec(t); if (!m) return null;
+    const d = +m[1], mo = +m[2], y = m[3].length === 2 ? 2000 + +m[3] : +m[3], dt = new Date(y, mo - 1, d);
+    return dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d ? `${y}-${pad(mo)}-${pad(d)}` : null; };
+  function enhance(inp){
+    if (inp.__dd || inp.hasAttribute("data-native")) return; inp.__dd = true;
+    const wrap = document.createElement("span"); wrap.className = "dd-wrap"; ["maxWidth", "width", "flex"].forEach(p => { if (inp.style[p]) wrap.style[p] = inp.style[p]; });
+    const txt = document.createElement("input"); txt.type = "text"; txt.inputMode = "numeric"; txt.autocomplete = "off"; txt.placeholder = "dd/mm/yyyy"; txt.className = (inp.className || "") + " dd-text"; if (inp.getAttribute("style")) txt.setAttribute("style", inp.getAttribute("style")); txt.style.width = "100%"; txt.style.maxWidth = "none";
+    txt.setAttribute("aria-label", inp.getAttribute("aria-label") || "Date (day/month/year)"); if (inp.disabled) txt.disabled = true;
+    const btn = document.createElement("button"); btn.type = "button"; btn.className = "dd-pick"; btn.tabIndex = -1; btn.setAttribute("aria-label", "Open calendar"); btn.innerHTML = SVG(ICON.calendar);
+    inp.parentNode.insertBefore(wrap, inp); wrap.append(txt, btn, inp); inp.classList.add("dd-native"); inp.tabIndex = -1;
+    const sync = () => { if (document.activeElement !== txt || !txt.value) txt.value = show(VD.get.call(inp)); };
+    Object.defineProperty(inp, "value", { configurable: true, get(){ return VD.get.call(this); }, set(v){ VD.set.call(this, v); sync(); } });
+    sync();
+    const commit = v => { if (VD.get.call(inp) === v) return; VD.set.call(inp, v); inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); };
+    txt.addEventListener("input", e => {
+      if (e.inputType === "insertText" && /^\d{2}$|^\d{1,2}\/\d{2}$/.test(txt.value)) txt.value += "/";
+      const full = /\d{4}$/.test(txt.value.trim()), v = full ? parse(txt.value) : null; txt.classList.toggle("dd-bad", full && !v); if (v) commit(v);
+    });
+    txt.addEventListener("blur", () => { const t = txt.value.trim(); if (!t) { if (!inp.required) commit(""); else txt.value = show(VD.get.call(inp)); } else { const v = parse(t); if (v) { commit(v); txt.value = show(v); } else { toast("Type the date as dd/mm/yyyy, e.g. 03/11/2026"); txt.value = show(VD.get.call(inp)); } } txt.classList.remove("dd-bad"); });
+    txt.addEventListener("keydown", e => { if (e.key === "Enter") { const v = parse(txt.value); if (v) commit(v); } });
+    inp.addEventListener("change", () => { if (document.activeElement !== txt) txt.value = show(VD.get.call(inp)); });
+    btn.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); try { inp.showPicker(); } catch { inp.focus(); inp.click(); } });
+  }
+  const scan = root => (root.querySelectorAll ? root.querySelectorAll('input[type="date"]') : []).forEach(enhance);
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType !== 1) return; if (n.matches && n.matches('input[type="date"]')) enhance(n); else scan(n); }))).observe(document.documentElement, { childList: true, subtree: true });
+  setTimeout(() => scan(document));
+})();
+
 // ---------- swipe left on a task card to delete (phone)
 const SW = { card: null, x0: 0, y0: 0, base: 0, dx: 0, mode: "", open: null, swiped: 0 };
 const swSet = (c, x, anim) => { c.classList.toggle("sw-anim", !!anim); c.style.setProperty("--sx", x + "px"); c.classList.toggle("sw-on", x < 0); };
@@ -226,7 +258,7 @@ function renderQA(){
     h += `<div class="qa-row"><span class="qa-lbl">Urgency</span><div class="qa-chips">${QA_URG.map(([v, l]) => ch("data-qa-urg", v, l, E.urg === v, "u-" + v)).join("")}</div></div>`;
   }
   h += `<div class="qa-row"><span class="qa-lbl">${E.work ? "Due" : "When"}</span><div class="qa-chips">${E.work ? ch("data-qa-due", "", "No date", !E.due) : ""}${dues.map(([k, l]) => ch("data-qa-due", k, l, E.due === k)).join("")}
-    <label class="qc pick ${customDue ? "on" : ""}" aria-pressed="${customDue}">${SVG(ICON.calendar)}${customDue ? esc(fmtDate(E.due)) : "Pick date"}<input type="date" id="qa-pick" value="${esc(E.due || "")}" aria-label="Pick a date"></label></div></div>`;
+    <label class="qc pick ${customDue ? "on" : ""}" aria-pressed="${customDue}">${SVG(ICON.calendar)}${customDue ? esc(fmtDate(E.due)) : "Pick date"}<input type="date" id="qa-pick" data-native value="${esc(E.due || "")}" aria-label="Pick a date"></label></div></div>`;
   h += `<p class="qa-tip">Shortcut: you can also type <code>#excel</code> <code>!high</code> <code>@fri</code> in the box.</p>`;
   box.innerHTML = h;
 }
@@ -1812,7 +1844,7 @@ document.addEventListener("submit", e => {
 }, true);
 // ----- readable due date under date boxes, and a fix when day and month were typed the other way round
 function dateHint(inp){
-  const h = inp.parentElement.querySelector(".dhint"); if (!h) return;
+  const h = (inp.closest("label") || inp.parentElement).querySelector(".dhint"); if (!h) return;
   const v = inp.value, tk = todayKey(); if (!v) { h.innerHTML = ""; return; }
   const [y, m, dd] = v.split("-").map(Number), sw = m !== dd && dd <= 12 ? `${y}-${pad(dd)}-${pad(m)}` : null;
   const past = v < tk, swapOk = sw && sw >= tk && (!past || true);

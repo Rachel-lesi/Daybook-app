@@ -1248,6 +1248,16 @@ label.f:has(.dhint){margin-bottom:18px}
 .dhint .dh-past{color:var(--crit)}
 .asg-editing{border:1px solid var(--accent);border-radius:12px;padding:12px;background:var(--surface)}
 .asg-more .row .btn svg{width:13px;height:13px;margin-right:4px;vertical-align:-2px}
+
+/* ===== dd/mm/yyyy date fields ===== */
+.dd-wrap{position:relative;display:flex;align-items:center;min-width:0;width:100%}
+.qrow .dd-wrap,.row .dd-wrap{width:auto;flex:1 1 140px}
+.dd-wrap .dd-text{width:100%;min-width:0;padding-right:36px!important}
+.dd-wrap .dd-text.dd-bad{border-color:var(--crit)!important}
+.dd-pick{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:30px;height:30px;display:grid;place-items:center;border:0;background:none;color:var(--muted);cursor:pointer;border-radius:6px;padding:0}
+.dd-pick:hover{background:var(--sunk);color:var(--ink)}
+.dd-pick svg{width:16px;height:16px}
+.dd-native{position:absolute!important;right:0;bottom:0;width:1px!important;height:1px!important;opacity:0;pointer-events:none;padding:0!important;border:0!important}
 </style>
 </head>
 <body class="locked">
@@ -1720,6 +1730,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=34"></script>
+<script type="module" src="app.js?v=35"></script>
 </body>
 </html>
