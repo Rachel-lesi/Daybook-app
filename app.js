@@ -403,7 +403,7 @@ function render(){
   if(S.view==="health") renderHealth();
   if(S.view==="money") renderMoney();
   if(S.view==="study") renderStudy();
-  if(S.view==="reflect") renderReport();
+  if(S.view==="reflect") renderReport(); else if(typeof autoSaveReports==="function") autoSaveReports();
   if(S.view==="today") renderFocus();
   tickTimer();
   if(S.view==="reflect") renderReflect();
@@ -1090,16 +1090,67 @@ function reportHTML(forFile){
   if (!forFile) return head + body;
   return `<html><head><meta charset="utf-8"><title>${esc(reportTitle(W))}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#465c47;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
 }
+// ---------- saved weekly reports: kept, organised by year, month and week
+S.reports = {}; S.wkMode = "live"; S.repMonth = null; S.repDel = null; S.repAutoDone = false;
+const wkMonday = off => weekKeys(off)[0];
+const offOf = mon => Math.round((new Date(mon + "T00:00") - new Date(wkMonday(0) + "T00:00")) / (7 * 864e5));
+function repDoc(off, note){ const W = weekData(off); return { week: W.a, end: W.b, title: reportTitle(W), sections: reportSections(W), name: S.name || "", org: S.org || "", note: note || "", savedAt: nowISO(), stats: { done: W.completed.length, updates: W.updates, mins: W.totalMins } }; }
+function repHasContent(off){ const W = weekData(off); return W.completed.length || W.updates || W.reflN || W.totalMins; }
+function saveReport(off, auto){ const prev = repGet(wkMonday(off)), d = { ...repDoc(off, prev ? prev.note : ""), auto: !!auto }; S.reports[d.week] = d; if (db) write("reports/" + d.week, () => db.doc("reports/" + d.week).set(d)); return d; }
+function autoSaveReports(){ if (!S.ready || !S.repLoaded || Date.now() - (S.repAutoAt || 0) < 20000) return; S.repAutoAt = Date.now();
+  for (let off = -1; off >= -4; off--) { const m = wkMonday(off); if (!S.reports[m] && repHasContent(off)) saveReport(off, true); } }
+const repGet = m => S.reports[m] && !S.reports[m].deleted ? S.reports[m] : null;
+function repView(){ const saved = repGet(wkMonday(S.wkOff)); return S.wkMode === "saved" && saved ? saved : null; }
+function repHTMLFrom(R, forFile){
+  const body = R.sections.map(([h, items]) => `<h2>${esc(h)}</h2>${items.length ? `<ul>${items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="none">None</p>`}`).join("") + ((R.note || "").trim() ? `<h2>Notes</h2><p>${esc(R.note.trim()).replace(/\n/g, "<br>")}</p>` : "");
+  const head = `<h1>${esc(R.title)}</h1>${R.name || R.org ? `<p class="who">${esc([R.name, R.org].filter(Boolean).join(" · "))}</p>` : ""}`;
+  if (!forFile) return head + body;
+  return `<html><head><meta charset="utf-8"><title>${esc(R.title)}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#465c47;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
+}
+function repTextFrom(R){ const L = [R.title]; if (R.name) L.push(R.name); if (R.org) L.push(R.org); for (const [h, items] of R.sections) { L.push("", h.toUpperCase()); L.push(...(items.length ? items.map(x => "- " + x) : ["- None"])); } if ((R.note || "").trim()) L.push("", "NOTES", R.note.trim()); return L.join("\n"); }
+function renderSavedReports(){
+  const box = $("#wk-saved"); if (!box) return;
+  const all = Object.values(S.reports).filter(r => !r.deleted).sort((a, b) => b.week.localeCompare(a.week));
+  if (!all.length) { box.innerHTML = `<p class="small muted" style="margin:0">Saved reports are kept here, filed by year, month and week. Tap <b>Save report</b> above, or they're saved for you automatically after each week ends.</p>`; return; }
+  const byM = {}; all.forEach(r => (byM[r.week.slice(0, 7)] = byM[r.week.slice(0, 7)] || []).push(r));
+  if (S.repMonth && !byM[S.repMonth]) S.repMonth = null;
+  if (!S.repMonth) {
+    const years = [...new Set(Object.keys(byM).map(k => k.slice(0, 4)))].sort().reverse();
+    box.innerHTML = `<div class="arc-crumbs"><b>All weekly reports</b><span class="muted small">${all.length} saved</span></div>` + years.map(y => `<div class="arc-year">${y}</div><div class="arc-folders">${Object.keys(byM).filter(k => k.startsWith(y)).sort().reverse().map(k => `<button type="button" class="folder" data-repm="${k}"><span class="fd-ic">${SVG(ICON.folder)}</span><span class="fd-name">${MONTHS[+k.slice(5) - 1]}</span><span class="fd-meta">${byM[k].length} report${byM[k].length > 1 ? "s" : ""}</span></button>`).join("")}</div>`).join("");
+    return;
+  }
+  const rs = byM[S.repMonth];
+  box.innerHTML = `<div class="arc-crumbs"><button type="button" class="crumb" data-repm="">All weekly reports</button><span class="muted">›</span><b>${MONTHS[+S.repMonth.slice(5) - 1]} ${S.repMonth.slice(0, 4)}</b></div>
+    <ul class="rep-list">${rs.map(r => `<li><button type="button" class="rep-open" data-repopen="${esc(r.week)}"><span class="aw-ic">${SVG(ICON.note)}</span><span><b>${esc(longRange(r.week, r.end))}</b><span class="small muted">${r.stats ? `${r.stats.done} done · ${r.stats.updates} updates${r.stats.mins ? " · " + fmtMins(r.stats.mins) : ""}` : ""}${(r.note || "").trim() ? " · has notes" : ""} · saved ${esc(fmtDate(isoDay(r.savedAt)))}${r.auto ? " (auto)" : ""}</span></span></button>
+      <button type="button" class="x" data-repdel="${esc(r.week)}" aria-label="Delete saved report">${S.repDel === r.week ? "Delete?" : "✕"}</button></li>`).join("")}</ul>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-repm],[data-repopen],[data-repdel],#wk-save,[data-wkmode]"); if (!t) return;
+  const d = t.dataset;
+  if (d.repm !== undefined) { S.repMonth = d.repm || null; renderSavedReports(); }
+  else if (d.repopen) { S.wkOff = offOf(d.repopen); S.wkMode = "saved"; renderReport(); $("#wk-doc").scrollIntoView({ block: "start", behavior: "smooth" }); }
+  else if (d.repdel) { if (S.repDel !== d.repdel) { S.repDel = d.repdel; renderSavedReports(); } else { const k = d.repdel; S.reports[k] = { week: k, deleted: true, savedAt: nowISO() }; if (db) write("reports/" + k, () => db.doc("reports/" + k).set(S.reports[k])); S.repDel = null; S.wkMode = "live"; renderReport(); toast("Saved report deleted"); } }
+  else if (t.id === "wk-save") { const r = saveReport(S.wkOff, false); r.note = $("#wk-note") ? $("#wk-note").value : r.note; if (db) write("reports/" + r.week, () => db.doc("reports/" + r.week).set(r)); S.wkMode = "saved"; S.repMonth = r.week.slice(0, 7); renderReport(); toast("Weekly report saved"); }
+  else if (d.wkmode) { S.wkMode = d.wkmode; renderReport(); }
+});
+document.addEventListener("change", e => { if (e.target.id !== "wk-note") return; const m = wkMonday(S.wkOff), r = repGet(m); if (!r) return; r.note = e.target.value; if (db) write("reports/" + m, () => db.doc("reports/" + m).set(r)); toast("Notes saved"); });
+
 function renderReport(){
-  const W = weekData(S.wkOff);
+  autoSaveReports();
+  const W = weekData(S.wkOff), saved = repGet(W.a), R = repView();
   $("#wk-label").textContent = (S.wkOff === 0 ? "This week · " : S.wkOff === -1 ? "Last week · " : "") + longRange(W.a, W.b);
   $("#wk-next").disabled = S.wkOff >= 0;
-  $("#wk-doc").innerHTML = reportHTML(false);
+  $("#wk-state").innerHTML = saved ? `<span class="wk-badge">${SVG(ICON.star)}Saved ${esc(fmtDate(isoDay(saved.savedAt)))} ${fmtTime(saved.savedAt)}${saved.auto ? " (auto)" : ""}</span><div class="seg"><button type="button" data-wkmode="saved" aria-pressed="${!!R}">Saved copy</button><button type="button" data-wkmode="live" aria-pressed="${!R}">Live</button></div>` : `<span class="small muted">Not saved yet</span>`;
+  $("#wk-save").textContent = saved ? (R ? "Update with latest" : "Save over saved copy") : "Save report";
+  $("#wk-notewrap").hidden = !saved;
+  if (saved && document.activeElement !== $("#wk-note")) $("#wk-note").value = saved.note || "";
+  $("#wk-doc").innerHTML = R ? repHTMLFrom(R, false) : reportHTML(false);
+  renderSavedReports();
 }
 document.addEventListener("click", async e => {
-  const w = e.target.closest("[data-wk]"); if (w) { S.wkOff += +w.dataset.wk; renderReport(); return; }
-  if (e.target.closest("#wk-copy")) { const t = reportText(); try { await navigator.clipboard.writeText(t); toast("Weekly report copied"); } catch { toast("Couldn't copy. Use Download instead."); } return; }
-  if (e.target.closest("#wk-word")) { const W = weekData(S.wkOff); const blob = new Blob(["﻿", reportHTML(true)], { type: "application/msword" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Weekly-report-${W.a}.doc`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000); toast("Word file downloaded"); return; }
+  const w = e.target.closest("[data-wk]"); if (w) { S.wkOff += +w.dataset.wk; S.wkMode = repGet(wkMonday(S.wkOff)) && S.wkOff < 0 ? "saved" : "live"; renderReport(); return; }
+  if (e.target.closest("#wk-copy")) { const t = repView() ? repTextFrom(repView()) : reportText(); try { await navigator.clipboard.writeText(t); toast("Weekly report copied"); } catch { toast("Couldn't copy. Use Download instead."); } return; }
+  if (e.target.closest("#wk-word")) { const W = weekData(S.wkOff); const blob = new Blob(["﻿", repView() ? repHTMLFrom(repView(), true) : reportHTML(true)], { type: "application/msword" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Weekly-report-${W.a}.doc`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000); toast("Word file downloaded"); return; }
   if (e.target.closest("#wk-print")) { document.body.classList.add("printing-report"); setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove("printing-report"), 500); }, 50); }
 });
 
@@ -2817,6 +2868,7 @@ function startData(){
   db.collection("health").orderBy("date", "desc").limit(400).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.health = o; render(); }, fail);
   db.collection("subjects").onSnapshot(s => { S.subjects = s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")); render(); }, fail);
   db.collection("classes").onSnapshot(s => { S.classes = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
+  db.collection("reports").onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.reports = o; S.repLoaded = true; render(); }, fail);
   db.collection("snotes").onSnapshot(s => { S.snotes = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("assignments").onSnapshot(s => { S.asg = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("shop").onSnapshot(s => { S.shop = s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")); render(); }, fail);
@@ -2843,7 +2895,7 @@ $("#uname").addEventListener("change", () => { S.name = $("#uname").value.trim()
 $("#bk-export").onclick = () => {
   const data = { app: "daybook", exportedAt: nowISO(), settings: { categories: S.cats },
     tasks: S.tasks, todos: S.todos, routine: S.routine, refl: S.refl, day: S.day,
-    courses: S.courses, time: S.time, health: S.health, body: S.body, conditions: S.conds, shop: S.shop, expenses: S.exp, subjects: S.subjects, classes: S.classes, assignments: S.asg, snotes: S.snotes };
+    courses: S.courses, time: S.time, health: S.health, body: S.body, conditions: S.conds, shop: S.shop, expenses: S.exp, subjects: S.subjects, classes: S.classes, assignments: S.asg, snotes: S.snotes, reports: S.reports };
   const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
   const a = document.createElement("a"); a.href = url; a.download = "daybook-backup-" + todayKey() + ".json"; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000); toast("Backup downloaded");
@@ -2862,6 +2914,7 @@ $("#bk-import").onchange = async e => {
     (d.time || []).forEach(t => ops.push(["time/" + t.id, strip(t)]));
     (d.body || []).forEach(t => ops.push(["body/" + t.id, strip(t)]));
     (d.snotes || []).forEach(t => ops.push(["snotes/" + t.id, strip(t)]));
+    Object.entries(d.reports || {}).forEach(([k, v]) => ops.push(["reports/" + k, v]));
     (d.subjects || []).forEach(t => ops.push(["subjects/" + t.id, strip(t)]));
     (d.classes || []).forEach(t => ops.push(["classes/" + t.id, strip(t)]));
     (d.assignments || []).forEach(t => ops.push(["assignments/" + t.id, strip(t)]));

@@ -1365,6 +1365,17 @@ label.f:has(.dhint){margin-bottom:18px}
 
 .arc-areas,.x-area{display:flex;flex-wrap:wrap;margin-bottom:10px}
 .arc-areas button,.x-area button{flex:1 1 auto}
+
+/* ===== saved weekly reports ===== */
+.wk-saverow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.wk-state{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.wk-badge{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;font-weight:600;color:var(--ok,var(--accent))}
+.wk-badge svg{width:14px;height:14px}
+.rep-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.rep-list li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding-right:6px}
+.rep-open{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;text-align:left;font:inherit;color:inherit;border:0;background:none;padding:10px 12px;cursor:pointer}
+.rep-open > span:last-child{display:grid;gap:2px}
+.rep-open:hover b{color:var(--accent)}
 </style>
 </head>
 <body class="locked">
@@ -1749,7 +1760,13 @@ label.f:has(.dhint){margin-bottom:18px}
       <div class="wk-head"><div><h2>Weekly report</h2><p class="small muted" style="margin:0">For your supervisor or internship logbook. Built from your tasks, time and reflections.</p></div>
         <div class="wk-nav"><button class="btn sm" type="button" data-wk="-1" aria-label="Previous week">‹</button><span id="wk-label" class="small"></span><button class="btn sm" type="button" data-wk="1" id="wk-next" aria-label="Next week">›</button></div></div>
       <div class="wk-actions"><button class="btn sm" type="button" id="wk-copy">Copy text</button><button class="btn sm" type="button" id="wk-word">Download Word</button><button class="btn sm" type="button" id="wk-print">Print / Save PDF</button></div>
+      <div class="wk-saverow"><div id="wk-state" class="wk-state"></div><button class="btn sm primary" type="button" id="wk-save">Save report</button></div>
+      <label class="f" id="wk-notewrap" hidden>Notes for this week <span class="muted" style="font-weight:400">· supervisor feedback, things to raise, plans. Saved with the report.</span><textarea id="wk-note" rows="2" placeholder="e.g. Supervisor happy with scrap report; next: automate in Power Query"></textarea></label>
       <article id="wk-doc" class="wk-doc"></article>
+    </div>
+    <div data-part="weekly" data-wide>
+      <div class="sechead"><h2>Saved weekly reports</h2><span class="meta">Filed by year, month and week</span></div>
+      <div class="panel arc" id="wk-saved"></div>
     </div>
   </section>
 
@@ -1851,6 +1868,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=48"></script>
+<script type="module" src="app.js?v=49"></script>
 </body>
 </html>
