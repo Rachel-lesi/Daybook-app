@@ -946,7 +946,7 @@ function renderCourses(){
       <div class="co-skills"><span class="small muted">Skills:</span>${S.cskEdit === c.id ? `${S.cats.map((k, i) => `<button type="button" class="qc ci-${i % 6}" data-csk="${esc(k.tag)}" aria-pressed="${(c.skills || []).includes(k.tag)}">${esc(k.name.split(/\s*\/\s*/)[0])}</button>`).join("")}<span class="qc-new"><input data-csknew placeholder="New skill" aria-label="New skill"><button type="button" class="qc" data-csknewadd>Add</button></span><button type="button" class="btn sm" data-cskdone>Done</button>`
         : `${(c.skills || []).map(t => catTag(t)).join("")}<button type="button" class="linkbtn small" data-cskedit>${(c.skills || []).length ? "Edit" : "+ Link skills"}</button>`}</div>
       <details class="co-mods" data-cid="${esc(c.id)}" ${(S.modOpen[c.id] ?? st.mods.length <= 12) ? "open" : ""}><summary class="small">Modules</summary>
-        ${st.mods.length ? `<ul class="subs">${st.mods.map((m, i) => `<li class="${m.done ? "done" : ""}"><input type="checkbox" data-cmod="${i}" ${m.done ? "checked" : ""} aria-label="Module done: ${esc(m.title)}"><span>${esc(m.title)}</span><button type="button" class="x" data-cmoddel="${i}" aria-label="Remove module">✕</button></li>`).join("")}</ul>` : `<p class="small muted">No modules yet. Paste them below, one per line.</p>`}
+        ${st.mods.length ? `<ul class="subs">${st.mods.map((m, i) => `<li class="${m.done ? "done" : ""}"><input type="checkbox" data-cmod="${i}" ${m.done ? "checked" : ""} aria-label="Module done: ${esc(m.title)}"><span class="grow">${esc(m.title)}${(() => { const mm = S.time.filter(x => x.type === "course" && x.ref === c.id && x.mod === m.id).reduce((a, x) => a + (+x.mins || 0), 0); return mm ? ` <span class="small muted">· ${fmtMins(mm)}</span>` : ""; })()}</span><button type="button" class="x tl-ed" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(m.id)}" aria-label="Log time for ${esc(m.title)}" title="Log time for this module">${SVG(ICON.timer)}</button><button type="button" class="x" data-cmoddel="${i}" aria-label="Remove module">✕</button></li>`).join("")}</ul>` : `<p class="small muted">No modules yet. Paste them below, one per line.</p>`}
         <textarea class="inp" data-cmodnew rows="2" placeholder="Paste module names, one per line"></textarea>
         <div class="co-foot"><button class="btn sm" type="button" data-cmodadd>Add modules</button><label class="small muted">Target date <input type="date" data-ctarget value="${esc(c.target || "")}"></label><button class="btn sm ghost danger" type="button" data-cdel>${courseDel === c.id ? "Tap again to delete" : "Delete course"}</button></div>
       </details></div>`; }).join("")
@@ -2422,26 +2422,35 @@ document.addEventListener("change", e => { if (e.target.dataset && e.target.data
 
 // ---------- log time by hand (forgot the timer, or studied longer)
 S.logT = null; S.logMins = 30;
-function openLog(type, ref, label){
-  S.logT = { type, ref, label }; S.logMins = S.logMins || 30;
+function openLog(type, ref, label, mod){
+  S.logT = { type, ref, label }; S.logMins = S.logMins || 30; S.logMod = mod || ""; S.logModDone = false;
   const d = $("#logdlg"), tk = todayKey();
   $("#lg-title").textContent = label || "Log time";
   $("#lg-chips").innerHTML = [15, 30, 45, 60, 90, 120].map(m => `<button type="button" class="qc" data-lgm="${m}" aria-pressed="${S.logMins === m}">${fmtMins(m)}</button>`).join("");
   $("#lg-custom").value = [15, 30, 45, 60, 90, 120].includes(S.logMins) ? "" : S.logMins;
   $("#lg-date").value = tk; $("#lg-end").value = nowHMs(); S.logEdit = null; $("#lg-save").textContent = "Log"; $("#lg-head").textContent = "Log time for";
-  S.lgUndo = null; renderLogList(); if (!d.open) d.showModal();
+  renderLogMods(); S.lgUndo = null; renderLogList(); if (!d.open) d.showModal();
 }
+function renderLogMods(){
+  const box = $("#lg-mods"); if (!box) return; const c = S.logT && S.logT.type === "course" ? S.courses.find(x => x.id === S.logT.ref) : null, mods = c ? c.modules || [] : [];
+  box.hidden = !mods.length; if (!mods.length) { box.innerHTML = ""; return; }
+  const cur = mods.find(m => m.id === S.logMod);
+  box.innerHTML = `<span class="small muted" style="font-weight:600">Module <span style="font-weight:400">(optional)</span></span><div class="qa-chips cwrap">${mods.map(m => `<button type="button" class="qc ${m.done ? "is-done" : ""}" data-lgmod="${esc(m.id)}" aria-pressed="${S.logMod === m.id}">${m.done ? "✓ " : ""}${esc(m.title)}</button>`).join("")}</div>
+    ${cur && !cur.done ? `<label class="small lg-mdone"><input type="checkbox" id="lg-mdone" ${S.logModDone ? "checked" : ""}> I finished this module</label>` : ""}`;
+}
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-lgmod]"); if (!b) return; S.logMod = S.logMod === b.dataset.lgmod ? "" : b.dataset.lgmod; renderLogMods(); });
+document.addEventListener("change", e => { if (e.target.id === "lg-mdone") S.logModDone = e.target.checked; });
 const logRef = x => S.logT && x.type === S.logT.type && x.ref === S.logT.ref;
 function renderLogList(){
   const box = $("#lg-list"); if (!box || !S.logT) return;
   const L = S.time.filter(logRef).sort((a, b) => (b.start || "").localeCompare(a.start || "")), tot = L.reduce((a, x) => a + (+x.mins || 0), 0);
-  box.innerHTML = (S.lgUndo ? `<div class="lg-undo small">Removed ${fmtMins(+S.lgUndo.rec.mins || 0)} on ${esc(fmtDate(S.lgUndo.rec.date))} <button type="button" class="linkbtn" data-lgundo>Undo</button></div>` : "") + (L.length ? `<div class="small muted" style="font-weight:600">Logged so far · ${fmtMins(tot)}</div><ul class="lg-list">${L.slice(0, 30).map(x => `<li class="${S.logEdit === x.id ? "is-edit" : ""}"><span class="od-d">${esc(fmtDate(x.date))}</span><span><b>${fmtMins(+x.mins || 0)}</b> <span class="small muted">${x.via === "manual" ? "logged by hand" : x.via === "focus" ? "focus timer" : "timer"}${x.end ? " · ended " + esc(fmt12(hm(minsOfISO(x.end)))) : ""}</span></span><span class="lg-acts"><button type="button" class="x tl-ed" data-lgedit="${esc(x.id)}" aria-label="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-lgdel="${esc(x.id)}" aria-label="Delete">✕</button></span></li>`).join("")}</ul>${L.length > 30 ? `<p class="small muted" style="margin:0">Showing the latest 30.</p>` : ""}` : "");
+  box.innerHTML = (S.lgUndo ? `<div class="lg-undo small">Removed ${fmtMins(+S.lgUndo.rec.mins || 0)} on ${esc(fmtDate(S.lgUndo.rec.date))} <button type="button" class="linkbtn" data-lgundo>Undo</button></div>` : "") + (L.length ? `<div class="small muted" style="font-weight:600">Logged so far · ${fmtMins(tot)}</div><ul class="lg-list">${L.slice(0, 30).map(x => `<li class="${S.logEdit === x.id ? "is-edit" : ""}"><span class="od-d">${esc(fmtDate(x.date))}</span><span><b>${fmtMins(+x.mins || 0)}</b>${x.mod ? (() => { const c = S.courses.find(y => y.id === x.ref), m = c && (c.modules || []).find(y => y.id === x.mod); return m ? ` <span class="small">· ${esc(m.title)}</span>` : ""; })() : ""} <span class="small muted">${x.via === "manual" ? "logged by hand" : x.via === "focus" ? "focus timer" : "timer"}${x.end ? " · ended " + esc(fmt12(hm(minsOfISO(x.end)))) : ""}</span></span><span class="lg-acts"><button type="button" class="x tl-ed" data-lgedit="${esc(x.id)}" aria-label="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-lgdel="${esc(x.id)}" aria-label="Delete">✕</button></span></li>`).join("")}</ul>${L.length > 30 ? `<p class="small muted" style="margin:0">Showing the latest 30.</p>` : ""}` : "");
 }
 function saveTimeRec(id, rec){ const i = S.time.findIndex(x => x.id === id); if (i >= 0) S.time[i] = { ...rec, id }; else S.time.unshift({ ...rec, id }); if (db) write("time/" + id, () => db.doc("time/" + id).set(rec)); render(); }
 function delTimeRec(id){ S.time = S.time.filter(x => x.id !== id); if (db) write("time/" + id, () => db.doc("time/" + id).delete()); render(); }
 document.addEventListener("click", e => {
   const ed = e.target.closest && e.target.closest("[data-lgedit]"), dl = e.target.closest && e.target.closest("[data-lgdel]");
-  if (ed) { const x = S.time.find(y => y.id === ed.dataset.lgedit); if (!x) return; S.logEdit = x.id; S.logMins = +x.mins || 0;
+  if (ed) { const x = S.time.find(y => y.id === ed.dataset.lgedit); if (!x) return; S.logEdit = x.id; S.logMins = +x.mins || 0; S.logMod = x.mod || ""; S.logModDone = false; renderLogMods();
     $("#lg-chips").querySelectorAll("[data-lgm]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.lgm === S.logMins)); $("#lg-custom").value = [15, 30, 45, 60, 90, 120].includes(S.logMins) ? "" : S.logMins;
     $("#lg-date").value = x.date; $("#lg-end").value = x.end ? hm(minsOfISO(x.end)) : "20:00"; $("#lg-save").textContent = "Save changes"; $("#lg-head").textContent = "Editing a session of"; renderLogList(); return; }
   if (dl) { const x = S.time.find(y => y.id === dl.dataset.lgdel); if (!x) return; const { id, ...rec } = x; delTimeRec(id); if (S.logEdit === id) { S.logEdit = null; $("#lg-save").textContent = "Log"; } S.lgUndo = { id, rec }; renderLogList(); }
@@ -2450,14 +2459,15 @@ document.addEventListener("click", e => {
 function logTime({ type, ref, label }, mins, date, end){
   mins = Math.round(+mins); if (!(mins > 0)) return false;
   const endD = new Date(`${date}T${end || "20:00"}:00`), startD = new Date(endD.getTime() - mins * 60000);
-  const id = "m" + Date.now().toString(36), rec = { start: startD.toISOString(), end: endD.toISOString(), mins, date, type, ref: ref || "", label: label || "", via: "manual" };
+  const id = "m" + Date.now().toString(36), rec = { start: startD.toISOString(), end: endD.toISOString(), mins, date, type, ref: ref || "", label: label || "", via: "manual", ...(S.logMod && type === "course" ? { mod: S.logMod } : {}) };
+  if (S.logMod && S.logModDone && type === "course") { const c = S.courses.find(x => x.id === ref); if (c) { const mods = (c.modules || []).map(m => m.id === S.logMod ? { ...m, done: true, doneAt: endD.toISOString() } : m); saveCourse({ ...c, modules: mods }); } }
   if (!S.time.some(x => x.id === id)) S.time.unshift({ ...rec, id });
   if (db) write("time/" + id, () => db.doc("time/" + id).set(rec));
   if (type === "task") { const t = S.tasks.find(x => x.id === ref); if (t) put("tasks", t.id, { ...strip(t), log: [...(t.log || []), { at: nowISO(), note: `Logged ${fmtMins(mins)} by hand` }].slice(-200), updatedAt: nowISO() }); }
   render(); if (type === "task" && $("#dlg").open && editing && editing.id === ref) { readTaskForm(); editing.log = [...(editing.log || []), { at: nowISO(), note: `Logged ${fmtMins(mins)} by hand` }]; redrawKeep(); } return true;
 }
 document.addEventListener("click", e => {
-  const o = e.target.closest && e.target.closest("[data-logtime]"); if (o) { e.preventDefault(); e.stopPropagation(); const [type, ref, ...l] = o.dataset.logtime.split("|"); openLog(type, ref, l.join("|")); return; }
+  const o = e.target.closest && e.target.closest("[data-logtime]"); if (o) { e.preventDefault(); e.stopPropagation(); const [type, ref, ...l] = o.dataset.logtime.split("|"); openLog(type, ref, l.join("|"), o.dataset.logmod || ""); return; }
   const m = e.target.closest && e.target.closest("[data-lgm]"); if (m) { S.logMins = +m.dataset.lgm; $("#lg-custom").value = ""; m.parentElement.querySelectorAll("[data-lgm]").forEach(b => b.setAttribute("aria-pressed", b === m)); }
 }, true);
 document.addEventListener("input", e => { if (e.target.id === "lg-custom") { const v = +e.target.value; if (v > 0) { S.logMins = v; $("#lg-chips").querySelectorAll("[data-lgm]").forEach(b => b.setAttribute("aria-pressed", "false")); } } });
@@ -2466,7 +2476,7 @@ document.addEventListener("submit", e => {
   const mins = +$("#lg-custom").value || S.logMins, date = $("#lg-date").value || todayKey();
   if (!(mins > 0) || mins > 24 * 60) { toast("Enter the minutes you spent"); return; }
   if (S.logEdit) { const x = S.time.find(y => y.id === S.logEdit); if (x) { const endD = new Date(`${date}T${$("#lg-end").value || "20:00"}:00`), startD = new Date(endD.getTime() - mins * 60000); const { id, ...rec } = x;
-      saveTimeRec(id, { ...rec, mins: Math.round(mins), date, start: startD.toISOString(), end: endD.toISOString() }); }
+      const nr = { ...rec, mins: Math.round(mins), date, start: startD.toISOString(), end: endD.toISOString() }; if (rec.type === "course") { if (S.logMod) nr.mod = S.logMod; else delete nr.mod; } saveTimeRec(id, nr); }
     S.logEdit = null; S.logMins = 30; $("#lg-custom").value = ""; $("#lg-chips").querySelectorAll("[data-lgm]").forEach(b => b.setAttribute("aria-pressed", b.dataset.lgm === "30")); $("#lg-date").value = todayKey(); $("#lg-end").value = nowHMs();
     $("#lg-save").textContent = "Log"; $("#lg-head").textContent = "Log time for"; renderLogList(); toast("Session updated"); return; }
   if (logTime(S.logT, mins, date, $("#lg-end").value)) { $("#logdlg").close(); toast(`Logged ${fmtMins(mins)}${date !== todayKey() ? " on " + fmtDate(date) : ""}`); }
