@@ -262,6 +262,7 @@ function renderQA(){
   if (E.study) {
     const subs = typeof curSubjects === "function" ? curSubjects() : [];
     h += `<div class="qa-row"><span class="qa-lbl">Subject</span><div class="qa-chips">${subs.length ? subs.map(s => ch("data-qa-subj", s.id, esc(s.code || s.name), S.qa.subj === s.id, "ci-" + ((+s.color || 0) % 6))).join("") : `<a class="qc ghost" href="#study-timetable">Add subjects first</a>`}</div></div>`;
+    if (S.qa.subj && S.qa.skind === "todo") { const al = S.asg.filter(a => a.subj === S.qa.subj && !a.parent && !["submitted", "graded"].includes(a.status)); if (al.length) h += `<div class="qa-row"><span class="qa-lbl">For</span><div class="qa-chips">${al.map(a => ch("data-qa-asg", a.id, esc(a.title), S.qa.asg === a.id)).join("")}</div></div>`; }
     h += `<div class="qa-row"><span class="qa-lbl">Kind</span><div class="qa-chips">${QA_SKIND.map(([v, l]) => ch("data-qa-skind", v, l, S.qa.skind === v)).join("")}</div></div>`;
   }
   if (E.work) {
@@ -286,7 +287,8 @@ $("#qa").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.dataset.qaType) { if (b.dataset.qaType !== "work") stripTokens(/^[#!]\S+/); S.mode = b.dataset.qaType; S.autoWork = false; if (S.mode !== "work" && !S.qa.due) S.qa.due = todayKey(); if (S.mode === "self" && !S.qa.cat) { const c = S.courses[0]; if (c && (c.skills || [])[0]) S.qa.cat = c.skills[0]; } }
   else if (b.dataset.qaCourse) { S.qa.course = S.qa.course === b.dataset.qaCourse ? "" : b.dataset.qaCourse; const c = S.courses.find(x => x.id === S.qa.course); if (c && !S.qa.cat && (c.skills || [])[0]) S.qa.cat = c.skills[0]; }
-  else if (b.dataset.qaSubj) { S.qa.subj = S.qa.subj === b.dataset.qaSubj ? "" : b.dataset.qaSubj; }
+  else if (b.dataset.qaSubj) { S.qa.subj = S.qa.subj === b.dataset.qaSubj ? "" : b.dataset.qaSubj; S.qa.asg = ""; }
+  else if (b.dataset.qaAsg) { S.qa.asg = S.qa.asg === b.dataset.qaAsg ? "" : b.dataset.qaAsg; }
   else if (b.dataset.qaSkind) { const was = S.qa.skind; S.qa.skind = b.dataset.qaSkind; if (was === "todo" && S.qa.skind !== "todo" && S.qa.due === todayKey()) S.qa.due = addDays(todayKey(), 7); if (S.qa.skind === "todo" && !S.qa.due) S.qa.due = todayKey(); }
   else if (b.dataset.qaCat !== undefined) { stripTokens(/^#\S+/); S.qa.cat = S.qa.cat === b.dataset.qaCat ? "" : b.dataset.qaCat; }
   else if (b.dataset.qaUrg) { stripTokens(/^!\S+/); S.qa.urg = b.dataset.qaUrg; }
@@ -322,7 +324,7 @@ $("#quick").addEventListener("submit", e => {
     toast(`Self-study added${cat ? " · " + catName(cat).split(/\s*\/\s*/)[0] : ""}${E.due && E.due !== todayKey() ? " for " + fmtDate(E.due) : ""}`);
   } else if (E.study) {
     const sj = S.qa.subj, kind = S.qa.skind;
-    if (kind === "todo") { put("todos", newId(), { title: p.title, date: E.due || todayKey(), done: false, doneAt: "", createdAt: nowISO(), kind: "study", subj: sj || "" }); toast(`Study to-do added${sj ? " · " + subjLabel(sj) : ""}${E.due && E.due !== todayKey() ? " for " + fmtDate(E.due) : ""}`); }
+    if (kind === "todo") { put("todos", newId(), { title: p.title, date: E.due || todayKey(), done: false, doneAt: "", createdAt: nowISO(), kind: "study", subj: sj || "", asg: S.qa.asg || "" }); S.qa.asg = ""; toast(`Study to-do added${sj ? " · " + subjLabel(sj) : ""}${E.due && E.due !== todayKey() ? " for " + fmtDate(E.due) : ""}`); }
     else { if (!sj) { toast("Pick a subject first"); return; }
       put("assignments", newId(), { subj: sj, title: p.title, type: kind, due: E.due || "", time: E.due ? "23:59" : "", weight: "", status: "todo", mark: "", notes: "", link: "", createdAt: nowISO(), doneAt: "" });
       toast(`${(QA_SKIND.find(x => x[0] === kind) || ["", "Item"])[1]} added · ${subjLabel(sj)}${E.due ? " · due " + fmtDate(E.due) : ""}`); }
@@ -553,13 +555,13 @@ function renderToday(){
   const later=mine.filter(t=>!t.done && t.date>tk).sort((a,b)=>a.date.localeCompare(b.date));
   $("#todo-meta").textContent = later.length?`${later.length} scheduled later`:"";
   const row = t => `<li class="${t.done?"done":""}"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done?"checked":""} aria-label="Done: ${esc(t.title)}">
-    <span class="grow"><span>${t.kind==="study"&&t.subj?`<span class="tag ${subjCls(t.subj)}">${esc(subjLabel(t.subj))}</span> `:""}${t.kind==="self"&&t.cat?catTag(t.cat)+" ":""}${esc(t.title)}</span>${t.date&&t.date!==tk?`<div class="sub ${t.date<tk&&!t.done?"overdue":""}">${t.date<tk?"From ":""}${esc(fmtDate(t.date))}</div>`:""}</span>
+    <span class="grow"><span>${t.kind==="study"&&t.subj?`<span class="tag ${subjCls(t.subj)}">${esc(subjLabel(t.subj))}</span> `:""}${t.kind==="study"&&t.asg&&S.asg.find(a=>a.id===t.asg)?`<span class="muted">${esc(S.asg.find(a=>a.id===t.asg).title)} › </span>`:""}${t.kind==="self"&&t.cat?catTag(t.cat)+" ":""}${esc(t.title)}</span>${t.date&&t.date!==tk?`<div class="sub ${t.date<tk&&!t.done?"overdue":""}">${t.date<tk?"From ":""}${esc(fmtDate(t.date))}</div>`:""}</span>
     <button class="x tl-ed" type="button" data-todoedit="${esc(t.id)}" aria-label="Edit ${esc(t.title)}" title="Edit">${SVG(ICON.edit)}</button><button class="x" type="button" data-deltodo="${esc(t.id)}" aria-label="Delete">✕</button></li>`;
   $("#todos").innerHTML = (open.length||later.length) ? open.map(row).join("") + (later.length?`<li class="sub" style="background:var(--sunk)">Later</li>`+later.map(row).join(""):"")
     : `<li class="empty">${S.ready?"Nothing to do. Add one in the box above.":"Loading…"}</li>`;
-  { const sh = studyTodayHtml(), st = S.todos.filter(t=>t.kind==="study"&&!t.done).sort((a,b)=>(a.date||"").localeCompare(b.date||"")), now = st.filter(t=>!t.date||t.date<=addDays(tk,1)), lat = st.length - now.length;
-    $("#today-study-wrap").hidden = !sh && !st.length && !S.subjects.length;
-    $("#today-study").innerHTML = (sh || "") + (now.length ? `<div class="small muted" style="margin-top:6px">Study to-dos</div><ul class="rows st-todos">${now.map(row).join("")}</ul>` : "") + (lat ? `<p class="small muted" style="margin:4px 0 0">${lat} more study to-do${lat===1?"":"s"} later this week or after · <a href="#study-assignments">see all</a></p>` : "") + (!sh && !st.length ? `<p class="small muted" style="margin:0">Nothing for study today. Add one with the box above: choose <b>Study</b>.</p>` : ""); }
+  { const sh = studyTodayHtml(), wk = studyWorkItems(), st = S.todos.filter(t=>t.kind==="study"&&!t.done).sort((a,b)=>(a.date||"").localeCompare(b.date||"")), now = st.filter(t=>!t.date||t.date<=addDays(tk,1)), lat = st.length - now.length;
+    $("#today-study-wrap").hidden = !sh && !st.length && !wk.length && !S.subjects.length;
+    $("#today-study").innerHTML = (sh || "") + (now.length || wk.length ? `<div class="small muted" style="margin-top:6px">Study to-dos</div><ul class="rows st-todos">${wk.map(asgTodoRow).join("")}${now.map(row).join("")}</ul>` : "") + (lat ? `<p class="small muted" style="margin:4px 0 0">${lat} more study to-do${lat===1?"":"s"} later this week or after · <a href="#study-assignments">see all</a></p>` : "") + (!sh && !st.length && !wk.length ? `<p class="small muted" style="margin:0">Nothing for study today. Add one with the box above: choose <b>Study</b>.</p>` : ""); }
   { const st = S.todos.filter(t=>t.kind==="self"&&!t.done).sort((a,b)=>(a.date||"").localeCompare(b.date||"")), now = st.filter(t=>!t.date||t.date<=addDays(tk,1)), lat = st.length-now.length, cs = S.courses.filter(c=>courseStats(c).pct<100);
     $("#today-self-wrap").hidden = !st.length && !S.courses.length;
     $("#today-self").innerHTML = (now.length ? `<ul class="rows st-todos">${now.map(row).join("")}</ul>` : `<p class="small muted" style="margin:0">${st.length ? "" : "Nothing planned. Add one with the box above: choose <b>Self-study / skills</b>."}</p>`) + (lat ? `<p class="small muted" style="margin:4px 0 0">${lat} more planned later</p>` : "")
@@ -568,7 +570,8 @@ function renderToday(){
   $("#focus").innerHTML = focus.length?focus.map(taskCard).join(""):`<div class="panel empty">${S.ready?"No open work tasks. Switch the box above to Work to add one.":"Loading…"}</div>`;
   const doneT=S.todos.filter(t=>t.done&&isoDay(t.doneAt)===tk).map(t=>({l:t.title,s:t.kind==="study"?"Study"+(t.subj?" · "+subjLabel(t.subj):""):t.kind==="self"?"Self-study"+(t.cat?" · "+catName(t.cat).split(/\s*\/\s*/)[0]:""):"To-do",at:t.doneAt}));
   const doneW=S.tasks.filter(t=>t.status==="done"&&isoDay(t.doneAt)===tk).map(t=>({l:t.title,s:catName(t.category),at:t.doneAt}));
-  const all=[...doneW,...doneT].sort((a,b)=>b.at.localeCompare(a.at));
+  const doneA=S.asg.filter(a=>["submitted","graded"].includes(a.status)&&isoDay(a.doneAt)===tk).map(a=>({l:a.title,s:"Submitted · "+subjLabel(a.subj),at:a.doneAt}));
+  const all=[...doneW,...doneT,...doneA].sort((a,b)=>b.at.localeCompare(a.at));
   $("#done-meta").textContent = all.length?`${all.length} completed`:"";
   $("#donetoday").innerHTML = all.length?all.map(x=>`<li><span class="grow"><span>${esc(x.l)}</span><div class="sub">${esc(x.s)} · ${fmtTime(x.at)}</div></span></li>`).join(""):`<li class="empty">Completed to-dos and work tasks show up here.</li>`;
 }
@@ -1782,11 +1785,11 @@ function renderStudy(){
       <div class="qa-chips cwrap">${ASG_TYPES.map(([v, l]) => `<button type="button" class="qc" data-asg-type="${v}" aria-pressed="${S.asgType === v}">${l}</button>`).join("")}</div>
       <div class="asg-row2"><label class="f">Due date<input type="date" id="as-due" data-dhint value="${addDays(tk, 7)}"><span class="dhint"></span></label><label class="f">Time<input type="time" id="as-time" value="23:59"></label><label class="f">Weight %<input type="number" id="as-weight" min="0" max="100" placeholder="e.g. 20"></label><button class="btn primary" type="submit">Add</button></div></form>`
       : `<p class="small muted" style="margin:0">Add your subjects in Timetable first, then track assignments here.</p>`}
-    ${(() => { const st = S.todos.filter(t => t.kind === "study" && (!t.done || isoDay(t.doneAt) === tk)).filter(t => !S.asgSubj || t.subj === S.asgSubj).sort((a, b) => (a.done - b.done) || (a.date || "").localeCompare(b.date || ""));
+    ${(() => { const st = S.todos.filter(t => t.kind === "study" && !(t.asg && S.asg.some(a => a.id === t.asg)) && (!t.done || isoDay(t.doneAt) === tk)).filter(t => !S.asgSubj || t.subj === S.asgSubj).sort((a, b) => (a.done - b.done) || (a.date || "").localeCompare(b.date || ""));
       return st.length ? `<details class="st-todo-box" open><summary class="small"><b>Study to-dos</b> <span class="muted">(${st.filter(t => !t.done).length})</span></summary><ul class="rows">${st.map(t => `<li class="${t.done ? "done" : ""}"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="Done: ${esc(t.title)}"><span class="grow"><span>${t.subj ? `<span class="tag ${subjCls(t.subj)}">${esc(subjLabel(t.subj))}</span> ` : ""}${esc(t.title)}</span>${t.date ? `<div class="sub ${t.date < tk && !t.done ? "overdue" : ""}">${esc(fmtDate(t.date))}</div>` : ""}</span><button class="x tl-ed" type="button" data-todoedit="${esc(t.id)}" aria-label="Edit">${SVG(ICON.edit)}</button><button class="x" type="button" data-deltodo="${esc(t.id)}" aria-label="Delete">✕</button></li>`).join("")}</ul></details>` : ""; })()}
     <div class="asg-filter"><div class="seg">${[["todo", `To do (${openN})`], ["done", "Submitted & graded"], ["all", "All"]].map(([v, l]) => `<button type="button" data-asg-f="${v}" aria-pressed="${S.asgFilter === v}">${l}</button>`).join("")}</div>
       ${S.subjects.length > 1 ? `<div class="qa-chips cwrap"><button type="button" class="qc" data-asg-s="" aria-pressed="${!S.asgSubj}">All subjects</button>${S.subjects.map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-asg-s="${esc(s.id)}" aria-pressed="${S.asgSubj === s.id}">${esc(s.code || s.name)}</button>`).join("")}</div>` : ""}</div>
-    ${list.length ? `<div class="asg-list">${asgGroups(list).map(g => g.kids.length ? `<div class="asg-group">${asgItem(g.a, g.kids)}<div class="asg-kids">${g.kids.map(k => asgItem(k)).join("")}</div></div>` : asgItem(g.a)).join("")}</div>`
+    ${list.length ? `<div class="asg-list">${asgGroups(list).map(g => { const td = asgTodos(g.a.id); return g.kids.length || td.length ? `<div class="asg-group">${asgItem(g.a, g.kids)}<div class="asg-kids">${g.kids.map(k => asgItem(k)).join("")}${td.length ? `<ul class="rows asg-todos">${td.map(asgTodoLi).join("")}</ul>` : ""}</div></div>` : asgItem(g.a); }).join("")}</div>`
       : `<div class="empty">${S.asgFilter === "todo" ? "Nothing due. Nice!" : "No assignments here yet."}</div>`}`;
   renderNotes(); renderPortfolio(); renderStudyCal(); dateHints();
   // ----- grades
@@ -1813,14 +1816,26 @@ function renderStudy(){
     : `<p class="small muted" style="margin:0">Add subjects in Timetable to work out your GPA.</p>`;
 }
 // Today card: classes today + assignments due soon
+// assignments you're working on now (In progress, or due today/tomorrow) appear as study to-dos on Today
+function studyWorkItems(){ const tk = todayKey(); return S.asg.filter(a => !["submitted", "graded"].includes(a.status) && (a.status === "doing" || (a.due && a.due <= addDays(tk, 1)))).sort((a, b) => ((a.due || "9999") + (a.time || "")).localeCompare((b.due || "9999") + (b.time || ""))); }
+const asgFullTitle = a => { const p = a.parent && S.asg.find(x => x.id === a.parent); return (p ? `<span class="muted">${esc(p.title)} › </span>` : "") + esc(a.title); };
+function asgTodoRow(a){ const [dt, cls] = dueText(a);
+  return `<li><input type="checkbox" data-asgdone="${esc(a.id)}" aria-label="Mark submitted: ${esc(a.title)}"><span class="grow"><span><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span> ${asgFullTitle(a)}</span><div class="sub ${cls === "over" ? "overdue" : ""}">${esc(dt.replace(/ · in \d+ days/, ""))}${a.status === "doing" ? " · in progress" : ""}</div></span><a class="x small" href="#study-assignments" data-asgopen="${esc(a.id)}">Open</a></li>`; }
+document.addEventListener("click", e => {
+  const st = e.target.closest && e.target.closest("[data-asgstart]"); if (st) { const a = S.asg.find(x => x.id === st.dataset.asgstart); if (a) { put("assignments", a.id, { ...strip(a), status: "doing" }); toast("Moved to your study to-dos"); } return; }
+  const op = e.target.closest && e.target.closest("[data-asgopen]"); if (op) { S.asgOpen = op.dataset.asgopen; S.asgFilter = "all"; }
+});
+document.addEventListener("change", e => { const c = e.target; if (!c.dataset || !c.dataset.asgdone) return; const a = S.asg.find(x => x.id === c.dataset.asgdone); if (!a) return;
+  put("assignments", a.id, { ...strip(a), status: "submitted", doneAt: nowISO() }); toast("Submitted. Well done! Add what you learned in Study → Assignments."); });
 function studyTodayHtml(){
   if (!S.subjects.length && !S.asg.length) return "";
   const tk = todayKey(), nowM = new Date().getHours() * 60 + new Date().getMinutes();
-  const cs = classesOn(tk), due = S.asg.filter(a => !["submitted", "graded"].includes(a.status) && a.due && a.due <= addDays(tk, 7)).sort((a, b) => (a.due + (a.time || "")).localeCompare(b.due + (b.time || "")));
+  const work = new Set(studyWorkItems().map(a => a.id));
+  const cs = classesOn(tk), due = S.asg.filter(a => !["submitted", "graded"].includes(a.status) && !work.has(a.id) && a.due && a.due <= addDays(tk, 7)).sort((a, b) => (a.due + (a.time || "")).localeCompare(b.due + (b.time || "")));
   const per = semPeriod(tk), brk = per && per.kind !== "teach" && per.kind !== "before" ? `<p class="small" style="margin:0"><b>${esc(per.label)}</b> <span class="muted">· no classes today</span></p>` : "";
-  if (!cs.length && !due.length) return brk || `<p class="small muted" style="margin:0">No classes today and nothing due in the next 7 days.</p>`;
+  if (!cs.length && !due.length) return brk || (work.size ? "" : `<p class="small muted" style="margin:0">No classes today and nothing due in the next 7 days.</p>`);
   return `${brk}${cs.length ? `<ul class="hlist">${cs.map(c => `<li class="${toMin(c.end) < nowM ? "past" : ""} ${attOf(c, tk) ? "att-off" : ""}"><span class="hl-t">${fmt12(c.start)}</span><span class="tag ${subjCls(c.subj)}">${esc(subjLabel(c.subj))}</span><span class="hl-b">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${clsLoc(c) ? " · " + esc(clsLoc(c)) : ""}</span><span class="hl-act">${attBtns(c, tk)}</span></li>`).join("")}</ul>` : ""}
-    ${due.length ? `<div class="small muted" style="margin-top:4px">Due soon</div><ul class="hlist">${due.map(a => { const [dt, cls] = dueText(a); return `<li><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="hl-b">${a.parent && S.asg.find(x => x.id === a.parent) ? `<span class="muted">${esc(S.asg.find(x => x.id === a.parent).title)} › </span>` : ""}${esc(a.title)}</span><span class="asg-due ${cls} small">${esc(dt.replace(/ · in \d+ days/, ""))}</span><span></span></li>`; }).join("")}</ul>` : ""}`;
+    ${due.length ? `<div class="small muted" style="margin-top:4px">Due soon</div><ul class="hlist">${due.map(a => { const [dt, cls] = dueText(a); return `<li><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="hl-b">${asgFullTitle(a)}</span><span class="asg-due ${cls} small">${esc(dt.replace(/ · in \d+ days/, ""))}</span><span class="hl-act"><button type="button" class="x small" data-asgstart="${esc(a.id)}" title="Start working on it: moves it to your study to-dos">Start</button></span></li>`; }).join("")}</ul>` : ""}`;
 }
 let studyNotesT = null;
 document.addEventListener("click", e => {
@@ -1894,15 +1909,19 @@ function asgDetail(a){
 // ----- one assignment card, and parts grouped under their main assignment
 function asgItem(a, kids){ const [dt, cls] = dueText(a), open = S.asgOpen === a.id;
       if (S.asgEdit === a.id) return asgEditForm(a);
-      const kd = kids && kids.length ? kids.filter(k => ["submitted", "graded"].includes(k.status)).length : 0;
+      const tds = asgTodos(a.id); kids = [...(kids || []), ...tds.map(t => ({ status: t.done ? "submitted" : "todo" }))];
+      const kd = kids.filter(k => ["submitted", "graded"].includes(k.status)).length;
       return `<div class="asg ${cls} st-${esc(a.status)} ${a.parent ? "is-part" : ""}"><div class="asg-main" data-asg-open="${esc(a.id)}" role="button" tabindex="0">
         <span class="asg-stripe ${subjCls(a.subj)}"></span>
         <div class="asg-body"><div class="asg-t"><b>${esc(a.title)}</b>${a.weight ? `<span class="asg-w">${esc(a.weight)}%</span>` : ""}</div>
-          <div class="line"><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="small">${esc((ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1])}</span><span class="asg-due ${cls}">${esc(dt)}</span>${kids && kids.length ? `<span class="asg-parts">${kd}/${kids.length} part${kids.length === 1 ? "" : "s"} done</span>` : ""}${a.status === "graded" && a.mark !== "" && a.mark != null ? `<span class="asg-mark">${esc(a.mark)}%</span>` : ""}</div></div></div>
+          <div class="line"><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="small">${esc((ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1])}</span><span class="asg-due ${cls}">${esc(dt)}</span>${kids.length ? `<span class="asg-parts">${kd}/${kids.length} done</span>` : ""}${a.status === "graded" && a.mark !== "" && a.mark != null ? `<span class="asg-mark">${esc(a.mark)}%</span>` : ""}</div></div></div>
         <div class="seg asg-st">${ASG_ST.map(([v, l]) => `<button type="button" data-asg-st="${esc(a.id)}:${v}" aria-pressed="${a.status === v}">${l}</button>`).join("")}</div>
         ${open || a.status === "graded" ? `<div class="asg-more">
           ${a.status === "graded" ? `<label class="f">Mark (%)<input type="number" min="0" max="100" step="0.1" data-asg-mark="${esc(a.id)}" value="${esc(a.mark ?? "")}" placeholder="e.g. 85"></label>` : ""}
           ${open ? asgDetail(a) : `<button type="button" class="btn sm ghost" data-asg-open="${esc(a.id)}">Notes, files & what you learned</button>`}</div>` : ""}</div>`; }
+const asgTodos = id => S.todos.filter(t => t.kind === "study" && t.asg === id).sort((a, b) => (a.done - b.done) || (a.date || "").localeCompare(b.date || ""));
+function asgTodoLi(t){ const tk = todayKey();
+  return `<li class="${t.done ? "done" : ""}"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="Done: ${esc(t.title)}"><span class="grow"><span>${esc(t.title)}</span><div class="sub ${t.date && t.date < tk && !t.done ? "overdue" : ""}">To-do${t.date ? " · " + esc(fmtDate(t.date)) : ""}</div></span><button class="x tl-ed" type="button" data-todoedit="${esc(t.id)}" aria-label="Edit">${SVG(ICON.edit)}</button><button class="x" type="button" data-deltodo="${esc(t.id)}" aria-label="Delete">✕</button></li>`; }
 function asgGroups(list){
   const ids = new Set(S.asg.map(a => a.id)), top = [], seen = new Set();
   list.forEach(a => { const pid = a.parent && ids.has(a.parent) ? a.parent : null; const root = pid ? S.asg.find(x => x.id === pid) : a;
@@ -2302,6 +2321,8 @@ document.addEventListener("submit", e => {
   if (logTime(S.logT, mins, date, $("#lg-end").value)) { $("#logdlg").close(); toast(`Logged ${fmtMins(mins)}${date !== todayKey() ? " on " + fmtDate(date) : ""}`); }
 });
 // ---------- edit a to-do (personal, study or self-study)
+function tdAsgOpts(subj, sel){ const L = S.asg.filter(a => !a.parent && (!subj || a.subj === subj) && (!["submitted", "graded"].includes(a.status) || a.id === sel)).sort((a, b) => ((a.due || "9999")).localeCompare(b.due || "9999"));
+  return `<option value="">Not linked to an assignment</option>` + L.map(a => `<option value="${esc(a.id)}" ${a.id === sel ? "selected" : ""}>${esc(subjLabel(a.subj))} · ${esc(a.title)}${a.due ? " · due " + esc(fmtDate(a.due)) : ""}</option>`).join(""); }
 S.tdEdit = null;
 function openTodoEdit(id){
   const t = S.todos.find(x => x.id === id); if (!t) return; S.tdEdit = id;
@@ -2309,7 +2330,8 @@ function openTodoEdit(id){
   f.innerHTML = `<div class="dlg-top"><h3>Edit</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close">✕</button></div>
     <label class="f">Title<input id="td-title" value="${esc(t.title)}" required></label>
     <div class="f"><span class="small muted" style="font-weight:600">Type</span><div class="qa-chips cwrap">${[["todo","To-do"],["study","Study"],["self","Self-study / skills"]].map(([v, l]) => `<button type="button" class="qc" data-tdkind="${v}" aria-pressed="${kind === v}">${l}</button>`).join("")}</div></div>
-    <div class="td-study" ${kind === "study" ? "" : "hidden"}><span class="small muted" style="font-weight:600">Subject</span><div class="qa-chips cwrap">${S.subjects.filter(isCur).map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-tdsubj="${esc(s.id)}" aria-pressed="${t.subj === s.id}">${esc(s.code || s.name)}</button>`).join("") || `<span class="small muted">No subjects yet</span>`}</div></div>
+    <div class="td-study" ${kind === "study" ? "" : "hidden"}><span class="small muted" style="font-weight:600">Subject</span><div class="qa-chips cwrap td-subjs">${S.subjects.filter(isCur).map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-tdsubj="${esc(s.id)}" aria-pressed="${t.subj === s.id}">${esc(s.code || s.name)}</button>`).join("") || `<span class="small muted">No subjects yet</span>`}</div>
+      <label class="f">Part of assignment <span class="muted">(optional)</span><select id="td-asg" class="inp">${tdAsgOpts(t.subj, t.asg)}</select></label></div>
     <div class="td-self" ${kind === "self" ? "" : "hidden"}><span class="small muted" style="font-weight:600">Skill</span><div class="qa-chips cwrap">${S.cats.map((c, i) => `<button type="button" class="qc ci-${i % 6}" data-tdcat="${esc(c.tag)}" aria-pressed="${t.cat === c.tag}">${esc(c.name.split(/\s*\/\s*/)[0])}</button>`).join("")}</div>
       ${S.courses.length ? `<span class="small muted" style="font-weight:600">Course</span><div class="qa-chips cwrap">${S.courses.map(c => `<button type="button" class="qc" data-tdcourse="${esc(c.id)}" aria-pressed="${t.course === c.id}">${esc(c.name)}</button>`).join("")}</div>` : ""}</div>
     <label class="f">Date<input type="date" id="td-date" value="${esc(t.date || "")}"></label>
@@ -2323,7 +2345,7 @@ document.addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return; const d = b.dataset;
   const pick = (attr, key) => { f.dataset[key] = f.dataset[key] === d[attr] ? "" : d[attr]; f.querySelectorAll(`[data-${attr.replace(/[A-Z]/g, m => "-" + m.toLowerCase())}]`).forEach(x => x.setAttribute("aria-pressed", x.dataset[attr] === f.dataset[key])); };
   if (d.tdkind) { f.dataset.kind = d.tdkind; f.querySelectorAll("[data-tdkind]").forEach(x => x.setAttribute("aria-pressed", x === b)); f.querySelector(".td-study").hidden = d.tdkind !== "study"; f.querySelector(".td-self").hidden = d.tdkind !== "self"; }
-  else if (d.tdsubj) pick("tdsubj", "subj");
+  else if (d.tdsubj) { pick("tdsubj", "subj"); const sa = $("#td-asg"); if (sa) { const cur = sa.value, a = S.asg.find(x => x.id === cur); sa.innerHTML = tdAsgOpts(f.dataset.subj, a && (!f.dataset.subj || a.subj === f.dataset.subj) ? cur : ""); } }
   else if (d.tdcat) pick("tdcat", "cat");
   else if (d.tdcourse) { pick("tdcourse", "course"); const c = S.courses.find(x => x.id === f.dataset.course); if (c && !f.dataset.cat && (c.skills || [])[0]) { f.dataset.cat = c.skills[0]; f.querySelectorAll("[data-tdcat]").forEach(x => x.setAttribute("aria-pressed", x.dataset.tdcat === f.dataset.cat)); } }
   else if (d.tddel !== undefined) { const t = S.todos.find(x => x.id === S.tdEdit); $("#tddlg").close(); if (t) { del("todos", t.id); toast("Deleted", () => put("todos", t.id, strip(t))); } }
@@ -2334,7 +2356,8 @@ document.addEventListener("submit", e => {
   const f = e.target, t = S.todos.find(x => x.id === S.tdEdit), title = $("#td-title").value.trim(); if (!t || !title) return;
   const kind = f.dataset.kind, rec = { ...strip(t), title, date: $("#td-date").value || t.date || todayKey() };
   delete rec.kind; delete rec.subj; delete rec.cat; delete rec.course;
-  if (kind === "study") Object.assign(rec, { kind, subj: f.dataset.subj || "" });
+  delete rec.asg;
+  if (kind === "study") { const av = $("#td-asg") ? $("#td-asg").value : ""; const a = S.asg.find(x => x.id === av); Object.assign(rec, { kind, subj: f.dataset.subj || (a ? a.subj : ""), asg: av || "" }); }
   if (kind === "self") Object.assign(rec, { kind, cat: f.dataset.cat || "", course: f.dataset.course || "" });
   put("todos", t.id, rec); $("#tddlg").close(); toast("Saved");
 });
