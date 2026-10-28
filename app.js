@@ -795,7 +795,7 @@ function renderOverview(){
     ${(() => { const c = mealSrcCounts(keys.filter(k => k <= tk)), n = c.home + c.out + c.delivery; return n ? `<div class="m-src-bar" title="Where your meals came from"><span class="small muted">Meals (${n})</span><span class="bar msb">${MEAL_SRC.map(([v], i) => `<i style="width:${c[v] / n * 100}%;background:${["var(--c1)","var(--c3)","var(--c4)"][i]}"></i>`).join("")}</span><span class="small">${MEAL_SRC.map(([v, l, ic]) => `${ic} ${Math.round(c[v] / n * 100)}%`).join(" · ")}</span></div>` : ""; })()}
     ${mv.length ? `<div class="sechead" style="margin:6px 0 0"><h3 class="small">Mood by day</h3><span class="meta">1 awful · 5 great</span></div>${barChart(moodVals, labels, 5, v => Math.round(v), "var(--c1)")}` : ""}`;
   $("#ov-sleep").innerHTML = sleepInsights(keys, labels, mini);
-  $("#ov-time").innerHTML = timeInsights(keys);
+  $("#ov-time").innerHTML = timeInsights();
   // spending
   const exR = S.exp.filter(e => inR2(e.date)), exTot = exR.reduce((a, e) => a + (+e.amount || 0), 0);
   const exDaily = keys.map(k => k < st || k > tk ? null : S.exp.filter(e => e.date === k).reduce((a, e) => a + (+e.amount || 0), 0));
@@ -2398,32 +2398,61 @@ function sleepInsights(keys, labels, mini){
     <ul class="sl-notes">${notes.map(n => `<li>${n}</li>`).join("")}</ul>`;
 }
 const TIME_COLORS = ["var(--c0)", "var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)", "var(--high)", "var(--med)"];
-function timeInsights(keys){
-  const tk = todayKey(), st = startKey(), days = keys.filter(k => k >= st && k <= tk), seg = {};
-  const add = (name, m) => { if (m > 0) seg[name] = (seg[name] || 0) + m; };
-  days.forEach(k => {
-    add("Sleep", sleepMins(hDoc(k).sleep) || 0);
-    classesOn(k).filter(c => !attOf(c, k)).forEach(c => add("Classes", toMin(c.end) - toMin(c.start)));
-    S.time.filter(x => x.date === k).forEach(x => { const m = +x.mins || 0;
-      if (x.type === "task") { const t = S.tasks.find(y => y.id === x.ref); add("Work · " + catName(t ? t.category : ""), m); }
-      else if (x.type === "course" || x.type === "self") add("Self-study & courses", m);
-      else if (x.type === "study") add("Study (assignments & revision)", m);
-      else add("Focus sessions", m); });
-  });
-  const tracked = Object.values(seg).reduce((a, b) => a + b, 0), total = days.length * 1440;
-  if (!tracked) return `<p class="small muted" style="margin:0">Nothing tracked yet. Time comes from your sleep log, class timetable and the ▶ timers on work tasks and courses.</p>`;
-  let items = Object.entries(seg).sort((a, b) => b[1] - a[1]);
-  if (items.length > 7) { const rest = items.slice(6).reduce((a, x) => a + x[1], 0); items = [...items.slice(0, 6), ["Other", rest]]; }
-  const withU = S.ovUntracked && total > tracked ? [...items, ["Not tracked", total - tracked]] : items;
-  const sum = withU.reduce((a, x) => a + x[1], 0), R = 70, C = 2 * Math.PI * R; let off = 0;
-  const arcs = withU.map(([n, m], i) => { const len = m / sum * C, col = n === "Not tracked" ? "var(--line)" : n === "Sleep" ? "var(--c0)" : TIME_COLORS[(i % (TIME_COLORS.length - 1)) + 1];
-    const a = `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${col}" stroke-width="34" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"><title>${esc(n)}: ${fmtHM(Math.round(m))} (${Math.round(m / sum * 100)}%)</title></circle>`; off += len; return { a, n, m, col }; });
-  const perDay = m => fmtHM(Math.round(m / days.length));
-  return `<div class="pie-wrap"><svg viewBox="0 0 180 180" class="pie" role="img" aria-label="Where your time went"><g transform="rotate(-90 90 90)">${arcs.map(x => x.a).join("")}</g>
-      <text x="90" y="86" text-anchor="middle" class="pie-n">${fmtHM(Math.round(tracked / days.length))}</text><text x="90" y="104" text-anchor="middle" class="pie-s">tracked / day</text></svg>
-    <ul class="pie-leg">${arcs.map(x => `<li><i style="background:${x.col}"></i><span>${esc(x.n)}</span><b>${Math.round(x.m / sum * 100)}%</b><span class="muted small">${perDay(x.m)}/day</span></li>`).join("")}</ul></div>
-    <label class="small muted pie-tog"><input type="checkbox" data-ovuntracked ${S.ovUntracked ? "checked" : ""}> Include untracked time (${Math.round((total - tracked) / total * 100)}% of the ${days.length} day${days.length === 1 ? "" : "s"})</label>`;
+S.tvMode = "day"; S.tvDay = null; S.tvWk = 0;
+function timeOfDay(k){ const seg = {}; const add = (n, m) => { if (m > 0) seg[n] = (seg[n] || 0) + m; };
+  add("Sleep", sleepMins(hDoc(k).sleep) || 0);
+  classesOn(k).filter(c => !attOf(c, k)).forEach(c => add("Classes", toMin(c.end) - toMin(c.start)));
+  S.time.filter(x => x.date === k).forEach(x => { const m = +x.mins || 0;
+    if (x.type === "task") { const t = S.tasks.find(y => y.id === x.ref); add("Work · " + catName(t ? t.category : "").split(/\s*\/\s*/)[0], m); }
+    else if (x.type === "course" || x.type === "self") add("Self-study & courses", m);
+    else if (x.type === "study") add("Study (assignments & revision)", m);
+    else add("Focus sessions", m); });
+  return seg; }
+const TV_FIXED = { "Sleep": "var(--c0)", "Classes": "var(--c1)", "Self-study & courses": "var(--c2)", "Study (assignments & revision)": "var(--c5)", "Focus sessions": "var(--med)", "Not tracked": "var(--line)" };
+function tvColor(n, workNames){ if (TV_FIXED[n]) return TV_FIXED[n]; const i = workNames.indexOf(n); return ["var(--c3)", "var(--c4)", "var(--high)", "var(--c5)", "var(--c1)"][i % 5]; }
+function pieSvg(items, center, sub, workNames){
+  const sum = items.reduce((a, x) => a + x[1], 0) || 1, R = 70, C = 2 * Math.PI * R; let off = 0;
+  const arcs = items.map(([n, m]) => { const len = m / sum * C, col = tvColor(n, workNames); const a = `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${col}" stroke-width="34" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"><title>${esc(n)}: ${fmtHM(Math.round(m))}</title></circle>`; off += len; return a; });
+  return `<svg viewBox="0 0 180 180" class="pie" role="img" aria-label="Where your time went"><g transform="rotate(-90 90 90)">${arcs.join("")}</g><text x="90" y="86" text-anchor="middle" class="pie-n">${center}</text><text x="90" y="104" text-anchor="middle" class="pie-s">${sub}</text></svg>`;
 }
+function timeInsights(){
+  const tk = todayKey(), st = startKey(), day = S.tvMode === "day";
+  const head = `<div class="tv-head"><div class="seg"><button type="button" data-tvmode="day" aria-pressed="${day}">Day</button><button type="button" data-tvmode="week" aria-pressed="${!day}">Weekly average</button></div>`;
+  if (day) {
+    const k = S.tvDay && S.tvDay <= tk ? S.tvDay : tk, seg = timeOfDay(k), workNames = Object.keys(seg).filter(n => n.startsWith("Work"));
+    let items = Object.entries(seg).sort((a, b) => b[1] - a[1]); const tracked = items.reduce((a, x) => a + x[1], 0);
+    if (S.ovUntracked && tracked < 1440) items = [...items, ["Not tracked", 1440 - tracked]];
+    const nav = `<div class="tv-nav"><button class="btn sm" type="button" data-tvday="-1" aria-label="Previous day">‹</button><span class="small"><b>${k === tk ? "Today" : k === addDays(tk, -1) ? "Yesterday" : esc(DAYS[keyDow(k)])}</b> ${esc(fmtDate(k).replace(/^\w+, /, ""))}</span><button class="btn sm" type="button" data-tvday="1" ${k >= tk ? "disabled" : ""} aria-label="Next day">›</button></div></div>`;
+    if (!tracked) return head + nav + `<p class="small muted" style="margin:0">Nothing tracked on this day. Time comes from your sleep log, class timetable, and timers or time logs on tasks and courses.</p>`;
+    return head + nav + `<div class="pie-wrap">${pieSvg(items, fmtHM(tracked), "tracked", workNames)}
+      <ul class="pie-leg">${items.map(([n, m]) => `<li><i style="background:${tvColor(n, workNames)}"></i><span>${esc(n)}</span><b>${fmtHM(Math.round(m))}</b><span class="muted small">${Math.round(m / (S.ovUntracked ? 1440 : tracked) * 100)}%</span></li>`).join("")}</ul></div>
+      <label class="small muted pie-tog"><input type="checkbox" data-ovuntracked ${S.ovUntracked ? "checked" : ""}> Show the rest of the 24 hours (${fmtHM(Math.max(0, 1440 - tracked))} not tracked)</label>`;
+  }
+  const keys = weekKeys(S.tvWk), days = keys.filter(k => k >= st && k <= tk), segs = days.map(timeOfDay), tot = {};
+  segs.forEach(sg => Object.entries(sg).forEach(([n, m]) => tot[n] = (tot[n] || 0) + m));
+  const nights = segs.filter(sg => sg.Sleep).length, workNames = Object.keys(tot).filter(n => n.startsWith("Work"));
+  const avgOf = n => n === "Sleep" ? (nights ? tot[n] / nights : 0) : tot[n] / Math.max(1, days.length);
+  let items = Object.keys(tot).map(n => [n, avgOf(n)]).sort((a, b) => b[1] - a[1]); const tracked = items.reduce((a, x) => a + x[1], 0);
+  if (S.ovUntracked && tracked < 1440) items = [...items, ["Not tracked", 1440 - tracked]];
+  const nav = `<div class="tv-nav"><button class="btn sm" type="button" data-tvwk="-1" aria-label="Previous week">‹</button><span class="small"><b>${S.tvWk === 0 ? "This week" : S.tvWk === -1 ? "Last week" : ""}</b> ${esc(longRange(keys[0], keys[6]))}</span><button class="btn sm" type="button" data-tvwk="1" ${S.tvWk >= 0 ? "disabled" : ""} aria-label="Next week">›</button></div></div>`;
+  if (!tracked) return head + nav + `<p class="small muted" style="margin:0">Nothing tracked this week yet.</p>`;
+  const names = items.map(x => x[0]).filter(n => n !== "Not tracked"), maxD = Math.max(60, ...segs.map(sg => Object.values(sg).reduce((a, b) => a + b, 0)));
+  const bars = `<div class="tv-bars">${keys.map(k => { const i = days.indexOf(k), sg = i >= 0 ? segs[i] : {}, t = Object.values(sg).reduce((a, b) => a + b, 0);
+      return `<button type="button" class="tv-bar ${k > tk ? "is-fut" : ""}" ${k > tk ? "disabled" : `data-tvgo="${k}"`} title="${esc(fmtDate(k))}: ${fmtHM(Math.round(t))} tracked"><span class="tv-stack" style="height:${(t / maxD * 100).toFixed(1)}%">${names.filter(n => sg[n]).map(n => `<i style="flex:${sg[n]};background:${tvColor(n, workNames)}"></i>`).join("")}</span><span class="tv-lbl">${DAYS[keyDow(k)].slice(0, 2)}</span><span class="tv-h">${t ? (Math.round(t / 6) / 10) + "h" : ""}</span></button>`; }).join("")}</div>`;
+  return head + nav + `<div class="pie-wrap">${pieSvg(items, fmtHM(Math.round(tracked)), "average / day", workNames)}
+      <ul class="pie-leg">${items.map(([n, m]) => `<li><i style="background:${tvColor(n, workNames)}"></i><span>${esc(n)}</span><b>${fmtHM(Math.round(m))}</b><span class="muted small">${n === "Not tracked" ? "a day" : n === "Sleep" ? `a night · ${nights} logged` : `a day · ${fmtHM(Math.round(tot[n]))} total`}</span></li>`).join("")}</ul></div>
+    <div class="small muted" style="font-weight:600">Each day <span style="font-weight:400">· tap a day to see it</span></div>${bars}
+    <label class="small muted pie-tog"><input type="checkbox" data-ovuntracked ${S.ovUntracked ? "checked" : ""}> Show the rest of the 24 hours</label>
+    <p class="small muted" style="margin:0">Averages use the ${plural(days.length, "day")} so far this week${nights && nights < days.length ? `; sleep uses the ${plural(nights, "night")} you logged` : ""}.</p>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-tvmode],[data-tvday],[data-tvwk],[data-tvgo]"); if (!t) return; const d = t.dataset, tk = todayKey();
+  if (d.tvmode) S.tvMode = d.tvmode;
+  else if (d.tvday) S.tvDay = addDays(S.tvDay && S.tvDay <= tk ? S.tvDay : tk, +d.tvday) > tk ? tk : addDays(S.tvDay && S.tvDay <= tk ? S.tvDay : tk, +d.tvday);
+  else if (d.tvwk) S.tvWk = Math.min(0, S.tvWk + +d.tvwk);
+  else if (d.tvgo) { S.tvDay = d.tvgo; S.tvMode = "day"; }
+  $("#ov-time").innerHTML = timeInsights();
+});
 S.ovUntracked = false;
 document.addEventListener("change", e => { if (e.target.dataset && e.target.dataset.ovuntracked !== undefined) { S.ovUntracked = e.target.checked; renderOverview(); } });
 

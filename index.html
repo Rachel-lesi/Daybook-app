@@ -1440,6 +1440,19 @@ label.f:has(.dhint){margin-bottom:18px}
 .co-tgt .dd-wrap{width:160px}
 .co-mods .subs{max-height:340px;overflow:auto}
 @media (max-width:520px){.co-next{grid-template-columns:1fr}.co-next-b{justify-content:flex-start}.co-btns{margin-left:0}}
+
+/* ===== time: day / weekly average ===== */
+#ov-time{display:grid;gap:12px}
+.tv-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.tv-nav{display:flex;align-items:center;gap:8px}
+.tv-bars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;height:130px;align-items:end}
+.tv-bar{display:grid;grid-template-rows:1fr auto auto;height:100%;align-items:end;justify-items:center;border:0;background:none;padding:0;font:inherit;color:inherit;cursor:pointer;min-width:0}
+.tv-bar.is-fut{opacity:.35;cursor:default}
+.tv-stack{width:70%;max-width:34px;min-height:2px;display:flex;flex-direction:column-reverse;border-radius:6px 6px 2px 2px;overflow:hidden;background:var(--sunk)}
+.tv-stack i{display:block;min-height:1px}
+.tv-lbl{font-size:.7rem;color:var(--muted);margin-top:4px}
+.tv-h{font-size:.66rem;font-family:var(--f-mono);color:var(--muted)}
+.tv-bar:hover .tv-lbl{color:var(--accent)}
 </style>
 </head>
 <body class="locked">
@@ -1674,7 +1687,7 @@ label.f:has(.dhint){margin-bottom:18px}
     </div>
     <div class="ov2">
       <div><div class="sechead"><h2>Sleep</h2><a class="meta" href="#health-body">Log sleep</a></div><div class="panel chartbox ovx" id="ov-sleep"></div></div>
-      <div><div class="sechead"><h2>Where your time went</h2><span class="meta">Sleep, classes and timed work</span></div><div class="panel chartbox ovx" id="ov-time"></div></div>
+      <div><div class="sechead"><h2>Where your time went</h2><span class="meta">Sleep, classes, work and study time</span></div><div class="panel chartbox ovx" id="ov-time"></div></div>
     </div>
     <div class="ov2">
       <div><div class="sechead"><h2>Wellbeing</h2><a class="meta" href="#health">Health</a></div><div class="panel chartbox ovx" id="ov-well"></div></div>
@@ -1942,6 +1955,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=53"></script>
+<script type="module" src="app.js?v=54"></script>
 </body>
 </html>
