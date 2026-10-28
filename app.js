@@ -378,7 +378,8 @@ function taskCard(t){
     </span></div>`;
 }
 function routineFor(k){ const wd=keyDow(k); const dd=dayDoc(k);
-  return [...S.routine.filter(r=>!r.days||r.days.includes(wd)), ...(dd.extra||[]).map(x=>({...x,extra:true}))].sort((a,b)=>a.time.localeCompare(b.time)); }
+  const moved=new Set((dd.extra||[]).filter(x=>x.from&&(dd.skip||{})[x.from]).map(x=>x.from));
+  return [...S.routine.filter(r=>(!r.days||r.days.includes(wd))&&!moved.has(r.id)), ...(dd.extra||[]).map(x=>({...x,extra:true}))].sort((a,b)=>a.time.localeCompare(b.time)); }
 function saveDay(k, dd){ S.day[k]=dd; if(db) write("checks/"+k, ()=>db.doc("checks/"+k).set({date:k,done:dd.done||{},skip:dd.skip||{},extra:dd.extra||[]})); renderToday(); }
 const DAYLBL = {"-1":"Yesterday","0":"Today","1":"Tomorrow"};
 // ---------- routine timeline in the summary card (day / week)
@@ -431,6 +432,37 @@ function heroHtml(active, done, next, missed){
     <div class="hero-stats"><span><b>${dn}/${active.length}</b> routine</span><span><b>${todoLeft}</b> to-do${todoLeft===1?"":"s"} left</span><span><b>${open}</b> task${open===1?"":"s"} open</span>${missed?`<span class="warn"><b>${missed}</b> not ticked</span>`:""}</div>
   </div></div>`;
 }
+// ---------- edit a routine item straight from Today
+S.rtEdit = null; S.rtScope = "always";
+function rtEditRow(r0, k, draft){
+  const r = draft ? { ...r0, ...draft } : r0;
+  const we = isWeekend(keyDow(k)), usual = daysLabel(r.days) || "its usual days";
+  return `<li class="tl-edit"><form id="tl-edit-form" data-rid="${esc(r.id)}" autocomplete="off">
+    <div class="tle-row"><input type="time" id="tle-t" value="${esc(r.time)}" aria-label="Time" required><input id="tle-l" value="${esc(r.label)}" aria-label="Name" required></div>
+    <select id="tle-k" aria-label="Type">${KINDS.map(([v,l])=>`<option value="${v}" ${v===(r.kind||"other")?"selected":""}>${l}</option>`).join("")}</select>
+    ${r.extra ? `<p class="small muted" style="margin:0">${r.from ? `Changed for ${esc(fmtDate(k))} only. Tap ✕ on it to go back to the usual one.` : `This item is for ${esc(fmtDate(k))} only.`}</p>` : `<div class="seg tle-scope"><button type="button" data-rtscope="always" aria-pressed="${S.rtScope==="always"}">Change routine (${esc(usual)})</button><button type="button" data-rtscope="day" aria-pressed="${S.rtScope==="day"}">Just ${esc(fmtDate(k))}</button></div>`}
+    <div class="row"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" data-rtedit-x>Cancel</button>${r.extra?"":`<a class="small" href="#settings-routine">More options (days, alarm) ›</a>`}</div>
+  </form></li>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-rtedit],[data-rtedit-x],[data-rtscope]"); if (!t || !t.closest("#timeline")) return;
+  if (t.dataset.rtedit) { S.rtEdit = t.dataset.rtedit; S.rtScope = "always"; renderToday(); const l = $("#tle-l"); if (l) { l.focus(); l.select(); } }
+  else if (t.dataset.rteditX !== undefined) { S.rtEdit = null; renderToday(); }
+  else if (t.dataset.rtscope) { S.rtScope = t.dataset.rtscope; t.parentElement.querySelectorAll("[data-rtscope]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && S.rtEdit && e.target.closest && e.target.closest("#tl-edit-form")) { S.rtEdit = null; renderToday(); } });
+document.addEventListener("submit", e => {
+  if (e.target.id !== "tl-edit-form") return; e.preventDefault();
+  const k = viewKey(), dd = dayDoc(k), id = e.target.dataset.rid;
+  const time = $("#tle-t").value, label = $("#tle-l").value.trim(), kind = $("#tle-k").value; if (!time || !label) return;
+  const ex = (dd.extra || []).find(x => x.id === id);
+  if (ex) { saveDay(k, { ...dd, extra: dd.extra.map(x => x.id === id ? { ...x, time, label, kind } : x) }); toast("Updated for " + fmtDate(k)); }
+  else { const r = S.routine.find(x => x.id === id); if (!r) return;
+    if (S.rtScope === "day") { const nid = newId(), done = { ...(dd.done || {}) }; if (done[id]) { done[nid] = done[id]; delete done[id]; }
+      saveDay(k, { ...dd, done, skip: { ...(dd.skip || {}), [id]: true }, extra: [...(dd.extra || []), { id: nid, time, label, kind, from: id }] }); toast("Changed for " + fmtDate(k) + " only"); }
+    else { saveRt({ ...r, time, label, kind }); toast("Routine updated"); } }
+  S.rtEdit = null; renderToday();
+});
 function renderToday(){
   const tk=todayKey(), k=viewKey(), isToday=S.dayOff===0, dd=dayDoc(k), done=dd.done||{}, skip=dd.skip||{};
   const items=routineFor(k), active=items.filter(r=>!skip[r.id]);
@@ -446,13 +478,15 @@ function renderToday(){
     : !isToday ? `<div class="hero-plan"><span><span class="greet" style="font-size:1.15rem">Planning ${esc(fmtDate(k))}</span><br><span class="hero-sub">Skip or add items for this day only. Your usual routine stays the same.</span></span><button class="btn sm" type="button" data-dayreset>Back to today</button></div>`
     : heroHtml(active, done, next, missed);
   $("#rt-meta").textContent = active.length ? `${active.filter(r=>done[r.id]).length} of ${active.length} done` : "";
+  const f0=$("#tl-edit-form"), draft = f0 && f0.dataset.rid===S.rtEdit ? { time:$("#tle-t").value, label:$("#tle-l").value, kind:$("#tle-k").value } : null;
   $("#timeline").innerHTML = items.length ? items.map(r=>{ const sk=!!skip[r.id];
+    if (S.rtEdit===r.id) return rtEditRow(r, k, draft);
     return `<li class="${done[r.id]?"done":""} ${sk?"skipped":""} ${r.time<nowHM?"past":""} ${next&&next.id===r.id?"next":""}">
     <span class="tm">${esc(r.time)}</span><input type="checkbox" data-check="${esc(r.id)}" ${done[r.id]?"checked":""} ${sk?"disabled":""} aria-label="Done: ${esc(r.label)}">
-    <span class="lbl">${routineIcon(r)}<span>${esc(r.label)}${r.alarm&&!r.extra?`<span class="tl-bell" title="Alarm ${+r.before?(+r.before)+" min before":"at the time"}">${SVG(ICON.bell)}</span>`:""}${sk?'<span class="pill">Skipped</span>':""}${r.extra?'<span class="pill">This day only</span>':""}</span></span>
+    <span class="lbl">${routineIcon(r)}<span>${esc(r.label)}${r.alarm&&!r.extra?`<span class="tl-bell" title="Alarm ${+r.before?(+r.before)+" min before":"at the time"}">${SVG(ICON.bell)}</span>`:""}${sk?'<span class="pill">Skipped</span>':""}${r.extra?`<span class="pill">${r.from?"Changed today":"This day only"}</span>`:""}</span></span>
     <span class="kind">${esc((KINDS.find(x=>x[0]===r.kind)||["","Other"])[1])}</span>
-    ${r.extra ? `<button class="x" type="button" data-delextra="${esc(r.id)}" aria-label="Remove ${esc(r.label)}">✕</button>`
-      : `<button class="x small" type="button" data-skip="${esc(r.id)}">${sk?"Undo":"Skip"}</button>`}</li>`; }).join("")
+    <span class="tl-acts"><button class="x tl-ed" type="button" data-rtedit="${esc(r.id)}" aria-label="Edit ${esc(r.label)}" title="Edit">${SVG(ICON.edit)}</button>${r.extra ? `<button class="x" type="button" data-delextra="${esc(r.id)}" aria-label="Remove ${esc(r.label)}">✕</button>`
+      : `<button class="x small" type="button" data-skip="${esc(r.id)}">${sk?"Undo":"Skip"}</button>`}</span></li>`; }).join("")
     : `<li class="empty" style="display:block">${S.ready?"Nothing scheduled for this day.":"Loading…"}</li>`;
   const open=S.todos.filter(t=>!t.done && (!t.date||t.date<=tk)).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
   const later=S.todos.filter(t=>!t.done && t.date>tk).sort((a,b)=>a.date.localeCompare(b.date));
@@ -689,6 +723,8 @@ function renderOverview(){
       ${mini(wNow ? wNow.weight + " kg" : "–", "Weight", wNow && wStart && wStart !== wNow ? `${+wNow.weight >= +wStart.weight ? "+" : ""}${(wNow.weight - wStart.weight).toFixed(1)} kg in this period` : "")}
       ${mini(ongoing, "Ongoing health issues", ongoing ? "see Health log" : "none")}</div>
     ${mv.length ? `<div class="sechead" style="margin:6px 0 0"><h3 class="small">Mood by day</h3><span class="meta">1 awful · 5 great</span></div>${barChart(moodVals, labels, 5, v => Math.round(v), "var(--c1)")}` : ""}`;
+  $("#ov-sleep").innerHTML = sleepInsights(keys, labels, mini);
+  $("#ov-time").innerHTML = timeInsights(keys);
   // spending
   const exR = S.exp.filter(e => inR2(e.date)), exTot = exR.reduce((a, e) => a + (+e.amount || 0), 0);
   const exDaily = keys.map(k => k < st || k > tk ? null : S.exp.filter(e => e.date === k).reduce((a, e) => a + (+e.amount || 0), 0));
@@ -1262,7 +1298,7 @@ function renderHealth(){
   const k = hk(), tk = todayKey(), d = hDoc(k), isT = k === tk;
   // day pager
   $("#h-day").innerHTML = `<button class="btn sm" type="button" data-hday="-1" aria-label="Previous day">‹</button><span class="mid">${isT ? "Today" : esc(DAYS[keyDow(k)])}<small>${esc(fmtDate(k))}</small></span><button class="btn sm" type="button" data-hday="1" ${isT ? "disabled" : ""} aria-label="Next day">›</button>`;
-  renderMood();
+  renderMood(); renderSleepCard();
   // water
   const goal = S.waterGoal || 8, cups = d.water || 0;
   const wk = rangeKeys(7).map(x => hDoc(x).water || 0), avgW = (wk.reduce((a, b) => a + b, 0) / 7).toFixed(1);
@@ -1931,6 +1967,100 @@ document.addEventListener("submit", e => {
 }, true);
 document.addEventListener("change", e => { if (e.target.id === "cl-subj" && $("#cl-room")) { const l = (subj(e.target.value) || {}).location; $("#cl-room").placeholder = l ? `Location (blank = ${l})` : "Location, e.g. DK3, Lab 2 or Zoom link"; } });
 
+// ---------- sleep (stored on the morning you woke up)
+const SLEEP_Q = [[1,"Awful"],[2,"Poor"],[3,"OK"],[4,"Good"],[5,"Great"]];
+const sleepMins = s => s && s.bed && s.wake ? ((toMin(s.wake) - toMin(s.bed)) + 1440) % 1440 || 1440 : null;
+const fmtHM = m => { if (m == null) return "–"; m = Math.round(m); const h = Math.floor(m / 60), r = m % 60; return h ? `${h}h${r ? " " + r + "m" : ""}` : `${r}m`; };
+const clockOf = m => { m = ((Math.round(m) % 1440) + 1440) % 1440; return fmt12(pad(Math.floor(m / 60)) + ":" + pad(m % 60)); };
+const nightMin = t => { const m = toMin(t); return m < 12 * 60 ? m + 1440 : m; }; // bedtimes after midnight count as late, not early
+function sleepGuess(k){
+  const tick = (day, re) => { const dd = dayDoc(day); const r = routineFor(day).find(x => re.test(x.label) || (re.source.includes("sleep") && x.kind === "sleep")); const v = r && (dd.done || {})[r.id]; return /^\d\d:\d\d$/.test(v || "") ? v : r ? r.time : null; };
+  return { bed: tick(addDays(k, -1), /sleep|bed/i) || "23:30", wake: tick(k, /wake/i) || "07:00" };
+}
+function renderSleepCard(){
+  const box = $("#h-sleep"); if (!box) return;
+  const k = hk(), d = hDoc(k), s = d.sleep, g = s || sleepGuess(k), isT = k === todayKey();
+  const wk = rangeKeys(7).map(x => sleepMins(hDoc(x).sleep)).filter(v => v != null), avg = wk.length ? wk.reduce((a, b) => a + b, 0) / wk.length : null;
+  box.innerHTML = `${s ? `<div class="sl-top"><b class="hw-n">${fmtHM(sleepMins(s))}</b><span class="muted small">${clockOf(toMin(s.bed))} → ${clockOf(toMin(s.wake))}${s.q ? " · " + SLEEP_Q[s.q - 1][1] : ""}</span></div>` : `<p class="small muted" style="margin:0">How did you sleep ${isT ? "last night" : "the night before " + esc(fmtDate(k))}?</p>`}
+    <form id="h-sleep-form" class="sl-form" autocomplete="off">
+      <label class="f">Went to sleep<input type="time" id="sl-bed" value="${esc(g.bed)}"></label>
+      <label class="f">Woke up<input type="time" id="sl-wake" value="${esc(g.wake)}"></label>
+      <div class="qa-chips cwrap sl-q">${SLEEP_Q.map(([v, l]) => `<button type="button" class="qc" data-slq="${v}" aria-pressed="${(s ? s.q : S.slQ) === v}">${l}</button>`).join("")}</div>
+      <div class="row"><button class="btn sm primary" type="submit">${s ? "Update" : "Save sleep"}</button>${s ? `<button class="btn sm ghost danger" type="button" data-sldel>Remove</button>` : ""}</div>
+    </form>
+    <p class="small muted" style="margin:0">7-day average: <b>${fmtHM(avg && Math.round(avg))}</b>${wk.length ? ` over ${wk.length} night${wk.length === 1 ? "" : "s"}` : ""} · adults usually need 7–9 hours</p>`;
+}
+S.slQ = 0;
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-slq],[data-sldel]"); if (!t || !t.closest("#h-sleep")) return;
+  const k = hk(), d = { ...hDoc(k) };
+  if (t.dataset.slq) { S.slQ = +t.dataset.slq; t.parentElement.querySelectorAll("[data-slq]").forEach(b => b.setAttribute("aria-pressed", b === t)); if (d.sleep) { d.sleep = { ...d.sleep, q: S.slQ }; saveHealth(k, d); } }
+  else { delete d.sleep; saveHealth(k, d); toast("Sleep entry removed"); }
+});
+document.addEventListener("submit", e => {
+  if (e.target.id !== "h-sleep-form") return; e.preventDefault();
+  const bed = $("#sl-bed").value, wake = $("#sl-wake").value; if (!bed || !wake) return;
+  const k = hk(), d = { ...hDoc(k) }; d.sleep = { bed, wake, q: (d.sleep && d.sleep.q) || S.slQ || 0 }; S.slQ = 0; saveHealth(k, d); toast(`Saved: ${fmtHM(sleepMins(d.sleep))} of sleep`);
+});
+// ---------- Insights: sleep analysis and where time went
+function sleepInsights(keys, labels, mini){
+  const tk = todayKey();
+  const vals = keys.map(k => k > tk ? null : sleepMins(hDoc(k).sleep)), got = keys.map((k, i) => ({ k, m: vals[i], s: hDoc(k).sleep })).filter(x => x.m != null);
+  if (!got.length) return `<p class="small muted" style="margin:0">No sleep logged in this period. Log it each morning on <a href="#health-body">Health → Body</a> and it's analysed here.</p>`;
+  const avg = got.reduce((a, x) => a + x.m, 0) / got.length;
+  const beds = got.map(x => nightMin(x.s.bed)), wakes = got.map(x => toMin(x.s.wake));
+  const mean = a => a.reduce((p, q) => p + q, 0) / a.length, sd = a => Math.sqrt(mean(a.map(v => (v - mean(a)) ** 2)));
+  const short = got.filter(x => x.m < 7 * 60).length, qs = got.filter(x => x.s.q).map(x => x.s.q);
+  const best = got.reduce((a, x) => x.m > a.m ? x : a), worst = got.reduce((a, x) => x.m < a.m ? x : a);
+  const wdA = got.filter(x => !isWeekend(keyDow(x.k))), weA = got.filter(x => isWeekend(keyDow(x.k)));
+  const notes = [];
+  const sdB = beds.length > 2 ? sd(beds) : null;
+  if (sdB != null) notes.push(sdB <= 45 ? `Your bedtime is fairly regular (varies by about ${Math.round(sdB)} min).` : `Your bedtime varies by about ${fmtHM(Math.round(sdB))} night to night. A steadier bedtime usually makes waking up easier.`);
+  if (short) notes.push(`${short} of ${got.length} night${got.length === 1 ? "" : "s"} were under 7 hours.`);
+  if (wdA.length >= 2 && weA.length >= 1) { const diff = mean(weA.map(x => x.m)) - mean(wdA.map(x => x.m)); if (Math.abs(diff) >= 45) notes.push(diff > 0 ? `You sleep ${fmtHM(Math.round(diff))} more on weekends, which can mean you're catching up on sleep lost during the week.` : `You sleep ${fmtHM(Math.round(-diff))} less on weekends.`); }
+  const withMood = got.map(x => ({ ...x, mood: dayMood(x.k) })).filter(x => x.mood != null), good = withMood.filter(x => x.m >= 7 * 60), bad = withMood.filter(x => x.m < 7 * 60);
+  if (good.length >= 2 && bad.length >= 2) { const dm = mean(good.map(x => x.mood)) - mean(bad.map(x => x.mood)); notes.push(Math.abs(dm) >= 0.3 ? `Your mood averages ${mean(good.map(x => x.mood)).toFixed(1)}/5 after 7+ hours vs ${mean(bad.map(x => x.mood)).toFixed(1)}/5 after shorter nights.` : `So far your mood looks about the same after short and long nights.`); }
+  else notes.push(`Check in your mood on more days to see how sleep affects it.`);
+  return `<div class="minis">
+      ${mini(fmtHM(Math.round(avg)), "Average sleep", `${got.length} night${got.length === 1 ? "" : "s"} logged`)}
+      ${mini(clockOf(mean(beds)), "Usual bedtime", sdB != null ? `± ${Math.round(sdB)} min` : "")}
+      ${mini(clockOf(mean(wakes)), "Usual wake-up", "")}
+      ${mini(qs.length ? (mean(qs)).toFixed(1) + "/5" : "–", "Sleep quality", qs.length ? SLEEP_Q[Math.round(mean(qs)) - 1][1] : "rate it when you log")}
+      ${mini(fmtHM(best.m), "Longest", esc(fmtDate(best.k)))}
+      ${mini(fmtHM(worst.m), "Shortest", esc(fmtDate(worst.k)))}</div>
+    <div class="sechead" style="margin:6px 0 0"><h3 class="small">Hours slept</h3><span class="meta">dashed line = 7 h</span></div>
+    <div class="sl-chart">${barChart(vals.map(v => v == null ? null : +(v / 60).toFixed(1)), labels, 10, v => v.toFixed(1).replace(/\.0$/, "") + "h", "var(--c0)")}<i class="sl-7" style="--y:${(10 + (190 - 10 - 30) * (1 - 7 / 10)) / 190 * 100}%"></i></div>
+    <ul class="sl-notes">${notes.map(n => `<li>${n}</li>`).join("")}</ul>`;
+}
+const TIME_COLORS = ["var(--c0)", "var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)", "var(--high)", "var(--med)"];
+function timeInsights(keys){
+  const tk = todayKey(), st = startKey(), days = keys.filter(k => k >= st && k <= tk), seg = {};
+  const add = (name, m) => { if (m > 0) seg[name] = (seg[name] || 0) + m; };
+  days.forEach(k => {
+    add("Sleep", sleepMins(hDoc(k).sleep) || 0);
+    classesOn(k).forEach(c => add("Classes", toMin(c.end) - toMin(c.start)));
+    S.time.filter(x => x.date === k).forEach(x => { const m = +x.mins || 0;
+      if (x.type === "task") { const t = S.tasks.find(y => y.id === x.ref); add("Work · " + catName(t ? t.category : ""), m); }
+      else if (x.type === "course") add("Self-study & courses", m);
+      else add("Focus sessions", m); });
+  });
+  const tracked = Object.values(seg).reduce((a, b) => a + b, 0), total = days.length * 1440;
+  if (!tracked) return `<p class="small muted" style="margin:0">Nothing tracked yet. Time comes from your sleep log, class timetable and the ▶ timers on work tasks and courses.</p>`;
+  let items = Object.entries(seg).sort((a, b) => b[1] - a[1]);
+  if (items.length > 7) { const rest = items.slice(6).reduce((a, x) => a + x[1], 0); items = [...items.slice(0, 6), ["Other", rest]]; }
+  const withU = S.ovUntracked && total > tracked ? [...items, ["Not tracked", total - tracked]] : items;
+  const sum = withU.reduce((a, x) => a + x[1], 0), R = 70, C = 2 * Math.PI * R; let off = 0;
+  const arcs = withU.map(([n, m], i) => { const len = m / sum * C, col = n === "Not tracked" ? "var(--line)" : n === "Sleep" ? "var(--c0)" : TIME_COLORS[(i % (TIME_COLORS.length - 1)) + 1];
+    const a = `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${col}" stroke-width="34" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"><title>${esc(n)}: ${fmtHM(Math.round(m))} (${Math.round(m / sum * 100)}%)</title></circle>`; off += len; return { a, n, m, col }; });
+  const perDay = m => fmtHM(Math.round(m / days.length));
+  return `<div class="pie-wrap"><svg viewBox="0 0 180 180" class="pie" role="img" aria-label="Where your time went"><g transform="rotate(-90 90 90)">${arcs.map(x => x.a).join("")}</g>
+      <text x="90" y="86" text-anchor="middle" class="pie-n">${fmtHM(Math.round(tracked / days.length))}</text><text x="90" y="104" text-anchor="middle" class="pie-s">tracked / day</text></svg>
+    <ul class="pie-leg">${arcs.map(x => `<li><i style="background:${x.col}"></i><span>${esc(x.n)}</span><b>${Math.round(x.m / sum * 100)}%</b><span class="muted small">${perDay(x.m)}/day</span></li>`).join("")}</ul></div>
+    <label class="small muted pie-tog"><input type="checkbox" data-ovuntracked ${S.ovUntracked ? "checked" : ""}> Include untracked time (${Math.round((total - tracked) / total * 100)}% of the ${days.length} day${days.length === 1 ? "" : "s"})</label>`;
+}
+S.ovUntracked = false;
+document.addEventListener("change", e => { if (e.target.dataset && e.target.dataset.ovuntracked !== undefined) { S.ovUntracked = e.target.checked; renderOverview(); } });
+
 // ---------- calendar
 S.calY = new Date().getFullYear(); S.calM = new Date().getMonth(); S.calSel = todayKey();
 const loadedMonths = new Set();
@@ -2248,7 +2378,7 @@ document.addEventListener("click", e=>{
   const off=e.target.closest("[data-dayoff]"); if(off){ S.dayOff=Math.max(-1,Math.min(6,S.dayOff+ +off.dataset.dayoff)); watchChecks(); renderToday(); return; }
   if(e.target.closest("[data-dayreset]")){ S.dayOff=0; watchChecks(); renderToday(); return; }
   const sk=e.target.closest("[data-skip]"); if(sk){ const k=viewKey(), dd=dayDoc(k), s={...(dd.skip||{})}; if(s[sk.dataset.skip]) delete s[sk.dataset.skip]; else s[sk.dataset.skip]=true; saveDay(k,{...dd,skip:s}); return; }
-  const dx=e.target.closest("[data-delextra]"); if(dx){ const k=viewKey(), dd=dayDoc(k); saveDay(k,{...dd,extra:(dd.extra||[]).filter(x=>x.id!==dx.dataset.delextra)}); return; }
+  const dx=e.target.closest("[data-delextra]"); if(dx){ const k=viewKey(), dd=dayDoc(k), x0=(dd.extra||[]).find(x=>x.id===dx.dataset.delextra), skip={...(dd.skip||{})}; if(x0&&x0.from){ delete skip[x0.from]; } saveDay(k,{...dd,skip,extra:(dd.extra||[]).filter(x=>x.id!==dx.dataset.delextra)}); if(x0&&x0.from) toast("Back to your usual routine"); return; }
   const ov=e.target.closest("[data-ovr]"); if(ov){ S.ovRange=+ov.dataset.ovr; renderOverview(); return; }
   const ot=e.target.closest("[data-ovt]"); if(ot){ S.ovOpen = S.ovOpen===ot.dataset.ovt ? null : ot.dataset.ovt; renderOverview(); if(S.ovOpen && matchMedia("(max-width:700px)").matches) $("#ov-detail").scrollIntoView({block:"nearest",behavior:"smooth"}); return; }
   const od=e.target.closest("[data-ovday]"); if(od){ S.calSel=od.dataset.ovday; const [y,m]=od.dataset.ovday.split("-").map(Number); S.calY=y; S.calM=m-1; location.hash="#work-calendar"; return; }

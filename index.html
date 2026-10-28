@@ -1195,6 +1195,40 @@ button.tile.is-open{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--
 .ov-detail .sechead h2{font-size:1.05rem}
 .od-list{max-width:760px}
 #r-del.armed{background:var(--crit);color:#fff;border-color:var(--crit)}
+
+/* ===== edit routine items on Today ===== */
+.tl-acts{display:inline-flex;align-items:center;gap:2px}
+.tl-ed svg{width:14px;height:14px}
+ol.timeline li.tl-edit{display:block;background:var(--accent-soft,var(--sunk))}
+#tl-edit-form{display:grid;gap:8px}
+.tle-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px}
+#tl-edit-form input,#tl-edit-form select{font:inherit;font-size:.92rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 10px;min-width:0;width:100%}
+#tl-edit-form input[type=time]{width:auto}
+.tle-scope{display:flex;flex-wrap:wrap}
+.tle-scope button{flex:1 1 auto}
+#tl-edit-form .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#tl-edit-form .row a{margin-left:auto}
+
+/* ===== sleep + time pie ===== */
+.sl-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sl-form{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sl-form .sl-q,.sl-form .row{grid-column:1/-1}
+.sl-form .row{display:flex;gap:8px}
+.sl-chart{position:relative}
+.sl-7{position:absolute;left:8.3%;right:1%;top:var(--y);border-top:1.5px dashed var(--muted);opacity:.6;pointer-events:none}
+.sl-notes{margin:0;padding-left:18px;display:grid;gap:4px;font-size:.88rem}
+.pie-wrap{display:grid;grid-template-columns:minmax(150px,200px) minmax(0,1fr);gap:16px;align-items:center}
+.pie{width:100%;height:auto}
+.pie circle{transition:opacity .15s}
+.pie circle:hover{opacity:.8}
+.chartbox .pie .pie-n{font-family:var(--f-mono);font-size:17px;fill:var(--ink)}
+.chartbox .pie .pie-s{font-family:var(--f-body);font-size:9.5px;fill:var(--muted)}
+.pie-leg{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.pie-leg li{display:grid;grid-template-columns:12px minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:.88rem}
+.pie-leg i{width:12px;height:12px;border-radius:3px}
+.pie-leg b{font-family:var(--f-mono);font-weight:500}
+.pie-tog{display:flex;gap:6px;align-items:center}
+@media (max-width:520px){.pie-wrap{grid-template-columns:1fr}.pie{max-width:220px;margin:0 auto}}
 </style>
 </head>
 <body class="locked">
@@ -1424,6 +1458,10 @@ button.tile.is-open{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--
       <div><div class="sechead"><h2>Daily life habits</h2><span class="meta">done / scheduled</span></div><div class="panel" id="ov-habits"></div></div>
     </div>
     <div class="ov2">
+      <div><div class="sechead"><h2>Sleep</h2><a class="meta" href="#health-body">Log sleep</a></div><div class="panel chartbox ovx" id="ov-sleep"></div></div>
+      <div><div class="sechead"><h2>Where your time went</h2><span class="meta">Sleep, classes and timed work</span></div><div class="panel chartbox ovx" id="ov-time"></div></div>
+    </div>
+    <div class="ov2">
       <div><div class="sechead"><h2>Wellbeing</h2><a class="meta" href="#health">Health</a></div><div class="panel chartbox ovx" id="ov-well"></div></div>
       <div><div class="sechead"><h2>Spending</h2><a class="meta" href="#money">Money</a></div><div class="panel chartbox ovx" id="ov-spend"></div></div>
     </div>
@@ -1492,6 +1530,10 @@ button.tile.is-open{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--
   <section class="view" id="v-health" hidden>
     <div class="g-col">
       <div data-part="body mind cycle" data-wide class="pager h-pager" id="h-day"></div>
+      <div data-part="body">
+        <div class="sechead"><h2>Sleep</h2><span class="meta">Log it when you wake up</span></div>
+        <div class="panel hcard" id="h-sleep"></div>
+      </div>
       <div data-part="body">
         <div class="sechead"><h2>Water</h2><span class="meta">1 cup = 250 ml</span></div>
         <div class="panel hcard" id="h-water"></div>
@@ -1659,6 +1701,6 @@ button.tile.is-open{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=30"></script>
+<script type="module" src="app.js?v=32"></script>
 </body>
 </html>
