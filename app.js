@@ -240,7 +240,7 @@ const QA_URG = [["critical","Critical"],["high","High"],["medium","Medium"],["lo
 function qaEffective(){
   const p = parseQuick($("#q").value);
   const work = S.mode === "work";
-  return { p, work, study: S.mode === "study", cat: p.cat || (p.newCat ? "__new" : S.qa.cat), urg: p.urg || S.qa.urg, due: p.due !== null && p.due !== undefined ? p.due : S.qa.due };
+  return { p, work, study: S.mode === "study", self: S.mode === "self", cat: p.cat || (p.newCat ? "__new" : S.qa.cat), urg: p.urg || S.qa.urg, due: p.due !== null && p.due !== undefined ? p.due : S.qa.due };
 }
 function dueChoices(){
   const tk = todayKey(), out = [[tk, "Today"], [addDays(tk, 1), "Tomorrow"]];
@@ -251,7 +251,12 @@ function renderQA(){
   const box = $("#qa"); if (!box) return;
   const E = qaEffective(), ch = (attr, val, label, on, extra = "") => `<button type="button" class="qc ${extra}" ${attr}="${esc(val)}" aria-pressed="${on}">${label}</button>`;
   const dues = dueChoices(), customDue = E.due && !dues.some(d => d[0] === E.due);
-  let h = `<div class="qa-row"><span class="qa-lbl">Type</span><div class="qa-chips">${ch("data-qa-type", "todo", "To-do", !E.work && !E.study)}${ch("data-qa-type", "work", "Work task", E.work)}${ch("data-qa-type", "study", "Study", E.study)}</div></div>`;
+  let h = `<div class="qa-row"><span class="qa-lbl">Type</span><div class="qa-chips">${ch("data-qa-type", "todo", "To-do", !E.work && !E.study)}${ch("data-qa-type", "work", "Work task", E.work)}${ch("data-qa-type", "study", "Study", E.study)}${ch("data-qa-type", "self", "Self-study / skills", E.self)}</div></div>`;
+  if (E.self) {
+    h += `<div class="qa-row"><span class="qa-lbl">Skill</span><div class="qa-chips">${S.cats.map((c, i) => ch("data-qa-cat", c.tag, esc(c.name.split(/\s*\/\s*/)[0]), E.cat === c.tag, "ci-" + (i % 6))).join("")}
+      ${S.qa.adding ? `<span class="qc-new"><input id="qa-newcat" placeholder="New skill" aria-label="New skill name"><button type="button" class="qc" data-qa-newsave>Add</button></span>` : ch("data-qa-newcat", "1", "+ New", false, "ghost")}</div></div>`;
+    if (S.courses.length) h += `<div class="qa-row"><span class="qa-lbl">Course</span><div class="qa-chips">${S.courses.map(c => ch("data-qa-course", c.id, esc(c.name.length > 26 ? c.name.slice(0, 24) + "…" : c.name), S.qa.course === c.id)).join("")}</div></div>`;
+  }
   if (E.study) {
     const subs = typeof curSubjects === "function" ? curSubjects() : [];
     h += `<div class="qa-row"><span class="qa-lbl">Subject</span><div class="qa-chips">${subs.length ? subs.map(s => ch("data-qa-subj", s.id, esc(s.code || s.name), S.qa.subj === s.id, "ci-" + ((+s.color || 0) % 6))).join("") : `<a class="qc ghost" href="#study-timetable">Add subjects first</a>`}</div></div>`;
@@ -265,7 +270,7 @@ function renderQA(){
   }
   h += `<div class="qa-row"><span class="qa-lbl">${E.work || (E.study && S.qa.skind !== "todo") ? "Due" : "When"}</span><div class="qa-chips">${E.work || (E.study && S.qa.skind !== "todo") ? ch("data-qa-due", "", "No date", !E.due) : ""}${dues.map(([k, l]) => ch("data-qa-due", k, l, E.due === k)).join("")}
     <label class="qc pick ${customDue ? "on" : ""}" aria-pressed="${customDue}">${SVG(ICON.calendar)}${customDue ? esc(fmtDate(E.due)) : "Pick date"}<input type="date" id="qa-pick" data-native value="${esc(E.due || "")}" aria-label="Pick a date"></label></div></div>`;
-  h += E.study ? `<p class="qa-tip">${S.qa.skind === "todo" ? "Study to-dos show in the Study list on Today." : "Saved to Study → Assignments, due at 11:59pm. Edit it there to change the time or weight."}</p>` : `<p class="qa-tip">Shortcut: you can also type <code>#excel</code> <code>!high</code> <code>@fri</code> in the box.</p>`;
+  h += E.self ? `<p class="qa-tip">Self-study counts towards that skill on Work → Skills.</p>` : E.study ? `<p class="qa-tip">${S.qa.skind === "todo" ? "Study to-dos show in the Study list on Today." : "Saved to Study → Assignments, due at 11:59pm. Edit it there to change the time or weight."}</p>` : `<p class="qa-tip">Shortcut: you can also type <code>#excel</code> <code>!high</code> <code>@fri</code> in the box.</p>`;
   box.innerHTML = h;
 }
 // remove typed tokens for a field when its chip is tapped, so the chip choice wins
@@ -277,7 +282,8 @@ $("#q").addEventListener("input", updateHint);
 $("#qa").addEventListener("pointerdown", e => { if (e.target.closest("button.qc")) e.preventDefault(); });
 $("#qa").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.qaType) { if (b.dataset.qaType !== "work") stripTokens(/^[#!]\S+/); S.mode = b.dataset.qaType; S.autoWork = false; if (S.mode !== "work" && !S.qa.due) S.qa.due = todayKey(); }
+  if (b.dataset.qaType) { if (b.dataset.qaType !== "work") stripTokens(/^[#!]\S+/); S.mode = b.dataset.qaType; S.autoWork = false; if (S.mode !== "work" && !S.qa.due) S.qa.due = todayKey(); if (S.mode === "self" && !S.qa.cat) { const c = S.courses[0]; if (c && (c.skills || [])[0]) S.qa.cat = c.skills[0]; } }
+  else if (b.dataset.qaCourse) { S.qa.course = S.qa.course === b.dataset.qaCourse ? "" : b.dataset.qaCourse; const c = S.courses.find(x => x.id === S.qa.course); if (c && !S.qa.cat && (c.skills || [])[0]) S.qa.cat = c.skills[0]; }
   else if (b.dataset.qaSubj) { S.qa.subj = S.qa.subj === b.dataset.qaSubj ? "" : b.dataset.qaSubj; }
   else if (b.dataset.qaSkind) { const was = S.qa.skind; S.qa.skind = b.dataset.qaSkind; if (was === "todo" && S.qa.skind !== "todo" && S.qa.due === todayKey()) S.qa.due = addDays(todayKey(), 7); if (S.qa.skind === "todo" && !S.qa.due) S.qa.due = todayKey(); }
   else if (b.dataset.qaCat !== undefined) { stripTokens(/^#\S+/); S.qa.cat = S.qa.cat === b.dataset.qaCat ? "" : b.dataset.qaCat; }
@@ -296,7 +302,7 @@ $("#qa").addEventListener("keydown", e => { if (e.target.id === "qa-newcat" && e
 $("#qa").addEventListener("change", e => { if (e.target.id === "qa-pick" && e.target.value) { stripTokens(/^@\S+/); S.qa.due = e.target.value; renderQA(); } });
 // show the chips while adding, hide them when you're done
 const qaShow = on => { $("#qa").hidden = !on; $("#quick").classList.toggle("open", on); };
-$("#quick").addEventListener("focusin", () => qaShow(true));
+$("#quick").addEventListener("focusin", e => { if ($("#qa").hidden && e.target.id === "q") renderQA(); qaShow(true); });
 $("#quick").addEventListener("focusout", () => setTimeout(() => { if (!$("#quick").contains(document.activeElement) && !$("#q").value.trim() && !S.qa.adding) qaShow(false); }, 150));
 $("#q").addEventListener("keydown", e => { if (e.key === "Escape") { $("#q").value = ""; updateHint(); $("#q").blur(); qaShow(false); } });
 $("#quick").addEventListener("submit", e => {
@@ -308,6 +314,10 @@ $("#quick").addEventListener("submit", e => {
     if (p.newCat) { const tag = p.newCat.toLowerCase().replace(/[^a-z0-9-]/g, ""); const name = p.newCat.charAt(0).toUpperCase() + p.newCat.slice(1); if (!S.cats.find(c => c.tag === tag)) { S.cats.push({ name, tag }); saveCats(); } cat = tag; }
     put("tasks", newId(), { title: p.title, desc: "", category: cat || "", urgency: E.urg || "medium", status: "todo", progress: 0, bottleneck: "", assignedBy: "", due: E.due || "", createdAt: nowISO(), updatedAt: nowISO(), doneAt: "", log: [{ at: nowISO(), note: "Task added" }] });
     toast(`Work task added${cat ? " · " + catName(cat).split(/\s*\/\s*/)[0] : ""}${E.due ? " · due " + fmtDate(E.due) : ""}`);
+  } else if (E.self) {
+    const cat = E.cat === "__new" ? "" : E.cat;
+    put("todos", newId(), { title: p.title, date: E.due || todayKey(), done: false, doneAt: "", createdAt: nowISO(), kind: "self", cat: cat || "", course: S.qa.course || "" });
+    toast(`Self-study added${cat ? " · " + catName(cat).split(/\s*\/\s*/)[0] : ""}${E.due && E.due !== todayKey() ? " for " + fmtDate(E.due) : ""}`);
   } else if (E.study) {
     const sj = S.qa.subj, kind = S.qa.skind;
     if (kind === "todo") { put("todos", newId(), { title: p.title, date: E.due || todayKey(), done: false, doneAt: "", createdAt: nowISO(), kind: "study", subj: sj || "" }); toast(`Study to-do added${sj ? " · " + subjLabel(sj) : ""}${E.due && E.due !== todayKey() ? " for " + fmtDate(E.due) : ""}`); }
@@ -368,7 +378,7 @@ function applyParts(){
 function route(){
   const R = parseRoute(), changed = R.main !== S.main || R.sub !== S.sub;
   S.main = R.main; S.sub = R.sub; S.view = R.view;
-  if (S.view === "work") setMode("work"); else if (S.view === "study") setMode("study"); else if (S.view === "today") setMode("todo");
+  if (S.view === "work") setMode("work"); else if (S.view === "study") setMode("study"); else if (S.view === "growth") setMode("self"); else if (S.view === "today") setMode("todo");
   renderNav(); applyParts(); render();
   if (changed) window.scrollTo(0, 0);
 }
@@ -534,21 +544,25 @@ function renderToday(){
     <span class="tl-acts"><button class="x tl-ed" type="button" data-rtedit="${esc(r.id)}" aria-label="Edit ${esc(r.label)}" title="Edit">${SVG(ICON.edit)}</button>${r.extra ? `<button class="x" type="button" data-delextra="${esc(r.id)}" aria-label="Remove ${esc(r.label)}">✕</button>`
       : `<button class="x small" type="button" data-skip="${esc(r.id)}">${sk?"Undo":"Skip"}</button>`}</span></li>`; }).join("")
     : `<li class="empty" style="display:block">${S.ready?"Nothing scheduled for this day.":"Loading…"}</li>`;
-  const mine=S.todos.filter(t=>t.kind!=="study");
+  const mine=S.todos.filter(t=>!t.kind);
   const open=mine.filter(t=>!t.done && (!t.date||t.date<=tk)).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
   const later=mine.filter(t=>!t.done && t.date>tk).sort((a,b)=>a.date.localeCompare(b.date));
   $("#todo-meta").textContent = later.length?`${later.length} scheduled later`:"";
   const row = t => `<li class="${t.done?"done":""}"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done?"checked":""} aria-label="Done: ${esc(t.title)}">
-    <span class="grow"><span>${t.kind==="study"&&t.subj?`<span class="tag ${subjCls(t.subj)}">${esc(subjLabel(t.subj))}</span> `:""}${esc(t.title)}</span>${t.date&&t.date!==tk?`<div class="sub ${t.date<tk&&!t.done?"overdue":""}">${t.date<tk?"From ":""}${esc(fmtDate(t.date))}</div>`:""}</span>
+    <span class="grow"><span>${t.kind==="study"&&t.subj?`<span class="tag ${subjCls(t.subj)}">${esc(subjLabel(t.subj))}</span> `:""}${t.kind==="self"&&t.cat?catTag(t.cat)+" ":""}${esc(t.title)}</span>${t.date&&t.date!==tk?`<div class="sub ${t.date<tk&&!t.done?"overdue":""}">${t.date<tk?"From ":""}${esc(fmtDate(t.date))}</div>`:""}</span>
     <button class="x" type="button" data-deltodo="${esc(t.id)}" aria-label="Delete">✕</button></li>`;
   $("#todos").innerHTML = (open.length||later.length) ? open.map(row).join("") + (later.length?`<li class="sub" style="background:var(--sunk)">Later</li>`+later.map(row).join(""):"")
     : `<li class="empty">${S.ready?"Nothing to do. Add one in the box above.":"Loading…"}</li>`;
   { const sh = studyTodayHtml(), st = S.todos.filter(t=>t.kind==="study"&&!t.done).sort((a,b)=>(a.date||"").localeCompare(b.date||"")), now = st.filter(t=>!t.date||t.date<=addDays(tk,1)), lat = st.length - now.length;
     $("#today-study-wrap").hidden = !sh && !st.length && !S.subjects.length;
     $("#today-study").innerHTML = (sh || "") + (now.length ? `<div class="small muted" style="margin-top:6px">Study to-dos</div><ul class="rows st-todos">${now.map(row).join("")}</ul>` : "") + (lat ? `<p class="small muted" style="margin:4px 0 0">${lat} more study to-do${lat===1?"":"s"} later this week or after · <a href="#study-assignments">see all</a></p>` : "") + (!sh && !st.length ? `<p class="small muted" style="margin:0">Nothing for study today. Add one with the box above: choose <b>Study</b>.</p>` : ""); }
+  { const st = S.todos.filter(t=>t.kind==="self"&&!t.done).sort((a,b)=>(a.date||"").localeCompare(b.date||"")), now = st.filter(t=>!t.date||t.date<=addDays(tk,1)), lat = st.length-now.length, cs = S.courses.filter(c=>courseStats(c).pct<100);
+    $("#today-self-wrap").hidden = !st.length && !S.courses.length;
+    $("#today-self").innerHTML = (now.length ? `<ul class="rows st-todos">${now.map(row).join("")}</ul>` : `<p class="small muted" style="margin:0">${st.length ? "" : "Nothing planned. Add one with the box above: choose <b>Self-study / skills</b>."}</p>`) + (lat ? `<p class="small muted" style="margin:4px 0 0">${lat} more planned later</p>` : "")
+      + (cs.length ? `<ul class="co-mini">${cs.slice(0,3).map(c=>{ const s2=courseStats(c); return `<li data-course="${esc(c.id)}"><span class="grow"><b>${esc(c.name)}</b><span class="bar"><i style="width:${s2.pct}%"></i></span></span><span class="small muted">${s2.pct}%</span><button class="btn sm" type="button" data-cfocus="${esc(c.id)}">${SVG(ICON.play)}25m</button></li>`; }).join("")}</ul>` : ""); }
   const focus=sortTasks(S.tasks.filter(t=>t.status!=="done")).slice(0,3);
   $("#focus").innerHTML = focus.length?focus.map(taskCard).join(""):`<div class="panel empty">${S.ready?"No open work tasks. Switch the box above to Work to add one.":"Loading…"}</div>`;
-  const doneT=S.todos.filter(t=>t.done&&isoDay(t.doneAt)===tk).map(t=>({l:t.title,s:t.kind==="study"?"Study"+(t.subj?" · "+subjLabel(t.subj):""):"To-do",at:t.doneAt}));
+  const doneT=S.todos.filter(t=>t.done&&isoDay(t.doneAt)===tk).map(t=>({l:t.title,s:t.kind==="study"?"Study"+(t.subj?" · "+subjLabel(t.subj):""):t.kind==="self"?"Self-study"+(t.cat?" · "+catName(t.cat).split(/\s*\/\s*/)[0]:""):"To-do",at:t.doneAt}));
   const doneW=S.tasks.filter(t=>t.status==="done"&&isoDay(t.doneAt)===tk).map(t=>({l:t.title,s:catName(t.category),at:t.doneAt}));
   const all=[...doneW,...doneT].sort((a,b)=>b.at.localeCompare(a.at));
   $("#done-meta").textContent = all.length?`${all.length} completed`:"";
@@ -895,7 +909,7 @@ document.addEventListener("click", e => {
 });
 
 // ---------- Growth: courses, habit streaks, skills
-let courseDel = null; S.modOpen = {};
+let courseDel = null; S.modOpen = {}; S.cskEdit = null;
 document.addEventListener("toggle", e => { const d = e.target; if (d.matches && d.matches("details[data-cid]")) S.modOpen[d.dataset.cid] = d.open; }, true);
 function minsFor(pred){ return S.time.filter(pred).reduce((a, x) => a + (+x.mins || 0), 0); }
 function weekAgoKey(){ const d = new Date(); d.setDate(d.getDate() - 6); return dkey(d); }
@@ -922,6 +936,8 @@ function renderCourses(){
       <div class="co-bar"><span class="bar"><i style="width:${st.pct}%"></i></span><b class="mono-n">${st.pct}%</b></div>
       <div class="co-stats"><span><b>${fmtMins(st.week)}</b> this week</span><span><b>${fmtMins(st.mins)}</b> total</span><span>${SVG(ICON.flame)}<b>${st.streak}</b> day streak</span></div>
       ${st.pace ? `<p class="small" style="margin:0">${st.pace}</p>` : ""}
+      <div class="co-skills"><span class="small muted">Skills:</span>${S.cskEdit === c.id ? `${S.cats.map((k, i) => `<button type="button" class="qc ci-${i % 6}" data-csk="${esc(k.tag)}" aria-pressed="${(c.skills || []).includes(k.tag)}">${esc(k.name.split(/\s*\/\s*/)[0])}</button>`).join("")}<span class="qc-new"><input data-csknew placeholder="New skill" aria-label="New skill"><button type="button" class="qc" data-csknewadd>Add</button></span><button type="button" class="btn sm" data-cskdone>Done</button>`
+        : `${(c.skills || []).map(t => catTag(t)).join("")}<button type="button" class="linkbtn small" data-cskedit>${(c.skills || []).length ? "Edit" : "+ Link skills"}</button>`}</div>
       <details class="co-mods" data-cid="${esc(c.id)}" ${(S.modOpen[c.id] ?? st.mods.length <= 12) ? "open" : ""}><summary class="small">Modules</summary>
         ${st.mods.length ? `<ul class="subs">${st.mods.map((m, i) => `<li class="${m.done ? "done" : ""}"><input type="checkbox" data-cmod="${i}" ${m.done ? "checked" : ""} aria-label="Module done: ${esc(m.title)}"><span>${esc(m.title)}</span><button type="button" class="x" data-cmoddel="${i}" aria-label="Remove module">✕</button></li>`).join("")}</ul>` : `<p class="small muted">No modules yet. Paste them below, one per line.</p>`}
         <textarea class="inp" data-cmodnew rows="2" placeholder="Paste module names, one per line"></textarea>
@@ -935,6 +951,10 @@ $("#course-form").addEventListener("submit", e => { e.preventDefault(); const n 
 document.addEventListener("click", e => {
   const card = e.target.closest("[data-course]"); if (!card) return;
   const c = S.courses.find(x => x.id === card.dataset.course); if (!c) return;
+  if (e.target.closest("[data-cskedit]")) { S.cskEdit = c.id; renderCourses(); return; }
+  if (e.target.closest("[data-cskdone]")) { S.cskEdit = null; renderCourses(); return; }
+  const sk = e.target.closest("[data-csk]"); if (sk) { const has = (c.skills || []).includes(sk.dataset.csk); saveCourse({ ...c, skills: has ? c.skills.filter(t => t !== sk.dataset.csk) : [...(c.skills || []), sk.dataset.csk] }); return; }
+  if (e.target.closest("[data-csknewadd]")) { const n = (card.querySelector("[data-csknew]").value || "").trim(); if (!n) return; let tag = n.split(/[\s\/]+/)[0].toLowerCase().replace(/[^a-z0-9-]/g, "") || "skill"; const ex = S.cats.find(k => k.name.toLowerCase() === n.toLowerCase()); if (ex) tag = ex.tag; else { while (S.cats.find(k => k.tag === tag)) tag += "2"; S.cats.push({ name: n, tag }); saveCats(); } saveCourse({ ...c, skills: [...new Set([...(c.skills || []), tag])] }); toast("Skill linked"); return; }
   if (e.target.closest("[data-cfocus]")) { startTimer({ type: "course", ref: c.id, label: c.name, mode: "focus", dur: 25 }); return; }
   if (e.target.closest("[data-cmodadd]")) { const ta = card.querySelector("[data-cmodnew]"); const lines = ta.value.split(/\n+/).map(x => x.replace(/^\s*[-*•\d.)]+\s*/, "").trim()).filter(Boolean);
     if (!lines.length) return; saveCourse({ ...c, modules: [...(c.modules || []), ...lines.map(t => ({ id: newSubId(), title: t, done: false }))] }); toast(`${lines.length} module${lines.length > 1 ? "s" : ""} added`); return; }
@@ -978,29 +998,34 @@ function renderHabits(){
     : `<div class="panel empty" style="grid-column:1/-1">Tick routine items on the Today page and your streaks build up here.</div>`;
 }
 function skillData(){
-  const cats = [...new Set([...S.cats.map(c => c.tag), ...S.tasks.map(t => t.category || "")])];
+  const selfT = S.todos.filter(t => t.kind === "self");
+  const cats = [...new Set([...S.cats.map(c => c.tag), ...S.tasks.map(t => t.category || ""), ...selfT.map(t => t.cat || ""), ...S.courses.flatMap(c => c.skills || [])])];
   return cats.map(tag => {
-    const ts = S.tasks.filter(t => (t.category || "") === tag); if (!ts.length) return null;
+    const ts = S.tasks.filter(t => (t.category || "") === tag), ss = selfT.filter(t => (t.cat || "") === tag), cs = S.courses.filter(c => (c.skills || []).includes(tag));
+    if (!ts.length && !ss.length && !cs.length) return null;
     const done = ts.filter(t => t.status === "done").sort((a, b) => (b.doneAt || "").localeCompare(a.doneAt || ""));
-    const mins = minsFor(x => x.type === "task" && ts.some(t => t.id === x.ref));
-    return { tag, name: tag ? catName(tag) : "Uncategorised", done, open: ts.length - done.length, mins };
-  }).filter(Boolean).sort((a, b) => b.done.length - a.done.length || b.mins - a.mins);
+    const selfDone = ss.filter(t => t.done).sort((a, b) => (b.doneAt || "").localeCompare(a.doneAt || ""));
+    const workMins = minsFor(x => x.type === "task" && ts.some(t => t.id === x.ref)), studyMins = minsFor(x => x.type === "course" && cs.some(c => c.id === x.ref));
+    return { tag, name: tag ? catName(tag) : "Uncategorised", done, open: ts.length - done.length, mins: workMins + studyMins, workMins, studyMins, selfDone, selfOpen: ss.length - selfDone.length, courses: cs };
+  }).filter(Boolean).sort((a, b) => (b.done.length + b.selfDone.length + b.courses.length) - (a.done.length + a.selfDone.length + a.courses.length) || b.mins - a.mins);
 }
 function resumeBullets(){
   const sd = skillData().filter(s => s.done.length);
   const L = [];
   for (const s of sd) {
     const ex = s.done.slice(0, 3).map(t => t.title.replace(/^\(Example\)\s*/i, "")).join("; ");
-    L.push(`• ${s.name}: completed ${s.done.length} task${s.done.length > 1 ? "s" : ""}${s.mins >= 60 ? ` (${Math.round(s.mins / 60)}+ hours)` : ""}, including ${ex}.`);
+    L.push(`• ${s.name}: completed ${s.done.length} task${s.done.length > 1 ? "s" : ""}${s.workMins >= 60 ? ` (${Math.round(s.workMins / 60)}+ hours)` : ""}, including ${ex}.`);
   }
+  S.courses.forEach(c => { const st = courseStats(c); if (st.done) L.push(`• ${c.name}: ${st.pct >= 100 ? "completed" : `${st.done} of ${st.mods.length} modules completed`}${st.mins >= 60 ? ` (${Math.round(st.mins / 60)}+ hours of study)` : ""}${(c.skills || []).length ? `, covering ${c.skills.map(t => catName(t).split(/\s*\/\s*/)[0]).join(", ")}` : ""}.`); });
   S.tasks.filter(t => t.status === "done" && t.impact).sort((a, b) => (b.doneAt || "").localeCompare(a.doneAt || "")).forEach(t => L.push(`• ${t.title}: ${t.impact}`));
   return L;
 }
 function renderSkills(){
   const sd = skillData();
-  $("#skills").innerHTML = sd.length ? sd.map(s => `<div class="panel skill"><div class="sk-head">${catTag(s.tag)}<span class="muted small">${s.done.length} done · ${s.open} open${s.mins ? " · " + fmtMins(s.mins) : ""}</span></div>
-      ${s.done.length ? `<ul class="sk-list">${s.done.slice(0, 5).map(t => `<li data-task="${esc(t.id)}"><span>${esc(t.title)}</span>${t.impact ? `<span class="impact">${SVG(ICON.star)}${esc(t.impact)}</span>` : ""}</li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Finish a task in this category to start building your record.</p>`}</div>`).join("")
-    : `<div class="panel empty">Your skills build up here as you complete work tasks.</div>`;
+  $("#skills").innerHTML = sd.length ? sd.map(s => `<div class="panel skill"><div class="sk-head">${catTag(s.tag)}<span class="muted small">${s.mins ? fmtMins(s.mins) + " total" : ""}</span></div>
+      <div class="sk-src">${s.done.length || s.open ? `<span>${SVG(ICON.work)}Work: <b>${s.done.length}</b> done${s.open ? ` · ${s.open} open` : ""}${s.workMins ? ` · ${fmtMins(s.workMins)}` : ""}</span>` : ""}${s.courses.length ? `<span>${SVG(ICON.book)}Courses: ${s.courses.map(c => { const st = courseStats(c); return `<a href="#study-courses">${esc(c.name)}</a> ${st.pct}%`; }).join(", ")}${s.studyMins ? ` · ${fmtMins(s.studyMins)}` : ""}</span>` : ""}${s.selfDone.length || s.selfOpen ? `<span>${SVG(ICON.class)}Self-study: <b>${s.selfDone.length}</b> done${s.selfOpen ? ` · ${s.selfOpen} to do` : ""}</span>` : ""}</div>
+      ${s.done.length || s.selfDone.length || s.courses.some(c => (c.modules || []).some(m => m.done)) ? `<ul class="sk-list">${[...s.done.map(t => ({ at: t.doneAt, h: `<li data-task="${esc(t.id)}"><span>${esc(t.title)}</span>${t.impact ? `<span class="impact">${SVG(ICON.star)}${esc(t.impact)}</span>` : ""}</li>` })), ...s.selfDone.map(t => ({ at: t.doneAt, h: `<li class="sk-self"><span>${esc(t.title)}</span><span class="small muted">Self-study · ${esc(fmtDate(isoDay(t.doneAt)))}</span></li>` })), ...s.courses.flatMap(c => (c.modules || []).filter(m => m.done).map(m => ({ at: m.doneAt || "", h: `<li class="sk-self"><span>${esc(m.title)}</span><span class="small muted">Module · ${esc(c.name)}${m.doneAt ? " · " + esc(fmtDate(isoDay(m.doneAt))) : ""}</span></li>` })))].sort((a, b) => (b.at || "").localeCompare(a.at || "")).slice(0, 6).map(x => x.h).join("")}</ul>` : `<p class="small muted" style="margin:0">${s.courses.length ? "Linked to your course. Add self-study or finish work tasks with this skill to list them here." : "Finish a work task or self-study item with this skill to start your record."}</p>`}</div>`).join("")
+    : `<div class="panel empty">Your skills build up here from work tasks, courses and self-study.</div>`;
   const b = resumeBullets();
   $("#bullets").textContent = b.length ? b.join("\n") : "Complete a few work tasks (and add a Result / impact when you mark them done) to generate resume bullet points here.";
   $("#bullets-copy").disabled = !b.length;

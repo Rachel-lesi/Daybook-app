@@ -1287,6 +1287,21 @@ label.f:has(.dhint){margin-bottom:18px}
 .st-todo-box summary{cursor:pointer;padding:2px 0}
 .st-todo-box .rows{margin:4px 0 0;padding:0}
 #todos .tag,.st-todos .tag,.st-todo-box .tag{font-size:.68rem;vertical-align:1px}
+
+/* ===== skills from courses + self-study ===== */
+.co-skills{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.co-skills .qc-new{display:inline-flex;gap:4px}
+.co-skills .qc-new input{font:inherit;font-size:.82rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:99px;padding:4px 10px;width:120px}
+.sk-src{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.82rem;color:var(--muted)}
+.sk-src span{display:inline-flex;align-items:center;gap:5px}
+.sk-src svg{width:13px;height:13px}
+.sk-src a{color:var(--ink)}
+.sk-list li.sk-self{cursor:default}
+.co-mini{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
+.co-mini li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.co-mini .grow{display:grid;gap:4px;min-width:0}
+.co-mini b{font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.co-mini .btn svg{width:12px;height:12px}
 </style>
 </head>
 <body class="locked">
@@ -1435,7 +1450,7 @@ label.f:has(.dhint){margin-bottom:18px}
     <nav class="subtabs" id="subtabs" aria-label="Section" hidden></nav>
     <form class="quick" id="quick" autocomplete="off">
       <div class="qrow">
-        <input id="q" placeholder="Add a to-do, work task or study item…" aria-label="Quick add" enterkeyhint="done">
+        <input id="q" placeholder="Add a to-do, work, study or self-study item…" aria-label="Quick add" enterkeyhint="done">
         <button class="btn primary" type="submit">Add</button>
       </div>
       <div class="qa" id="qa" hidden></div>
@@ -1468,6 +1483,10 @@ label.f:has(.dhint){margin-bottom:18px}
     <div id="today-study-wrap" hidden>
       <div class="sechead"><h2>Study</h2><a class="meta" href="#study">Classes, deadlines & study to-dos</a></div>
       <div class="panel hcard" id="today-study"></div>
+    </div>
+    <div id="today-self-wrap" hidden>
+      <div class="sechead"><h2>Self-study & skills</h2><a class="meta" href="#work-skills">Skills</a></div>
+      <div class="panel hcard" id="today-self"></div>
     </div>
     <div>
       <div class="sechead"><h2>Focus timer</h2><span class="meta">Pomodoro</span></div>
@@ -1543,7 +1562,7 @@ label.f:has(.dhint){margin-bottom:18px}
     </div>
     <div class="g-col">
       <div data-part="skills">
-        <div class="sechead"><h2>Skills & achievements</h2><span class="meta">Built from completed work tasks</span></div>
+        <div class="sechead"><h2>Skills & achievements</h2><span class="meta">Built from work tasks, courses and self-study</span></div>
         <div id="skills" class="g-stack"></div>
       </div>
       <div data-part="skills">
@@ -1759,6 +1778,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=37"></script>
+<script type="module" src="app.js?v=38"></script>
 </body>
 </html>
