@@ -2399,17 +2399,45 @@ function sleepInsights(keys, labels, mini){
 }
 const TIME_COLORS = ["var(--c0)", "var(--c1)", "var(--c2)", "var(--c3)", "var(--c4)", "var(--c5)", "var(--high)", "var(--med)"];
 S.tvMode = "day"; S.tvDay = null; S.tvWk = 0;
-function timeOfDay(k){ const seg = {}; const add = (n, m) => { if (m > 0) seg[n] = (seg[n] || 0) + m; };
-  add("Sleep", sleepMins(hDoc(k).sleep) || 0);
-  classesOn(k).filter(c => !attOf(c, k)).forEach(c => add("Classes", toMin(c.end) - toMin(c.start)));
-  S.time.filter(x => x.date === k).forEach(x => { const m = +x.mins || 0;
-    if (x.type === "task") { const t = S.tasks.find(y => y.id === x.ref); add("Work · " + catName(t ? t.category : "").split(/\s*\/\s*/)[0], m); }
-    else if (x.type === "course" || x.type === "self") add("Self-study & courses", m);
-    else if (x.type === "study") add("Study (assignments & revision)", m);
-    else add("Focus sessions", m); });
-  return seg; }
-const TV_FIXED = { "Sleep": "var(--c0)", "Classes": "var(--c1)", "Self-study & courses": "var(--c2)", "Study (assignments & revision)": "var(--c5)", "Focus sessions": "var(--med)", "Not tracked": "var(--line)" };
-function tvColor(n, workNames){ if (TV_FIXED[n]) return TV_FIXED[n]; const i = workNames.indexOf(n); return ["var(--c3)", "var(--c4)", "var(--high)", "var(--c5)", "var(--c1)"][i % 5]; }
+// ---------- what each minute of a day was spent on: sleep log, timed sessions, classes, then ticked routine items
+function routineCat(r){
+  const l = (r.label || "").toLowerCase(), k = r.kind || "other";
+  if (/\bsleep|\bbed\b|nap\b/.test(l)) return null;
+  if (k === "meal" || /breakfast|brunch|lunch|dinner|supper|\bmeal|\beat\b|snack/.test(l)) return "Meals";
+  if (/scroll|social|tiktok|instagram|youtube|netflix|\bgame|red ?note|xiaohongshu|movie|drama|series/.test(l)) return "Leisure & screen time";
+  if (k === "work" || /\bwork|email|e-mail|intern|meeting|report|office|shift/.test(l)) return "Work";
+  if (k === "class" || k === "study" || /study|practi[cs]e|revis|lecture|tutorial|assignment|course|homework|excel|sql|python|coding|read|exam|reflect/.test(l)) return "Study & courses";
+  if (k === "health" || /gym|swim|run\b|running|exercise|walk|workout|yoga|sport|badminton|basketball|football/.test(l)) return "Exercise & health";
+  if (/commut|travel|drive|driving|\bbus\b|train|\bmrt|\blrt|grab|moving to|go to|going to|arrive|home\b|back to/.test(l)) return "Travel";
+  if (/shop|grocer|errand|chore|laundry|clean|cook|wash|tidy|pay /.test(l)) return "Chores & errands";
+  if (k === "break" || /break|rest|relax|chill/.test(l)) return "Breaks & rest";
+  if (/wake|shower|bath|get ready|getting ready|dress|skincare|brush/.test(l)) return "Getting ready";
+  if (k === "supplement" || /supplement|vitamin|medicine|pill/.test(l)) return "Getting ready";
+  const t = (r.label || "Other").trim(); return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function timeCat(x){
+  if (x.type === "task") { const t = S.tasks.find(y => y.id === x.ref); return "Work"; }
+  if (x.type === "course" || x.type === "self" || x.type === "study") return "Study & courses";
+  return "Focus sessions";
+}
+function dayTimeline(k){
+  const T = new Array(1440).fill(null), fill = (a, b, c, force) => { a = Math.max(0, Math.round(a)); b = Math.min(1440, Math.round(b)); for (let i = a; i < b; i++) if (force || !T[i]) T[i] = c; };
+  // sleep: the night that ended this morning, and the night that started this evening
+  const s0 = hDoc(k).sleep; if (s0 && s0.bed && s0.wake) { const b = toMin(s0.bed), w = toMin(s0.wake); if (b > w) fill(0, w, "Sleep", true); else fill(b, w, "Sleep", true); }
+  const s1 = hDoc(addDays(k, 1)).sleep; if (s1 && s1.bed && s1.wake && toMin(s1.bed) > toMin(s1.wake)) fill(toMin(s1.bed), 1440, "Sleep", true);
+  // timed and logged sessions
+  S.time.filter(x => x.date === k && x.start).forEach(x => { const a = minsOfISO(x.start), m = +x.mins || 0; fill(a, Math.min(1440, a + m), timeCat(x)); });
+  // classes you attended
+  classesOn(k).filter(c => !attOf(c, k)).forEach(c => fill(toMin(c.start), toMin(c.end), "Classes"));
+  // routine items you ticked: each runs until the next item starts (at most 4 hours)
+  const dd = dayDoc(k), done = dd.done || {}, skip = dd.skip || {}, items = routineFor(k).filter(r => !skip[r.id]).sort((a, b) => a.time.localeCompare(b.time));
+  items.forEach((r, i) => { if (!done[r.id]) return; const cat = routineCat(r); if (!cat) return; const a = toMin(r.time), nx = items[i + 1] ? toMin(items[i + 1].time) : a + 60; fill(a, Math.min(nx, a + ({ "Meals": 60, "Getting ready": 45 }[cat] || 240)), cat); });
+  return T;
+}
+function timeOfDay(k){ const seg = {}; dayTimeline(k).forEach(c => { if (c) seg[c] = (seg[c] || 0) + 1; }); return seg; }
+const TV_FIXED = { "Sleep": "#4a6fa5", "Work": "#465c47", "Study & courses": "#86659f", "Classes": "#3f8789", "Meals": "#d08a3e", "Exercise & health": "#c0646f", "Travel": "#8a8f5a", "Chores & errands": "#a07a5a", "Leisure & screen time": "#e0a1b0", "Breaks & rest": "#9bb3a0", "Getting ready": "#b7a8d6", "Focus sessions": "#c9a227", "Not tracked": "var(--line)" };
+const TV_EXTRA = ["#6f8fb8", "#b88b6f", "#7a9e7e", "#a678a0", "#c7a35b", "#5f9ea0"];
+function tvColor(n){ if (TV_FIXED[n]) return TV_FIXED[n]; let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return TV_EXTRA[h % TV_EXTRA.length]; }
 function pieSvg(items, center, sub, workNames){
   const sum = items.reduce((a, x) => a + x[1], 0) || 1, R = 70, C = 2 * Math.PI * R; let off = 0;
   const arcs = items.map(([n, m]) => { const len = m / sum * C, col = tvColor(n, workNames); const a = `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${col}" stroke-width="34" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"><title>${esc(n)}: ${fmtHM(Math.round(m))}</title></circle>`; off += len; return a; });
@@ -2424,7 +2452,9 @@ function timeInsights(){
     if (S.ovUntracked && tracked < 1440) items = [...items, ["Not tracked", 1440 - tracked]];
     const nav = `<div class="tv-nav"><button class="btn sm" type="button" data-tvday="-1" aria-label="Previous day">‹</button><span class="small"><b>${k === tk ? "Today" : k === addDays(tk, -1) ? "Yesterday" : esc(DAYS[keyDow(k)])}</b> ${esc(fmtDate(k).replace(/^\w+, /, ""))}</span><button class="btn sm" type="button" data-tvday="1" ${k >= tk ? "disabled" : ""} aria-label="Next day">›</button></div></div>`;
     if (!tracked) return head + nav + `<p class="small muted" style="margin:0">Nothing tracked on this day. Time comes from your sleep log, class timetable, and timers or time logs on tasks and courses.</p>`;
-    return head + nav + `<div class="pie-wrap">${pieSvg(items, fmtHM(tracked), "tracked", workNames)}
+    const TL = dayTimeline(k), runs = []; TL.forEach((c, i) => { const last = runs[runs.length - 1]; if (last && last.c === c) last.n++; else runs.push({ c, a: i, n: 1 }); });
+    const strip = `<div class="tv-strip">${runs.map(r => `<i style="flex:${r.n};background:${r.c ? tvColor(r.c) : "transparent"}" title="${r.c ? esc(r.c) : "Not tracked"} ${hm(r.a)}–${hm(r.a + r.n)}"></i>`).join("")}</div><div class="tv-ticks">${[0, 6, 12, 18, 24].map(h => `<span>${h === 24 ? "" : fmt12(pad(h % 24) + ":00").replace(":00", "")}</span>`).join("")}</div>`;
+    return head + nav + strip + `<div class="pie-wrap">${pieSvg(items, fmtHM(tracked), "tracked", workNames)}
       <ul class="pie-leg">${items.map(([n, m]) => `<li><i style="background:${tvColor(n, workNames)}"></i><span>${esc(n)}</span><b>${fmtHM(Math.round(m))}</b><span class="muted small">${Math.round(m / (S.ovUntracked ? 1440 : tracked) * 100)}%</span></li>`).join("")}</ul></div>
       <label class="small muted pie-tog"><input type="checkbox" data-ovuntracked ${S.ovUntracked ? "checked" : ""}> Show the rest of the 24 hours (${fmtHM(Math.max(0, 1440 - tracked))} not tracked)</label>`;
   }

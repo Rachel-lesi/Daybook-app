@@ -1453,6 +1453,10 @@ label.f:has(.dhint){margin-bottom:18px}
 .tv-lbl{font-size:.7rem;color:var(--muted);margin-top:4px}
 .tv-h{font-size:.66rem;font-family:var(--f-mono);color:var(--muted)}
 .tv-bar:hover .tv-lbl{color:var(--accent)}
+
+.tv-strip{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--sunk);border:1px solid var(--line)}
+.tv-strip i{display:block;min-width:0}
+.tv-ticks{display:flex;justify-content:space-between;font-size:.66rem;color:var(--muted);margin-top:-6px}
 </style>
 </head>
 <body class="locked">
@@ -1687,7 +1691,7 @@ label.f:has(.dhint){margin-bottom:18px}
     </div>
     <div class="ov2">
       <div><div class="sechead"><h2>Sleep</h2><a class="meta" href="#health-body">Log sleep</a></div><div class="panel chartbox ovx" id="ov-sleep"></div></div>
-      <div><div class="sechead"><h2>Where your time went</h2><span class="meta">Sleep, classes, work and study time</span></div><div class="panel chartbox ovx" id="ov-time"></div></div>
+      <div><div class="sechead"><h2>Where your time went</h2><span class="meta">From your sleep log, timers, classes and ticked routine</span></div><div class="panel chartbox ovx" id="ov-time"></div></div>
     </div>
     <div class="ov2">
       <div><div class="sechead"><h2>Wellbeing</h2><a class="meta" href="#health">Health</a></div><div class="panel chartbox ovx" id="ov-well"></div></div>
@@ -1955,6 +1959,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=54"></script>
+<script type="module" src="app.js?v=55"></script>
 </body>
 </html>
