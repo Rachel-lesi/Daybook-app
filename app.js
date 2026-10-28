@@ -722,6 +722,7 @@ function renderOverview(){
       ${mini(bowelN, "Bowel movements", `${(bowelN / Math.max(1, keys.filter(k => k >= st && k <= tk).length)).toFixed(1)}/day`)}
       ${mini(wNow ? wNow.weight + " kg" : "–", "Weight", wNow && wStart && wStart !== wNow ? `${+wNow.weight >= +wStart.weight ? "+" : ""}${(wNow.weight - wStart.weight).toFixed(1)} kg in this period` : "")}
       ${mini(ongoing, "Ongoing health issues", ongoing ? "see Health log" : "none")}</div>
+    ${(() => { const c = mealSrcCounts(keys.filter(k => k <= tk)), n = c.home + c.out + c.delivery; return n ? `<div class="m-src-bar" title="Where your meals came from"><span class="small muted">Meals (${n})</span><span class="bar msb">${MEAL_SRC.map(([v], i) => `<i style="width:${c[v] / n * 100}%;background:${["var(--c1)","var(--c3)","var(--c4)"][i]}"></i>`).join("")}</span><span class="small">${MEAL_SRC.map(([v, l, ic]) => `${ic} ${Math.round(c[v] / n * 100)}%`).join(" · ")}</span></div>` : ""; })()}
     ${mv.length ? `<div class="sechead" style="margin:6px 0 0"><h3 class="small">Mood by day</h3><span class="meta">1 awful · 5 great</span></div>${barChart(moodVals, labels, 5, v => Math.round(v), "var(--c1)")}` : ""}`;
   $("#ov-sleep").innerHTML = sleepInsights(keys, labels, mini);
   $("#ov-time").innerHTML = timeInsights(keys);
@@ -1263,13 +1264,16 @@ const hDoc = k => ({ date: k, water: 0, meals: [], bowel: [], flow: "", sym: [],
 function saveHealth(k, d){ S.health[k] = d; if (db) write("health/" + k, () => db.doc("health/" + k).set(d)); renderHealth(); }
 const hid = () => "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const nowHMs = () => pad(new Date().getHours()) + ":" + pad(new Date().getMinutes());
+const MEAL_SRC = [["home","Cooked myself","🍳"],["out","Restaurant","🍽️"],["delivery","Food delivery","🛵"]];
+const mealSrcCounts = keys => { const c = { home: 0, out: 0, delivery: 0 }; keys.forEach(k => (hDoc(k).meals || []).forEach(m => { if (c[m.src] != null) c[m.src]++; })); return c; };
+const mealSrcLine = c => MEAL_SRC.map(([v, l, i]) => `${i} ${c[v]} ${l.toLowerCase()}`).join(" · ");
 const MEALS = [["breakfast","Breakfast"],["lunch","Lunch"],["dinner","Dinner"],["snack","Snack"],["drink","Drink"]];
 const BOWEL = [["hard","Hard / constipated"],["normal","Normal"],["soft","Soft"],["watery","Watery / diarrhoea"]];
 const FLOW = [["","None"],["spotting","Spotting"],["light","Light"],["medium","Medium"],["heavy","Heavy"]];
 const SYMS = ["Cramps","Headache","Bloating","Back pain","Tender breasts","Acne","Fatigue","Mood swings","Cravings","Nausea"];
 const COND_KIND = [["symptom","Symptom"],["illness","Illness"],["injury","Injury"],["medication","Medication"],["doctor","Doctor visit"]];
 const SEV = [["mild","Mild"],["moderate","Moderate"],["severe","Severe"]];
-S.mealType = "breakfast"; S.bowelType = "normal"; S.condKind = "symptom"; S.condSev = "mild";
+S.mealType = "breakfast"; S.mealSrc = "home"; S.bowelType = "normal"; S.condKind = "symptom"; S.condSev = "mild";
 function guessMeal(){ const h = new Date().getHours(); return h < 11 ? "breakfast" : h < 15 ? "lunch" : h < 17 ? "snack" : h < 22 ? "dinner" : "snack"; }
 // --- cycle maths (from days marked with flow)
 function cycleInfo(){
@@ -1308,9 +1312,11 @@ function renderHealth(){
     <label class="small muted hw-goal">Daily goal <select id="h-goal">${[6,7,8,9,10,12].map(n => `<option value="${n}" ${n === goal ? "selected" : ""}>${n} cups</option>`).join("")}</select></label>`;
   // meals
   const meals = (d.meals || []).slice().sort((a, b) => a.time.localeCompare(b.time));
-  $("#h-meals").innerHTML = `${meals.length ? `<ul class="hlist">${meals.map(m => `<li><span class="hl-t">${esc(m.time)}</span><span class="hl-tag m-${esc(m.type)}">${esc((MEALS.find(x => x[0] === m.type) || ["", m.type])[1])}</span><span class="hl-b">${esc(m.text)}</span><button type="button" class="x" data-hdel="meals:${esc(m.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Nothing logged${isT ? " yet today" : ""}.</p>`}
+  $("#h-meals").innerHTML = `${meals.length ? `<ul class="hlist">${meals.map(m => `<li><span class="hl-t">${esc(m.time)}</span><span class="hl-tag m-${esc(m.type)}">${esc((MEALS.find(x => x[0] === m.type) || ["", m.type])[1])}</span><span class="hl-b">${esc(m.text)}</span><span class="hl-act"><button type="button" class="m-src" data-msrc="${esc(m.id)}" title="${esc((MEAL_SRC.find(x => x[0] === m.src) || ["", "Where from? Tap to set"])[1])}: tap to change">${(MEAL_SRC.find(x => x[0] === m.src) || ["", "", "＋"])[2]}</button><button type="button" class="x" data-hdel="meals:${esc(m.id)}" aria-label="Remove">✕</button></span></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Nothing logged${isT ? " yet today" : ""}.</p>`}
     <div class="qa-chips cwrap">${MEALS.map(([v, l]) => `<button type="button" class="qc" data-meal="${v}" aria-pressed="${S.mealType === v}">${l}</button>`).join("")}</div>
-    <form class="qrow" id="h-meal-form" autocomplete="off"><input id="h-meal" class="inp" placeholder="What did you eat? e.g. Nasi lemak, teh o"><input type="time" id="h-meal-t" class="inp" value="${isT ? nowHMs() : "12:00"}" style="max-width:110px"><button class="btn sm" type="submit">Add</button></form>`;
+    <div class="qa-chips cwrap m-srcs">${MEAL_SRC.map(([v, l, i]) => `<button type="button" class="qc" data-mealsrc="${v}" aria-pressed="${S.mealSrc === v}">${i} ${l}</button>`).join("")}</div>
+    <form class="qrow" id="h-meal-form" autocomplete="off"><input id="h-meal" class="inp" placeholder="What did you eat? e.g. Nasi lemak, teh o"><input type="time" id="h-meal-t" class="inp" value="${isT ? nowHMs() : "12:00"}" style="max-width:110px"><button class="btn sm" type="submit">Add</button></form>
+    <p class="small muted" style="margin:0">Last 7 days: ${mealSrcLine(mealSrcCounts(rangeKeys(7)))}</p>`;
   // bowel
   const bw = (d.bowel || []).slice().sort((a, b) => a.time.localeCompare(b.time));
   const wkB = rangeKeys(7).reduce((a, x) => a + (hDoc(x).bowel || []).length, 0);
@@ -1376,6 +1382,8 @@ document.addEventListener("click", e => {
   else if (t.dataset.water) { d.water = Math.max(0, (d.water || 0) + +t.dataset.water); saveHealth(k, d); if (+t.dataset.water > 0 && d.water === (S.waterGoal || 8)) toast("Water goal reached! 💧"); }
   else if (t.dataset.cup) { const n = +t.dataset.cup; d.water = d.water === n ? n - 1 : n; saveHealth(k, d); }
   else if (t.dataset.meal) { S.mealType = t.dataset.meal; renderHealth(); $("#h-meal").focus(); }
+  else if (t.dataset.mealsrc) { S.mealSrc = t.dataset.mealsrc; t.parentElement.querySelectorAll("[data-mealsrc]").forEach(b => b.setAttribute("aria-pressed", b === t)); $("#h-meal").focus(); }
+  else if (t.dataset.msrc) { const order = MEAL_SRC.map(x => x[0]); d.meals = (d.meals || []).map(m => m.id === t.dataset.msrc ? { ...m, src: order[(order.indexOf(m.src) + 1) % order.length] } : m); saveHealth(k, d); const m = d.meals.find(x => x.id === t.dataset.msrc); toast((MEAL_SRC.find(x => x[0] === m.src) || ["", ""])[1]); }
   else if (t.dataset.bowel) { S.bowelType = t.dataset.bowel; renderHealth(); }
   else if (t.dataset.hdel) { const [f, id] = t.dataset.hdel.split(":"); d[f] = (d[f] || []).filter(x => x.id !== id); saveHealth(k, d); }
   else if (t.dataset.bdel) { del("body", t.dataset.bdel); }
@@ -1391,7 +1399,7 @@ document.addEventListener("click", e => {
 document.addEventListener("submit", e => {
   const f = e.target; if (!f.closest || !f.closest("#v-health")) return;
   e.preventDefault();
-  if (f.id === "h-meal-form") { const txt = $("#h-meal").value.trim(); if (!txt) { $("#h-meal").focus(); return; } addHealthItem("meals", { id: hid(), type: S.mealType, text: txt, time: $("#h-meal-t").value || nowHMs() }); setTimeout(() => $("#h-meal") && $("#h-meal").focus(), 30); }
+  if (f.id === "h-meal-form") { const txt = $("#h-meal").value.trim(); if (!txt) { $("#h-meal").focus(); return; } addHealthItem("meals", { id: hid(), type: S.mealType, src: S.mealSrc, text: txt, time: $("#h-meal-t").value || nowHMs() }); setTimeout(() => $("#h-meal") && $("#h-meal").focus(), 30); }
   else if (f.id === "h-bowel-form") { addHealthItem("bowel", { id: hid(), type: S.bowelType, note: $("#h-bowel-note").value.trim(), time: hk() === todayKey() ? nowHMs() : "12:00" }); toast("Logged"); }
   else if (f.id === "h-body-form") { const hh = parseFloat($("#hb-h").value), ww = parseFloat($("#hb-w").value), dt = $("#hb-date").value || todayKey();
     if (!hh && !ww) { toast("Enter your height, weight or both"); return; }

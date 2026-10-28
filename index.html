@@ -1229,6 +1229,16 @@ ol.timeline li.tl-edit{display:block;background:var(--accent-soft,var(--sunk))}
 .pie-leg b{font-family:var(--f-mono);font-weight:500}
 .pie-tog{display:flex;gap:6px;align-items:center}
 @media (max-width:520px){.pie-wrap{grid-template-columns:1fr}.pie{max-width:220px;margin:0 auto}}
+
+/* ===== meal source ===== */
+.hl-act{display:inline-flex;align-items:center;gap:2px}
+.m-src{border:0;background:none;font-size:1rem;line-height:1;padding:4px;cursor:pointer;border-radius:6px}
+.m-src:hover{background:var(--sunk)}
+.m-srcs .qc{font-size:.8rem}
+.m-src-bar{display:grid;grid-template-columns:auto minmax(60px,1fr) auto;gap:10px;align-items:center;margin-top:6px}
+.bar.msb{display:flex;overflow:hidden}
+.bar.msb i{display:block;height:100%;border-radius:0}
+@media (max-width:560px){.m-src-bar{grid-template-columns:1fr}}
 </style>
 </head>
 <body class="locked">
@@ -1701,6 +1711,6 @@ ol.timeline li.tl-edit{display:block;background:var(--accent-soft,var(--sunk))}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=32"></script>
+<script type="module" src="app.js?v=33"></script>
 </body>
 </html>
