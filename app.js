@@ -59,7 +59,8 @@ document.addEventListener("click", e => { const x = e.target.closest && e.target
     sync();
     const commit = v => { if (VD.get.call(inp) === v) return; VD.set.call(inp, v); inp.dispatchEvent(new Event("input", { bubbles: true })); inp.dispatchEvent(new Event("change", { bubbles: true })); };
     txt.addEventListener("input", e => {
-      if (e.inputType === "insertText" && /^\d{2}$|^\d{1,2}\/\d{2}$/.test(txt.value)) txt.value += "/";
+      if (/\/\//.test(txt.value)) txt.value = txt.value.replace(/\/{2,}/g, "/");
+      else if (e.inputType === "insertText" && /\d$/.test(e.data || "") && /^\d{2}$|^\d{1,2}\/\d{2}$/.test(txt.value)) txt.value += "/";
       const full = /\d{4}$/.test(txt.value.trim()), v = full ? parse(txt.value) : null; txt.classList.toggle("dd-bad", full && !v); if (v) commit(v);
     });
     txt.addEventListener("blur", () => { const t = txt.value.trim(); if (!t) { if (!inp.required) commit(""); else txt.value = show(VD.get.call(inp)); } else { const v = parse(t); if (v) { commit(v); txt.value = show(v); } else { toast("Type the date as dd/mm/yyyy, e.g. 03/11/2026"); txt.value = show(VD.get.call(inp)); } } txt.classList.remove("dd-bad"); });
@@ -1815,11 +1816,11 @@ function renderStudy(){
 function studyTodayHtml(){
   if (!S.subjects.length && !S.asg.length) return "";
   const tk = todayKey(), nowM = new Date().getHours() * 60 + new Date().getMinutes();
-  const cs = classesOn(tk), due = S.asg.filter(a => !["submitted", "graded"].includes(a.status) && a.due && a.due <= addDays(tk, 3)).sort((a, b) => (a.due + (a.time || "")).localeCompare(b.due + (b.time || "")));
+  const cs = classesOn(tk), due = S.asg.filter(a => !["submitted", "graded"].includes(a.status) && a.due && a.due <= addDays(tk, 7)).sort((a, b) => (a.due + (a.time || "")).localeCompare(b.due + (b.time || "")));
   const per = semPeriod(tk), brk = per && per.kind !== "teach" && per.kind !== "before" ? `<p class="small" style="margin:0"><b>${esc(per.label)}</b> <span class="muted">· no classes today</span></p>` : "";
-  if (!cs.length && !due.length) return brk || `<p class="small muted" style="margin:0">No classes today and nothing due in the next 3 days.</p>`;
+  if (!cs.length && !due.length) return brk || `<p class="small muted" style="margin:0">No classes today and nothing due in the next 7 days.</p>`;
   return `${brk}${cs.length ? `<ul class="hlist">${cs.map(c => `<li class="${toMin(c.end) < nowM ? "past" : ""} ${attOf(c, tk) ? "att-off" : ""}"><span class="hl-t">${fmt12(c.start)}</span><span class="tag ${subjCls(c.subj)}">${esc(subjLabel(c.subj))}</span><span class="hl-b">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${clsLoc(c) ? " · " + esc(clsLoc(c)) : ""}</span><span class="hl-act">${attBtns(c, tk)}</span></li>`).join("")}</ul>` : ""}
-    ${due.length ? `<div class="small muted" style="margin-top:4px">Due soon</div><ul class="hlist">${due.map(a => { const [dt, cls] = dueText(a); return `<li><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="hl-b">${esc(a.title)}</span><span class="asg-due ${cls} small">${esc(dt.replace(/ · in \d+ days/, ""))}</span><span></span></li>`; }).join("")}</ul>` : ""}`;
+    ${due.length ? `<div class="small muted" style="margin-top:4px">Due soon</div><ul class="hlist">${due.map(a => { const [dt, cls] = dueText(a); return `<li><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="hl-b">${a.parent && S.asg.find(x => x.id === a.parent) ? `<span class="muted">${esc(S.asg.find(x => x.id === a.parent).title)} › </span>` : ""}${esc(a.title)}</span><span class="asg-due ${cls} small">${esc(dt.replace(/ · in \d+ days/, ""))}</span><span></span></li>`; }).join("")}</ul>` : ""}`;
 }
 let studyNotesT = null;
 document.addEventListener("click", e => {
@@ -1887,7 +1888,7 @@ function asgDetail(a){
       <label class="f">Skills used <span class="muted" style="font-weight:400">· separate with commas</span><input data-asg-skills="${esc(a.id)}" value="${esc((a.skills || []).join(", "))}" placeholder="e.g. SQL, k-means clustering, report writing, teamwork"></label></div>` : ""}
     <label class="f">Notes<textarea data-asg-notes="${esc(a.id)}" rows="4" placeholder="Requirements, rubric, group members, approach, feedback from lecturer…">${esc(a.notes || "")}</textarea></label>
     ${linksEditor("asg", a.id, asgLinks(a))}
-    ${a.parent ? `<p class="small muted" style="margin:0">Part of <b>${esc((S.asg.find(x => x.id === a.parent) || {}).title || "")}</b></p>` : `<div class="f"><span class="small muted" style="font-weight:600">Parts <span style="font-weight:400">· split it into pieces, e.g. Coding, Report, Video</span></span><div class="qrow"><input class="inp" data-part-title="${esc(a.id)}" placeholder="Add a part"><button class="btn sm" type="button" data-part-add="${esc(a.id)}">Add part</button></div></div>`}
+    ${a.parent ? `<p class="small muted" style="margin:0">Part of <b>${esc((S.asg.find(x => x.id === a.parent) || {}).title || "")}</b></p>` : `<div class="f"><span class="small muted" style="font-weight:600">Parts <span style="font-weight:400">· split it into pieces, e.g. Coding, Report, Video</span></span><div class="qrow part-row"><input class="inp" data-part-title="${esc(a.id)}" placeholder="Add a part, e.g. Coding"><input type="date" class="inp" data-part-due="${esc(a.id)}" value="${esc(a.due || "")}" aria-label="Part due date"><button class="btn sm" type="button" data-part-add="${esc(a.id)}">Add part</button></div></div>`}
     <div class="row"><button type="button" class="btn sm" data-asg-edit="${esc(a.id)}">${SVG(ICON.edit)}Edit details</button><button type="button" class="btn sm ghost danger" data-asg-del="${esc(a.id)}">${S.asgDel === a.id ? "Tap again to delete" : "Delete"}</button></div>`;
 }
 // ----- one assignment card, and parts grouped under their main assignment
@@ -1933,8 +1934,9 @@ document.addEventListener("click", e => {
 document.addEventListener("click", e => {
   const b = e.target.closest && e.target.closest("[data-part-add]"); if (!b) return;
   const p = S.asg.find(x => x.id === b.dataset.partAdd), inp = document.querySelector(`[data-part-title="${b.dataset.partAdd}"]`), ti = (inp && inp.value || "").trim(); if (!p || !ti) { inp && inp.focus(); return; }
-  put("assignments", newId(), { subj: p.subj, title: ti, type: p.type || "assignment", due: p.due || "", time: p.time || "", weight: "", status: "todo", mark: "", notes: "", link: "", parent: p.id, createdAt: nowISO(), doneAt: "" });
-  toast("Part added. Edit it to set its own due date."); setTimeout(() => { const n = document.querySelector(`[data-part-title="${p.id}"]`); if (n) n.focus(); }, 60);
+  const pd = document.querySelector(`input[data-part-due="${b.dataset.partAdd}"]`);
+  put("assignments", newId(), { subj: p.subj, title: ti, type: p.type || "assignment", due: (pd && pd.value) || p.due || "", time: p.time || "", weight: "", status: "todo", mark: "", notes: "", link: "", parent: p.id, createdAt: nowISO(), doneAt: "" });
+  toast("Part added"); setTimeout(() => { const n = document.querySelector(`[data-part-title="${p.id}"]`); if (n) n.focus(); }, 60);
 });
 document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset && e.target.dataset.partTitle) { e.preventDefault(); document.querySelector(`[data-part-add="${e.target.dataset.partTitle}"]`).click(); } });
 document.addEventListener("submit", e => {
