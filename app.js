@@ -25,6 +25,7 @@ const fmtTime = iso => { const d=new Date(iso); return pad(d.getHours())+":"+pad
 const isoDay = iso => iso ? dkey(new Date(iso)) : "";
 
 const S = { tasks:[], todos:[], routine:[], day:{}, refl:{}, cats:[], view:"today", catFilter:null, stFilter:"open", mode:"todo", ready:false, dayOff:0, rtFilter:"all" };
+const DAY_BACK = 90;
 const viewKey = () => { const d=new Date(); d.setDate(d.getDate()+S.dayOff); return dkey(d); };
 const keyDow = k => { const [y,m,d]=k.split("-").map(Number); return new Date(y,m-1,d).getDay(); };
 const isWeekend = dow => dow===0 || dow===6;
@@ -488,6 +489,8 @@ function heroHtml(active, done, next, missed){
     <div class="hero-stats"><span><b>${dn}/${active.length}</b> routine</span><span><b>${todoLeft}</b> to-do${todoLeft===1?"":"s"} left</span><span><b>${open}</b> task${open===1?"":"s"} open</span>${missed?`<span class="warn"><b>${missed}</b> not ticked</span>`:""}</div>
   </div></div>`;
 }
+document.addEventListener("change", e => { if (e.target.id !== "day-jump" || !e.target.value) return; const n = Math.round((new Date(e.target.value + "T00:00") - new Date(todayKey() + "T00:00")) / 864e5); S.dayOff = Math.max(-DAY_BACK, Math.min(6, n)); S.rtEdit = null; watchChecks(); renderToday(); });
+document.addEventListener("click", e => { const l = e.target.closest && e.target.closest(".day-pick"); if (!l || e.target.id === "day-jump") return; e.preventDefault(); const i = $("#day-jump"); try { i.showPicker(); } catch { i.focus(); i.click(); } });
 // ---------- edit a routine item straight from Today
 S.rtEdit = null; S.rtScope = "always";
 function rtEditRow(r0, k, draft){
@@ -502,7 +505,7 @@ function rtEditRow(r0, k, draft){
 }
 document.addEventListener("click", e => {
   const t = e.target.closest && e.target.closest("[data-rtedit],[data-rtedit-x],[data-rtscope]"); if (!t || !t.closest("#timeline")) return;
-  if (t.dataset.rtedit) { S.rtEdit = t.dataset.rtedit; S.rtScope = "always"; renderToday(); const l = $("#tle-l"); if (l) { l.focus(); l.select(); } }
+  if (t.dataset.rtedit) { S.rtEdit = t.dataset.rtedit; S.rtScope = S.dayOff < 0 ? "day" : "always"; renderToday(); const l = $("#tle-l"); if (l) { l.focus(); l.select(); } }
   else if (t.dataset.rteditX !== undefined) { S.rtEdit = null; renderToday(); }
   else if (t.dataset.rtscope) { S.rtScope = t.dataset.rtscope; t.parentElement.querySelectorAll("[data-rtscope]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
 });
@@ -527,11 +530,11 @@ function renderToday(){
   const missed = isToday ? active.filter(r=>r.time<nowHM && !done[r.id]).length : 0;
   const we=isWeekend(keyDow(k));
   $("#rt-title").textContent = (we?"Weekend":"Weekday")+" routine";
-  $("#daypager").innerHTML = `<button class="btn sm" type="button" data-dayoff="-1" ${S.dayOff<=-1?"disabled":""} aria-label="Previous day">‹</button>
-    <span class="mid">${esc(DAYLBL[S.dayOff]||DAYS[keyDow(k)])}<small>${esc(fmtDate(k))}</small></span>
+  $("#daypager").innerHTML = `<button class="btn sm" type="button" data-dayoff="-1" ${S.dayOff<=-DAY_BACK?"disabled":""} aria-label="Previous day">‹</button>
+    <label class="mid day-pick" title="Pick a day">${esc(DAYLBL[S.dayOff]||DAYS[keyDow(k)])}<small>${esc(fmtDate(k))}${S.dayOff<-1||S.dayOff>1?" "+k.slice(0,4):""} ▾</small><input type="date" id="day-jump" data-native value="${k}" min="${addDays(tk,-DAY_BACK)}" max="${addDays(tk,6)}" aria-label="Pick a day"></label>
     <button class="btn sm" type="button" data-dayoff="1" ${S.dayOff>=6?"disabled":""} aria-label="Next day">›</button>`;
   $("#now").innerHTML = !S.ready ? `<span class="s">Loading your day…</span>`
-    : !isToday ? `<div class="hero-plan"><span><span class="greet" style="font-size:1.15rem">Planning ${esc(fmtDate(k))}</span><br><span class="hero-sub">Skip or add items for this day only. Your usual routine stays the same.</span></span><button class="btn sm" type="button" data-dayreset>Back to today</button></div>`
+    : !isToday ? `<div class="hero-plan"><span><span class="greet" style="font-size:1.15rem">${S.dayOff<0?"Editing":"Planning"} ${esc(fmtDate(k))}</span><br><span class="hero-sub">${S.dayOff<0?"Tick what you did, untick mistakes, or tap ✎ to fix an item's time or name for that day.":"Skip or add items for this day only. Your usual routine stays the same."}</span></span><button class="btn sm" type="button" data-dayreset>Back to today</button></div>`
     : heroHtml(active, done, next, missed);
   $("#rt-meta").textContent = active.length ? `${active.filter(r=>done[r.id]).length} of ${active.length} done` : "";
   const f0=$("#tl-edit-form"), draft = f0 && f0.dataset.rid===S.rtEdit ? { time:$("#tle-t").value, label:$("#tle-l").value, kind:$("#tle-k").value } : null;
@@ -608,7 +611,7 @@ function drawTask(){
       <label class="f">Assigned by<input id="t-by" value="${esc(t.assignedBy)}" placeholder="Supervisor's name"></label>
       <label class="f">Repeats<select id="t-repeat">${REPEAT.map(([v,l])=>`<option value="${v}" ${(t.repeat||"none")===v?"selected":""}>${l}</option>`).join("")}</select></label>
       <label class="f">Progress: <span id="t-pv">${+t.progress||0}%</span><input type="range" id="t-prog" min="0" max="100" step="${subs.length?1:5}" value="${+t.progress||0}" ${subs.length?"disabled":""} style="padding:0;border:0;background:none"></label>
-      <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Time spent</span><span class="tspent">${SVG(ICON.timer)}${mins?fmtMins(mins):"None yet"}<span class="muted small"> · use ▶ on the task card or </span><button type="button" class="linkbtn small" data-logtime="task|${esc(editing.id)}|${esc(editing.title)}">log time by hand</button></span></div>
+      <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Time spent</span><span class="tspent">${SVG(ICON.timer)}${mins?fmtMins(mins):"None yet"}<span class="muted small"> · use ▶ on the task card or </span><button type="button" class="linkbtn small" data-logtime="task|${esc(editing.id)}|${esc(editing.title)}">log or edit time</button></span></div>
     </div>
     <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Urgency</span><div class="seg" id="t-urg">${URG.map(u=>`<button type="button" data-v="${u}" aria-pressed="${t.urgency===u}">${u[0].toUpperCase()+u.slice(1)}</button>`).join("")}</div></div>
     <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Status</span><div class="seg" id="t-st">${STATUS.map(([k,l])=>`<button type="button" data-v="${k}" aria-pressed="${t.status===k}">${l}</button>`).join("")}</div></div>
@@ -932,7 +935,7 @@ function renderCourses(){
   $("#courses").innerHTML = S.courses.length ? S.courses.slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")).map(c => { const st = courseStats(c);
     return `<div class="panel course" data-course="${esc(c.id)}">
       <div class="co-head"><span class="co-ic">${SVG(ICON.book)}</span><div class="co-title"><b>${esc(c.name)}</b><span class="muted small">${st.done}/${st.mods.length} modules${c.target ? ` · target ${esc(fmtDate(c.target))}` : ""}</span></div>
-        <span class="co-btns"><button class="btn sm" type="button" data-logtime="course|${esc(c.id)}|${esc(c.name)}">+ Log time</button><button class="btn sm" type="button" data-cfocus="${esc(c.id)}">${SVG(ICON.play)}Study 25m</button></span></div>
+        <span class="co-btns"><button class="btn sm" type="button" data-logtime="course|${esc(c.id)}|${esc(c.name)}">${SVG(ICON.timer)}Time log</button><button class="btn sm" type="button" data-cfocus="${esc(c.id)}">${SVG(ICON.play)}Study 25m</button></span></div>
       <div class="co-bar"><span class="bar"><i style="width:${st.pct}%"></i></span><b class="mono-n">${st.pct}%</b></div>
       <div class="co-stats"><span><b>${fmtMins(st.week)}</b> this week</span><span><b>${fmtMins(st.mins)}</b> total</span><span>${SVG(ICON.flame)}<b>${st.streak}</b> day streak</span></div>
       ${st.pace ? `<p class="small" style="margin:0">${st.pace}</p>` : ""}
@@ -2232,9 +2235,25 @@ function openLog(type, ref, label){
   $("#lg-title").textContent = label || "Log time";
   $("#lg-chips").innerHTML = [15, 30, 45, 60, 90, 120].map(m => `<button type="button" class="qc" data-lgm="${m}" aria-pressed="${S.logMins === m}">${fmtMins(m)}</button>`).join("");
   $("#lg-custom").value = [15, 30, 45, 60, 90, 120].includes(S.logMins) ? "" : S.logMins;
-  $("#lg-date").value = tk; $("#lg-end").value = nowHMs();
-  if (!d.open) d.showModal();
+  $("#lg-date").value = tk; $("#lg-end").value = nowHMs(); S.logEdit = null; $("#lg-save").textContent = "Log"; $("#lg-head").textContent = "Log time for";
+  S.lgUndo = null; renderLogList(); if (!d.open) d.showModal();
 }
+const logRef = x => S.logT && x.type === S.logT.type && x.ref === S.logT.ref;
+function renderLogList(){
+  const box = $("#lg-list"); if (!box || !S.logT) return;
+  const L = S.time.filter(logRef).sort((a, b) => (b.start || "").localeCompare(a.start || "")), tot = L.reduce((a, x) => a + (+x.mins || 0), 0);
+  box.innerHTML = (S.lgUndo ? `<div class="lg-undo small">Removed ${fmtMins(+S.lgUndo.rec.mins || 0)} on ${esc(fmtDate(S.lgUndo.rec.date))} <button type="button" class="linkbtn" data-lgundo>Undo</button></div>` : "") + (L.length ? `<div class="small muted" style="font-weight:600">Logged so far · ${fmtMins(tot)}</div><ul class="lg-list">${L.slice(0, 30).map(x => `<li class="${S.logEdit === x.id ? "is-edit" : ""}"><span class="od-d">${esc(fmtDate(x.date))}</span><span><b>${fmtMins(+x.mins || 0)}</b> <span class="small muted">${x.via === "manual" ? "logged by hand" : x.via === "focus" ? "focus timer" : "timer"}${x.end ? " · ended " + esc(fmt12(hm(minsOfISO(x.end)))) : ""}</span></span><span class="lg-acts"><button type="button" class="x tl-ed" data-lgedit="${esc(x.id)}" aria-label="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-lgdel="${esc(x.id)}" aria-label="Delete">✕</button></span></li>`).join("")}</ul>${L.length > 30 ? `<p class="small muted" style="margin:0">Showing the latest 30.</p>` : ""}` : "");
+}
+function saveTimeRec(id, rec){ const i = S.time.findIndex(x => x.id === id); if (i >= 0) S.time[i] = { ...rec, id }; else S.time.unshift({ ...rec, id }); if (db) write("time/" + id, () => db.doc("time/" + id).set(rec)); render(); }
+function delTimeRec(id){ S.time = S.time.filter(x => x.id !== id); if (db) write("time/" + id, () => db.doc("time/" + id).delete()); render(); }
+document.addEventListener("click", e => {
+  const ed = e.target.closest && e.target.closest("[data-lgedit]"), dl = e.target.closest && e.target.closest("[data-lgdel]");
+  if (ed) { const x = S.time.find(y => y.id === ed.dataset.lgedit); if (!x) return; S.logEdit = x.id; S.logMins = +x.mins || 0;
+    $("#lg-chips").querySelectorAll("[data-lgm]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.lgm === S.logMins)); $("#lg-custom").value = [15, 30, 45, 60, 90, 120].includes(S.logMins) ? "" : S.logMins;
+    $("#lg-date").value = x.date; $("#lg-end").value = x.end ? hm(minsOfISO(x.end)) : "20:00"; $("#lg-save").textContent = "Save changes"; $("#lg-head").textContent = "Editing a session of"; renderLogList(); return; }
+  if (dl) { const x = S.time.find(y => y.id === dl.dataset.lgdel); if (!x) return; const { id, ...rec } = x; delTimeRec(id); if (S.logEdit === id) { S.logEdit = null; $("#lg-save").textContent = "Log"; } S.lgUndo = { id, rec }; renderLogList(); }
+  const un = e.target.closest && e.target.closest("[data-lgundo]"); if (un && S.lgUndo) { saveTimeRec(S.lgUndo.id, S.lgUndo.rec); S.lgUndo = null; renderLogList(); }
+});
 function logTime({ type, ref, label }, mins, date, end){
   mins = Math.round(+mins); if (!(mins > 0)) return false;
   const endD = new Date(`${date}T${end || "20:00"}:00`), startD = new Date(endD.getTime() - mins * 60000);
@@ -2253,6 +2272,10 @@ document.addEventListener("submit", e => {
   if (e.target.id !== "lg-form") return; e.preventDefault();
   const mins = +$("#lg-custom").value || S.logMins, date = $("#lg-date").value || todayKey();
   if (!(mins > 0) || mins > 24 * 60) { toast("Enter the minutes you spent"); return; }
+  if (S.logEdit) { const x = S.time.find(y => y.id === S.logEdit); if (x) { const endD = new Date(`${date}T${$("#lg-end").value || "20:00"}:00`), startD = new Date(endD.getTime() - mins * 60000); const { id, ...rec } = x;
+      saveTimeRec(id, { ...rec, mins: Math.round(mins), date, start: startD.toISOString(), end: endD.toISOString() }); }
+    S.logEdit = null; S.logMins = 30; $("#lg-custom").value = ""; $("#lg-chips").querySelectorAll("[data-lgm]").forEach(b => b.setAttribute("aria-pressed", b.dataset.lgm === "30")); $("#lg-date").value = todayKey(); $("#lg-end").value = nowHMs();
+    $("#lg-save").textContent = "Log"; $("#lg-head").textContent = "Log time for"; renderLogList(); toast("Session updated"); return; }
   if (logTime(S.logT, mins, date, $("#lg-end").value)) { $("#logdlg").close(); toast(`Logged ${fmtMins(mins)}${date !== todayKey() ? " on " + fmtDate(date) : ""}`); }
 });
 // ---------- edit a to-do (personal, study or self-study)
@@ -2356,7 +2379,7 @@ function renderCalDay(){
   const reflHtml = r && (r.did || r.learned || r.mistakes || r.improve) ? `<dl class="cd-refl">${[["Did", r.did], ["Learned", r.learned], ["Mistakes", r.mistakes], ["Improve", r.improve]].filter(x => (x[1] || "").trim()).map(([a, b]) => `<dt>${a}</dt><dd>${esc(b)}</dd>`).join("")}${r.mood ? `<dt>Energy</dt><dd>${r.mood}/5</dd>` : ""}</dl>` : none(k <= tk ? "No reflection written for this day." : "Reflection opens on the day.");
   $("#cal-day").innerHTML = `<div class="panel cd">
     <div class="sechead" style="align-items:center"><h2>${esc(DAYS[keyDow(k)])}, ${esc(fmtDate(k).split(", ")[1])} ${k.slice(0, 4)}</h2>
-      <span style="display:flex;gap:6px;flex-wrap:wrap">${off >= -1 && off <= 6 ? `<button class="btn sm" type="button" data-calopen="${off}">Open in Today</button>` : ""}${k <= tk ? `<button class="btn sm" type="button" data-calrefl="${k}">${r ? "Edit reflection" : "Write reflection"}</button>` : ""}</span></div>
+      <span style="display:flex;gap:6px;flex-wrap:wrap">${off >= -DAY_BACK && off <= 6 ? `<button class="btn sm" type="button" data-calopen="${off}">${off < 0 ? "Edit routine" : "Open in Today"}</button>` : ""}${k <= tk ? `<button class="btn sm" type="button" data-calrefl="${k}">${r ? "Edit reflection" : "Write reflection"}</button>` : ""}</span></div>
     ${sec("Work", workHtml)}
     ${sec("Reflection", reflHtml)}
     ${sec("To-dos", todoHtml)}
@@ -2607,7 +2630,7 @@ document.addEventListener("click", e=>{
   const st=e.target.closest("[data-st]"); if(st){ S.stFilter = S.stFilter===st.dataset.st && st.classList.contains("stat") ? "open" : st.dataset.st; renderWork(); return; }
   const c=e.target.closest("[data-cat]"); if(c){ S.catFilter = c.dataset.cat==="" ? null : (S.catFilter===c.dataset.cat?null:c.dataset.cat); renderWork(); return; }
   const dt=e.target.closest("[data-deltodo]"); if(dt){ del("todos",dt.dataset.deltodo); return; }
-  const off=e.target.closest("[data-dayoff]"); if(off){ S.dayOff=Math.max(-1,Math.min(6,S.dayOff+ +off.dataset.dayoff)); watchChecks(); renderToday(); return; }
+  const off=e.target.closest("[data-dayoff]"); if(off){ S.dayOff=Math.max(-DAY_BACK,Math.min(6,S.dayOff+ +off.dataset.dayoff)); S.rtEdit=null; watchChecks(); renderToday(); return; }
   if(e.target.closest("[data-dayreset]")){ S.dayOff=0; watchChecks(); renderToday(); return; }
   const sk=e.target.closest("[data-skip]"); if(sk){ const k=viewKey(), dd=dayDoc(k), s={...(dd.skip||{})}; if(s[sk.dataset.skip]) delete s[sk.dataset.skip]; else s[sk.dataset.skip]=true; saveDay(k,{...dd,skip:s}); return; }
   const dx=e.target.closest("[data-delextra]"); if(dx){ const k=viewKey(), dd=dayDoc(k), x0=(dd.extra||[]).find(x=>x.id===dx.dataset.delextra), skip={...(dd.skip||{})}; if(x0&&x0.from){ delete skip[x0.from]; } saveDay(k,{...dd,skip,extra:(dd.extra||[]).filter(x=>x.id!==dx.dataset.delextra)}); if(x0&&x0.from) toast("Back to your usual routine"); return; }
@@ -2620,7 +2643,8 @@ document.addEventListener("click", e=>{
 });
 document.addEventListener("change", e=>{
   const ck=e.target.closest("[data-check]");
-  if(ck){ const k=viewKey(); const dd=dayDoc(k); const cur={...(dd.done||{})}; if(ck.checked) cur[ck.dataset.check]=fmtTime(nowISO()); else delete cur[ck.dataset.check];
+  if(ck){ const k=viewKey(); const dd=dayDoc(k); const cur={...(dd.done||{})}; const r=routineFor(k).find(x=>x.id===ck.dataset.check);
+    if(ck.checked) cur[ck.dataset.check]= k<todayKey() && r ? r.time : fmtTime(nowISO()); else delete cur[ck.dataset.check];
     saveDay(k, {...dd, done:cur}); }
   const td=e.target.closest("[data-todo]");
   if(td){ const t=S.todos.find(x=>x.id===td.dataset.todo); if(t){ put("todos", t.id, {...strip(t), done:td.checked, doneAt: td.checked?nowISO():""}); } }
