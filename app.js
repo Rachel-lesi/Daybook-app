@@ -1671,11 +1671,12 @@ function renderStudy(){
     ${S.subjects.length ? `<form id="asg-form" class="st-form" autocomplete="off">
       <div class="asg-row1"><select id="as-subj" class="inp">${subjOptions(S.asgSubj || "")}</select><input id="as-title" class="inp" placeholder="Title, e.g. Assignment 2: Clustering report" required></div>
       <div class="qa-chips cwrap">${ASG_TYPES.map(([v, l]) => `<button type="button" class="qc" data-asg-type="${v}" aria-pressed="${S.asgType === v}">${l}</button>`).join("")}</div>
-      <div class="asg-row2"><label class="f">Due date<input type="date" id="as-due" value="${addDays(tk, 7)}"></label><label class="f">Time<input type="time" id="as-time" value="23:59"></label><label class="f">Weight %<input type="number" id="as-weight" min="0" max="100" placeholder="e.g. 20"></label><button class="btn primary" type="submit">Add</button></div></form>`
+      <div class="asg-row2"><label class="f">Due date<input type="date" id="as-due" data-dhint value="${addDays(tk, 7)}"><span class="dhint"></span></label><label class="f">Time<input type="time" id="as-time" value="23:59"></label><label class="f">Weight %<input type="number" id="as-weight" min="0" max="100" placeholder="e.g. 20"></label><button class="btn primary" type="submit">Add</button></div></form>`
       : `<p class="small muted" style="margin:0">Add your subjects in Timetable first, then track assignments here.</p>`}
     <div class="asg-filter"><div class="seg">${[["todo", `To do (${openN})`], ["done", "Submitted & graded"], ["all", "All"]].map(([v, l]) => `<button type="button" data-asg-f="${v}" aria-pressed="${S.asgFilter === v}">${l}</button>`).join("")}</div>
       ${S.subjects.length > 1 ? `<div class="qa-chips cwrap"><button type="button" class="qc" data-asg-s="" aria-pressed="${!S.asgSubj}">All subjects</button>${S.subjects.map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-asg-s="${esc(s.id)}" aria-pressed="${S.asgSubj === s.id}">${esc(s.code || s.name)}</button>`).join("")}</div>` : ""}</div>
     ${list.length ? `<div class="asg-list">${list.map(a => { const [dt, cls] = dueText(a), open = S.asgOpen === a.id;
+      if (S.asgEdit === a.id) return asgEditForm(a);
       return `<div class="asg ${cls} st-${esc(a.status)}"><div class="asg-main" data-asg-open="${esc(a.id)}" role="button" tabindex="0">
         <span class="asg-stripe ${subjCls(a.subj)}"></span>
         <div class="asg-body"><div class="asg-t"><b>${esc(a.title)}</b>${a.weight ? `<span class="asg-w">${esc(a.weight)}%</span>` : ""}</div>
@@ -1685,7 +1686,7 @@ function renderStudy(){
           ${a.status === "graded" ? `<label class="f">Mark (%)<input type="number" min="0" max="100" step="0.1" data-asg-mark="${esc(a.id)}" value="${esc(a.mark ?? "")}" placeholder="e.g. 85"></label>` : ""}
           ${open ? asgDetail(a) : `<button type="button" class="btn sm ghost" data-asg-open="${esc(a.id)}">Notes, files & what you learned</button>`}</div>` : ""}</div>`; }).join("")}</div>`
       : `<div class="empty">${S.asgFilter === "todo" ? "Nothing due. Nice!" : "No assignments here yet."}</div>`}`;
-  renderNotes(); renderPortfolio(); renderStudyCal();
+  renderNotes(); renderPortfolio(); renderStudyCal(); dateHints();
   // ----- grades
   const rows = curSubjects().map(s => { const gr = GRADES.find(g => g[0] === s.grade); const cr = +s.credits || 0;
     const ga = S.asg.filter(a => a.subj === s.id && a.status === "graded" && a.mark !== "" && a.mark != null && +a.weight);
@@ -1783,8 +1784,43 @@ function asgDetail(a){
       <label class="f">Skills used <span class="muted" style="font-weight:400">· separate with commas</span><input data-asg-skills="${esc(a.id)}" value="${esc((a.skills || []).join(", "))}" placeholder="e.g. SQL, k-means clustering, report writing, teamwork"></label></div>` : ""}
     <label class="f">Notes<textarea data-asg-notes="${esc(a.id)}" rows="4" placeholder="Requirements, rubric, group members, approach, feedback from lecturer…">${esc(a.notes || "")}</textarea></label>
     ${linksEditor("asg", a.id, asgLinks(a))}
-    <div class="row"><button type="button" class="btn sm ghost danger" data-asg-del="${esc(a.id)}">${S.asgDel === a.id ? "Tap again to delete" : "Delete"}</button></div>`;
+    <div class="row"><button type="button" class="btn sm" data-asg-edit="${esc(a.id)}">${SVG(ICON.edit)}Edit details</button><button type="button" class="btn sm ghost danger" data-asg-del="${esc(a.id)}">${S.asgDel === a.id ? "Tap again to delete" : "Delete"}</button></div>`;
 }
+// ----- edit an assignment
+S.asgEdit = null; S.asgEType = "assignment";
+function asgEditForm(a){
+  return `<form class="asg asg-editing st-form" id="asg-edit-form" data-id="${esc(a.id)}" autocomplete="off">
+    <div class="small"><b>Edit</b></div>
+    <div class="asg-row1"><select id="ae-subj" class="inp">${subjOptions(a.subj)}</select><input id="ae-title" class="inp" value="${esc(a.title)}" required></div>
+    <div class="qa-chips cwrap">${ASG_TYPES.map(([v, l]) => `<button type="button" class="qc" data-asge-type="${v}" aria-pressed="${S.asgEType === v}">${l}</button>`).join("")}</div>
+    <div class="asg-row2"><label class="f">Due date<input type="date" id="ae-due" data-dhint value="${esc(a.due || "")}"><span class="dhint"></span></label><label class="f">Time<input type="time" id="ae-time" value="${esc(a.time || "")}"></label><label class="f">Weight %<input type="number" id="ae-weight" min="0" max="100" value="${esc(a.weight ?? "")}"></label></div>
+    <div class="row"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" data-asg-edit-x>Cancel</button></div></form>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-asg-edit],[data-asg-edit-x],[data-asge-type],[data-dswap]"); if (!t || !t.closest("#v-study")) return;
+  const d = t.dataset;
+  if (d.asgEdit) { const a = S.asg.find(x => x.id === d.asgEdit); if (!a) return; S.asgEdit = a.id; S.asgEType = a.type || "assignment"; renderStudy(); dateHints(); $("#ae-title") && $("#ae-title").focus(); }
+  else if (d.asgEditX !== undefined) { S.asgEdit = null; renderStudy(); dateHints(); }
+  else if (d.asgeType) { S.asgEType = d.asgeType; t.parentElement.querySelectorAll("[data-asge-type]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
+  else if (d.dswap) { const inp = t.closest("label").querySelector("input[type=date]"); inp.value = d.dswap; dateHint(inp); }
+});
+document.addEventListener("submit", e => {
+  if (e.target.id !== "asg-edit-form") return; e.preventDefault();
+  const a = S.asg.find(x => x.id === e.target.dataset.id), ti = $("#ae-title").value.trim(); if (!a || !ti) return;
+  put("assignments", a.id, { ...strip(a), subj: $("#ae-subj").value || a.subj, title: ti, type: S.asgEType, due: $("#ae-due").value, time: $("#ae-time").value, weight: $("#ae-weight").value ? +$("#ae-weight").value : "" });
+  S.asgEdit = null; toast("Assignment updated");
+}, true);
+// ----- readable due date under date boxes, and a fix when day and month were typed the other way round
+function dateHint(inp){
+  const h = inp.parentElement.querySelector(".dhint"); if (!h) return;
+  const v = inp.value, tk = todayKey(); if (!v) { h.innerHTML = ""; return; }
+  const [y, m, dd] = v.split("-").map(Number), sw = m !== dd && dd <= 12 ? `${y}-${pad(dd)}-${pad(m)}` : null;
+  const past = v < tk, swapOk = sw && sw >= tk && (!past || true);
+  h.innerHTML = `<span class="${past ? "dh-past" : ""}">${esc(fmtDate(v))} ${y}${past ? " · in the past" : ""}</span>${past && swapOk ? ` <button type="button" class="linkbtn" data-dswap="${sw}">Did you mean ${esc(fmtDate(sw))}?</button>` : ""}`;
+}
+function dateHints(){ document.querySelectorAll("#v-study input[data-dhint]").forEach(dateHint); }
+document.addEventListener("input", e => { if (e.target.matches && e.target.matches("input[data-dhint]")) dateHint(e.target); });
+document.addEventListener("change", e => { if (e.target.matches && e.target.matches("input[data-dhint]")) dateHint(e.target); });
 // ----- notes subtab
 function renderNotes(){
   const box = $("#st-notes"); if (!box) return;
