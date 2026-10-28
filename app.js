@@ -916,7 +916,8 @@ document.addEventListener("click", e => {
 });
 
 // ---------- Growth: courses, habit streaks, skills
-let courseDel = null; S.modOpen = {}; S.cskEdit = null;
+let courseDel = null; S.modOpen = {}; S.cskEdit = null; S.coMore = null;
+document.addEventListener("toggle", e => { const d = e.target; if (d.matches && d.matches("details[data-cmore]")) S.coMore = d.open ? d.dataset.cmore : (S.coMore === d.dataset.cmore ? null : S.coMore); }, true);
 document.addEventListener("toggle", e => { const d = e.target; if (d.matches && d.matches("details[data-cid]")) S.modOpen[d.dataset.cid] = d.open; }, true);
 function minsFor(pred){ return S.time.filter(pred).reduce((a, x) => a + (+x.mins || 0), 0); }
 function weekAgoKey(){ const d = new Date(); d.setDate(d.getDate() - 6); return dkey(d); }
@@ -936,6 +937,8 @@ function courseStats(c){
   return { mods, done, pct: mods.length ? Math.round(done / mods.length * 100) : 0, mins, week, streak, pace };
 }
 function renderCourses(){
+  const sums = S.courses.map(courseStats), tw = sums.reduce((a, x) => a + x.week, 0), md = sums.reduce((a, x) => a + x.done, 0), mt = sums.reduce((a, x) => a + x.mods.length, 0);
+  $("#co-sum").innerHTML = S.courses.length ? `<span><b>${S.courses.length}</b> course${S.courses.length === 1 ? "" : "s"}</span><span><b>${md}/${mt}</b> modules done</span><span><b>${fmtMins(tw)}</b> this week</span><span><b>${fmtMins(sums.reduce((a, x) => a + x.mins, 0))}</b> total</span>` : "";
   $("#courses").innerHTML = S.courses.length ? S.courses.slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")).map(c => { const st = courseStats(c);
     return `<div class="panel course" data-course="${esc(c.id)}">
       <div class="co-head"><span class="co-ic">${SVG(ICON.book)}</span><div class="co-title"><b>${esc(c.name)}</b><span class="muted small">${st.done}/${st.mods.length} modules${c.target ? ` · target ${esc(fmtDate(c.target))}` : ""}</span></div>
@@ -943,12 +946,15 @@ function renderCourses(){
       <div class="co-bar"><span class="bar"><i style="width:${st.pct}%"></i></span><b class="mono-n">${st.pct}%</b></div>
       <div class="co-stats"><span><b>${fmtMins(st.week)}</b> this week</span><span><b>${fmtMins(st.mins)}</b> total</span><span>${SVG(ICON.flame)}<b>${st.streak}</b> day streak</span></div>
       ${st.pace ? `<p class="small" style="margin:0">${st.pace}</p>` : ""}
+      ${(() => { const nx = st.mods.find(m => !m.done); return nx ? `<div class="co-next"><span class="small muted">Next up</span><b>${esc(nx.title)}</b><span class="co-next-b"><button type="button" class="btn sm" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(nx.id)}">${SVG(ICON.timer)}Log</button><button type="button" class="btn sm" data-cmod-done="${st.mods.indexOf(nx)}">✓ Done</button></span></div>` : ""; })()}
       <div class="co-skills"><span class="small muted">Skills:</span>${S.cskEdit === c.id ? `${S.cats.map((k, i) => `<button type="button" class="qc ci-${i % 6}" data-csk="${esc(k.tag)}" aria-pressed="${(c.skills || []).includes(k.tag)}">${esc(k.name.split(/\s*\/\s*/)[0])}</button>`).join("")}<span class="qc-new"><input data-csknew placeholder="New skill" aria-label="New skill"><button type="button" class="qc" data-csknewadd>Add</button></span><button type="button" class="btn sm" data-cskdone>Done</button>`
         : `${(c.skills || []).map(t => catTag(t)).join("")}<button type="button" class="linkbtn small" data-cskedit>${(c.skills || []).length ? "Edit" : "+ Link skills"}</button>`}</div>
       <details class="co-mods" data-cid="${esc(c.id)}" ${(S.modOpen[c.id] ?? st.mods.length <= 12) ? "open" : ""}><summary class="small">Modules</summary>
         ${st.mods.length ? `<ul class="subs">${st.mods.map((m, i) => `<li class="${m.done ? "done" : ""}"><input type="checkbox" data-cmod="${i}" ${m.done ? "checked" : ""} aria-label="Module done: ${esc(m.title)}"><span class="grow">${esc(m.title)}${(() => { const mm = S.time.filter(x => x.type === "course" && x.ref === c.id && x.mod === m.id).reduce((a, x) => a + (+x.mins || 0), 0); return mm ? ` <span class="small muted">· ${fmtMins(mm)}</span>` : ""; })()}</span><button type="button" class="x tl-ed" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(m.id)}" aria-label="Log time for ${esc(m.title)}" title="Log time for this module">${SVG(ICON.timer)}</button><button type="button" class="x" data-cmoddel="${i}" aria-label="Remove module">✕</button></li>`).join("")}</ul>` : `<p class="small muted">No modules yet. Paste them below, one per line.</p>`}
-        <textarea class="inp" data-cmodnew rows="2" placeholder="Paste module names, one per line"></textarea>
-        <div class="co-foot"><button class="btn sm" type="button" data-cmodadd>Add modules</button><label class="small muted">Target date <input type="date" data-ctarget value="${esc(c.target || "")}"></label><button class="btn sm ghost danger" type="button" data-cdel>${courseDel === c.id ? "Tap again to delete" : "Delete course"}</button></div>
+      </details>
+      <details class="co-more" data-cmore="${esc(c.id)}" ${S.coMore === c.id || !st.mods.length ? "open" : ""}><summary class="small">${st.mods.length ? "Add modules · target date · delete" : "Add modules"}</summary>
+        <textarea class="inp" data-cmodnew rows="3" placeholder="Paste module names, one per line"></textarea>
+        <div class="co-foot"><button class="btn sm primary" type="button" data-cmodadd>Add modules</button><label class="small muted co-tgt">Target date <input type="date" data-ctarget value="${esc(c.target || "")}"></label><button class="btn sm ghost danger" type="button" data-cdel>${courseDel === c.id ? "Tap again to delete" : "Delete course"}</button></div>
       </details></div>`; }).join("")
     : `<div class="panel empty">No courses yet. Add your Google certificate above to track modules, study hours and a streak.</div>`;
 }
@@ -958,6 +964,7 @@ $("#course-form").addEventListener("submit", e => { e.preventDefault(); const n 
 document.addEventListener("click", e => {
   const card = e.target.closest("[data-course]"); if (!card) return;
   const c = S.courses.find(x => x.id === card.dataset.course); if (!c) return;
+  const cdn = e.target.closest("[data-cmod-done]"); if (cdn) { const mods = c.modules.map(m => ({ ...m })), m = mods[+cdn.dataset.cmodDone]; m.done = true; m.doneAt = nowISO(); saveCourse({ ...c, modules: mods }); toast("Module done"); return; }
   if (e.target.closest("[data-cnotes]")) { S.noteSpace = "self"; S.noteSubj = "c:" + c.id; S.noteEdit = null; location.hash = "#study-notes"; return; }
   if (e.target.closest("[data-cskedit]")) { S.cskEdit = c.id; renderCourses(); return; }
   if (e.target.closest("[data-cskdone]")) { S.cskEdit = null; renderCourses(); return; }
@@ -965,7 +972,7 @@ document.addEventListener("click", e => {
   if (e.target.closest("[data-csknewadd]")) { const n = (card.querySelector("[data-csknew]").value || "").trim(); if (!n) return; let tag = n.split(/[\s\/]+/)[0].toLowerCase().replace(/[^a-z0-9-]/g, "") || "skill"; const ex = S.cats.find(k => k.name.toLowerCase() === n.toLowerCase()); if (ex) tag = ex.tag; else { while (S.cats.find(k => k.tag === tag)) tag += "2"; S.cats.push({ name: n, tag }); saveCats(); } saveCourse({ ...c, skills: [...new Set([...(c.skills || []), tag])] }); toast("Skill linked"); return; }
   if (e.target.closest("[data-cfocus]")) { startTimer({ type: "course", ref: c.id, label: c.name, mode: "focus", dur: 25 }); return; }
   if (e.target.closest("[data-cmodadd]")) { const ta = card.querySelector("[data-cmodnew]"); const lines = ta.value.split(/\n+/).map(x => x.replace(/^\s*[-*•\d.)]+\s*/, "").trim()).filter(Boolean);
-    if (!lines.length) return; saveCourse({ ...c, modules: [...(c.modules || []), ...lines.map(t => ({ id: newSubId(), title: t, done: false }))] }); toast(`${lines.length} module${lines.length > 1 ? "s" : ""} added`); return; }
+    if (!lines.length) return; saveCourse({ ...c, modules: [...(c.modules || []), ...lines.map(t => ({ id: newSubId(), title: t, done: false }))] }); S.coMore = null; toast(`${lines.length} module${lines.length > 1 ? "s" : ""} added`); return; }
   const md = e.target.closest("[data-cmoddel]"); if (md) { const mods = [...c.modules]; mods.splice(+md.dataset.cmoddel, 1); saveCourse({ ...c, modules: mods }); return; }
   if (e.target.closest("[data-cdel]")) { if (courseDel !== c.id) { courseDel = c.id; renderCourses(); } else { courseDel = null; del("courses", c.id); toast("Course deleted"); } }
 });

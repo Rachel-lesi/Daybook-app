@@ -1417,6 +1417,29 @@ label.f:has(.dhint){margin-bottom:18px}
 .lg-mdone{display:flex;align-items:center;gap:6px}
 .co-mods .subs li{grid-template-columns:auto minmax(0,1fr) auto auto;gap:6px 10px}
 .co-mods .tl-ed svg{width:14px;height:14px}
+
+/* ===== courses layout ===== */
+.co-sum{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.co-sum:empty{display:none}
+.co-sum span{display:inline-flex;gap:6px;align-items:baseline;font-size:.82rem;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:5px 12px}
+.co-sum b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+.co-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,500px),1fr));gap:16px;align-items:start}
+.course{gap:12px}
+.co-head{flex-wrap:wrap;align-items:flex-start}
+.co-title{flex:1 1 200px;min-width:0}
+.co-btns{margin-left:auto}
+.co-next{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 10px;align-items:center;padding:10px 12px;border-radius:10px;background:var(--accent-soft,var(--sunk))}
+.co-next b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.co-next-b{display:inline-flex;gap:6px}
+.co-next .btn{display:inline-flex;align-items:center;gap:5px}
+.co-next .btn svg{width:13px;height:13px}
+.co-more summary{cursor:pointer;color:var(--muted)}
+.co-more{display:grid;gap:8px}
+.co-more[open] summary{margin-bottom:6px}
+.co-tgt{display:inline-flex;align-items:center;gap:6px}
+.co-tgt .dd-wrap{width:160px}
+.co-mods .subs{max-height:340px;overflow:auto}
+@media (max-width:520px){.co-next{grid-template-columns:1fr}.co-next-b{justify-content:flex-start}.co-btns{margin-left:0}}
 </style>
 </head>
 <body class="locked">
@@ -1665,10 +1688,11 @@ label.f:has(.dhint){margin-bottom:18px}
 
   <section class="view" id="v-growth" hidden>
     <div class="g-col">
-      <div data-part="courses">
-        <div class="sechead"><h2>Courses</h2><span class="meta">Google certificate and other study</span></div>
+      <div data-part="courses" data-wide>
+        <div class="sechead"><h2>Courses</h2><span class="meta">Certificates and self-study courses</span></div>
+        <div class="co-sum" id="co-sum"></div>
         <form id="course-form" class="panel course-form" autocomplete="off"><input id="course-name" class="inp" placeholder="Course name, e.g. Google Data Analytics Certificate"><label class="small muted cf-date">Target<input type="date" id="course-target" class="inp"></label><button class="btn sm primary" type="submit">Add course</button></form>
-        <div id="courses" class="g-stack"></div>
+        <div id="courses" class="co-grid"></div>
       </div>
       <div data-part="streaks" data-wide>
         <div class="sechead"><h2>Habit streaks</h2><span class="meta">From your routine ticks · skipped days don't break a streak</span></div>
@@ -1918,6 +1942,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=52"></script>
+<script type="module" src="app.js?v=53"></script>
 </body>
 </html>
