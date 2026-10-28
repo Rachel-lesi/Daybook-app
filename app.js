@@ -1785,16 +1785,7 @@ function renderStudy(){
       return st.length ? `<details class="st-todo-box" open><summary class="small"><b>Study to-dos</b> <span class="muted">(${st.filter(t => !t.done).length})</span></summary><ul class="rows">${st.map(t => `<li class="${t.done ? "done" : ""}"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="Done: ${esc(t.title)}"><span class="grow"><span>${t.subj ? `<span class="tag ${subjCls(t.subj)}">${esc(subjLabel(t.subj))}</span> ` : ""}${esc(t.title)}</span>${t.date ? `<div class="sub ${t.date < tk && !t.done ? "overdue" : ""}">${esc(fmtDate(t.date))}</div>` : ""}</span><button class="x tl-ed" type="button" data-todoedit="${esc(t.id)}" aria-label="Edit">${SVG(ICON.edit)}</button><button class="x" type="button" data-deltodo="${esc(t.id)}" aria-label="Delete">✕</button></li>`).join("")}</ul></details>` : ""; })()}
     <div class="asg-filter"><div class="seg">${[["todo", `To do (${openN})`], ["done", "Submitted & graded"], ["all", "All"]].map(([v, l]) => `<button type="button" data-asg-f="${v}" aria-pressed="${S.asgFilter === v}">${l}</button>`).join("")}</div>
       ${S.subjects.length > 1 ? `<div class="qa-chips cwrap"><button type="button" class="qc" data-asg-s="" aria-pressed="${!S.asgSubj}">All subjects</button>${S.subjects.map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-asg-s="${esc(s.id)}" aria-pressed="${S.asgSubj === s.id}">${esc(s.code || s.name)}</button>`).join("")}</div>` : ""}</div>
-    ${list.length ? `<div class="asg-list">${list.map(a => { const [dt, cls] = dueText(a), open = S.asgOpen === a.id;
-      if (S.asgEdit === a.id) return asgEditForm(a);
-      return `<div class="asg ${cls} st-${esc(a.status)}"><div class="asg-main" data-asg-open="${esc(a.id)}" role="button" tabindex="0">
-        <span class="asg-stripe ${subjCls(a.subj)}"></span>
-        <div class="asg-body"><div class="asg-t"><b>${esc(a.title)}</b>${a.weight ? `<span class="asg-w">${esc(a.weight)}%</span>` : ""}</div>
-          <div class="line"><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="small">${esc((ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1])}</span><span class="asg-due ${cls}">${esc(dt)}</span>${a.status === "graded" && a.mark !== "" && a.mark != null ? `<span class="asg-mark">${esc(a.mark)}%</span>` : ""}</div></div></div>
-        <div class="seg asg-st">${ASG_ST.map(([v, l]) => `<button type="button" data-asg-st="${esc(a.id)}:${v}" aria-pressed="${a.status === v}">${l}</button>`).join("")}</div>
-        ${open || a.status === "graded" ? `<div class="asg-more">
-          ${a.status === "graded" ? `<label class="f">Mark (%)<input type="number" min="0" max="100" step="0.1" data-asg-mark="${esc(a.id)}" value="${esc(a.mark ?? "")}" placeholder="e.g. 85"></label>` : ""}
-          ${open ? asgDetail(a) : `<button type="button" class="btn sm ghost" data-asg-open="${esc(a.id)}">Notes, files & what you learned</button>`}</div>` : ""}</div>`; }).join("")}</div>`
+    ${list.length ? `<div class="asg-list">${asgGroups(list).map(g => g.kids.length ? `<div class="asg-group">${asgItem(g.a, g.kids)}<div class="asg-kids">${g.kids.map(k => asgItem(k)).join("")}</div></div>` : asgItem(g.a)).join("")}</div>`
       : `<div class="empty">${S.asgFilter === "todo" ? "Nothing due. Nice!" : "No assignments here yet."}</div>`}`;
   renderNotes(); renderPortfolio(); renderStudyCal(); dateHints();
   // ----- grades
@@ -1896,7 +1887,28 @@ function asgDetail(a){
       <label class="f">Skills used <span class="muted" style="font-weight:400">· separate with commas</span><input data-asg-skills="${esc(a.id)}" value="${esc((a.skills || []).join(", "))}" placeholder="e.g. SQL, k-means clustering, report writing, teamwork"></label></div>` : ""}
     <label class="f">Notes<textarea data-asg-notes="${esc(a.id)}" rows="4" placeholder="Requirements, rubric, group members, approach, feedback from lecturer…">${esc(a.notes || "")}</textarea></label>
     ${linksEditor("asg", a.id, asgLinks(a))}
+    ${a.parent ? `<p class="small muted" style="margin:0">Part of <b>${esc((S.asg.find(x => x.id === a.parent) || {}).title || "")}</b></p>` : `<div class="f"><span class="small muted" style="font-weight:600">Parts <span style="font-weight:400">· split it into pieces, e.g. Coding, Report, Video</span></span><div class="qrow"><input class="inp" data-part-title="${esc(a.id)}" placeholder="Add a part"><button class="btn sm" type="button" data-part-add="${esc(a.id)}">Add part</button></div></div>`}
     <div class="row"><button type="button" class="btn sm" data-asg-edit="${esc(a.id)}">${SVG(ICON.edit)}Edit details</button><button type="button" class="btn sm ghost danger" data-asg-del="${esc(a.id)}">${S.asgDel === a.id ? "Tap again to delete" : "Delete"}</button></div>`;
+}
+// ----- one assignment card, and parts grouped under their main assignment
+function asgItem(a, kids){ const [dt, cls] = dueText(a), open = S.asgOpen === a.id;
+      if (S.asgEdit === a.id) return asgEditForm(a);
+      const kd = kids && kids.length ? kids.filter(k => ["submitted", "graded"].includes(k.status)).length : 0;
+      return `<div class="asg ${cls} st-${esc(a.status)} ${a.parent ? "is-part" : ""}"><div class="asg-main" data-asg-open="${esc(a.id)}" role="button" tabindex="0">
+        <span class="asg-stripe ${subjCls(a.subj)}"></span>
+        <div class="asg-body"><div class="asg-t"><b>${esc(a.title)}</b>${a.weight ? `<span class="asg-w">${esc(a.weight)}%</span>` : ""}</div>
+          <div class="line"><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="small">${esc((ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1])}</span><span class="asg-due ${cls}">${esc(dt)}</span>${kids && kids.length ? `<span class="asg-parts">${kd}/${kids.length} part${kids.length === 1 ? "" : "s"} done</span>` : ""}${a.status === "graded" && a.mark !== "" && a.mark != null ? `<span class="asg-mark">${esc(a.mark)}%</span>` : ""}</div></div></div>
+        <div class="seg asg-st">${ASG_ST.map(([v, l]) => `<button type="button" data-asg-st="${esc(a.id)}:${v}" aria-pressed="${a.status === v}">${l}</button>`).join("")}</div>
+        ${open || a.status === "graded" ? `<div class="asg-more">
+          ${a.status === "graded" ? `<label class="f">Mark (%)<input type="number" min="0" max="100" step="0.1" data-asg-mark="${esc(a.id)}" value="${esc(a.mark ?? "")}" placeholder="e.g. 85"></label>` : ""}
+          ${open ? asgDetail(a) : `<button type="button" class="btn sm ghost" data-asg-open="${esc(a.id)}">Notes, files & what you learned</button>`}</div>` : ""}</div>`; }
+function asgGroups(list){
+  const ids = new Set(S.asg.map(a => a.id)), top = [], seen = new Set();
+  list.forEach(a => { const pid = a.parent && ids.has(a.parent) ? a.parent : null; const root = pid ? S.asg.find(x => x.id === pid) : a;
+    if (seen.has(root.id)) return; seen.add(root.id);
+    const kids = S.asg.filter(k => k.parent === root.id && (list.includes(k) || list.includes(root))).sort((x, y) => ((x.due || "9999") + (x.time || "")).localeCompare((y.due || "9999") + (y.time || "")));
+    top.push({ a: root, kids }); });
+  return top;
 }
 // ----- edit an assignment
 S.asgEdit = null; S.asgEType = "assignment";
@@ -1906,6 +1918,8 @@ function asgEditForm(a){
     <div class="asg-row1"><select id="ae-subj" class="inp">${subjOptions(a.subj)}</select><input id="ae-title" class="inp" value="${esc(a.title)}" required></div>
     <div class="qa-chips cwrap">${ASG_TYPES.map(([v, l]) => `<button type="button" class="qc" data-asge-type="${v}" aria-pressed="${S.asgEType === v}">${l}</button>`).join("")}</div>
     <div class="asg-row2"><label class="f">Due date<input type="date" id="ae-due" data-dhint value="${esc(a.due || "")}"><span class="dhint"></span></label><label class="f">Time<input type="time" id="ae-time" value="${esc(a.time || "")}"></label><label class="f">Weight %<input type="number" id="ae-weight" min="0" max="100" value="${esc(a.weight ?? "")}"></label></div>
+    ${(() => { const kidsOf = S.asg.filter(x => x.parent === a.id).length, opts = S.asg.filter(x => x.id !== a.id && !x.parent).sort((x, y) => (x.subj === a.subj ? 0 : 1) - (y.subj === a.subj ? 0 : 1) || x.title.localeCompare(y.title));
+      return kidsOf ? `<p class="small muted" style="margin:0">This is a main assignment with ${kidsOf} part${kidsOf === 1 ? "" : "s"}.</p>` : `<label class="f">Part of <span class="muted">(optional)</span><select id="ae-parent" class="inp"><option value="">Not part of another assignment</option>${opts.map(x => `<option value="${esc(x.id)}" ${a.parent === x.id ? "selected" : ""}>${esc(subjLabel(x.subj))} · ${esc(x.title)}</option>`).join("")}</select></label>`; })()}
     <div class="row"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" data-asg-edit-x>Cancel</button></div></form>`;
 }
 document.addEventListener("click", e => {
@@ -1916,10 +1930,17 @@ document.addEventListener("click", e => {
   else if (d.asgeType) { S.asgEType = d.asgeType; t.parentElement.querySelectorAll("[data-asge-type]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
   else if (d.dswap) { const inp = t.closest("label").querySelector("input[type=date]"); inp.value = d.dswap; dateHint(inp); }
 });
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest("[data-part-add]"); if (!b) return;
+  const p = S.asg.find(x => x.id === b.dataset.partAdd), inp = document.querySelector(`[data-part-title="${b.dataset.partAdd}"]`), ti = (inp && inp.value || "").trim(); if (!p || !ti) { inp && inp.focus(); return; }
+  put("assignments", newId(), { subj: p.subj, title: ti, type: p.type || "assignment", due: p.due || "", time: p.time || "", weight: "", status: "todo", mark: "", notes: "", link: "", parent: p.id, createdAt: nowISO(), doneAt: "" });
+  toast("Part added. Edit it to set its own due date."); setTimeout(() => { const n = document.querySelector(`[data-part-title="${p.id}"]`); if (n) n.focus(); }, 60);
+});
+document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target.dataset && e.target.dataset.partTitle) { e.preventDefault(); document.querySelector(`[data-part-add="${e.target.dataset.partTitle}"]`).click(); } });
 document.addEventListener("submit", e => {
   if (e.target.id !== "asg-edit-form") return; e.preventDefault();
   const a = S.asg.find(x => x.id === e.target.dataset.id), ti = $("#ae-title").value.trim(); if (!a || !ti) return;
-  put("assignments", a.id, { ...strip(a), subj: $("#ae-subj").value || a.subj, title: ti, type: S.asgEType, due: $("#ae-due").value, time: $("#ae-time").value, weight: $("#ae-weight").value ? +$("#ae-weight").value : "" });
+  put("assignments", a.id, { ...strip(a), subj: $("#ae-subj").value || a.subj, title: ti, type: S.asgEType, due: $("#ae-due").value, time: $("#ae-time").value, weight: $("#ae-weight").value ? +$("#ae-weight").value : "", parent: $("#ae-parent") ? $("#ae-parent").value : (a.parent || "") });
   S.asgEdit = null; toast("Assignment updated");
 }, true);
 // ----- readable due date under date boxes, and a fix when day and month were typed the other way round
