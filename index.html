@@ -1342,6 +1342,21 @@ label.f:has(.dhint){margin-bottom:18px}
 .asg.is-part .asg-t b{font-weight:600;font-size:.95rem}
 .asg-parts{font-size:.74rem;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--sunk);color:var(--muted)}
 @media (max-width:560px){.asg-kids{margin-left:8px;padding-left:8px}}
+
+/* ===== notes folders ===== */
+.note-space{display:flex;flex-wrap:wrap}
+.note-space button{display:inline-flex;align-items:center;gap:6px}
+.note-space svg{width:15px;height:15px}
+.nfolders{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:10px}
+.nfolder{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 12px;align-items:center;text-align:left;font:inherit;color:inherit;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.nfolder:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.nf-ic{grid-row:span 2;width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,currentColor 14%,var(--surface))}
+.nf-ic svg{width:20px;height:20px}
+.nf-t{display:grid;min-width:0}
+.nf-t b,.nf-t span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nf-n{line-height:1.35}
+.ng-h{margin-top:6px;display:flex;gap:6px;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:4px}
+#st-notes{display:grid;gap:10px}
 </style>
 </head>
 <body class="locked">
@@ -1631,7 +1646,7 @@ label.f:has(.dhint){margin-bottom:18px}
       <div class="panel hcard" id="st-asg"></div>
     </div>
     <div data-part="notes" data-wide>
-      <div class="sechead"><h2>Notes & resources</h2><span class="meta">Lecture notes, slides, past papers, links</span></div>
+      <div class="sechead"><h2>Notes & resources</h2><span class="meta">A folder for each unit and course</span></div>
       <div class="panel hcard" id="st-notes"></div>
     </div>
     <div data-part="portfolio" data-wide>
@@ -1826,6 +1841,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=44"></script>
+<script type="module" src="app.js?v=45"></script>
 </body>
 </html>

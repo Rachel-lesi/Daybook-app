@@ -939,7 +939,7 @@ function renderCourses(){
   $("#courses").innerHTML = S.courses.length ? S.courses.slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")).map(c => { const st = courseStats(c);
     return `<div class="panel course" data-course="${esc(c.id)}">
       <div class="co-head"><span class="co-ic">${SVG(ICON.book)}</span><div class="co-title"><b>${esc(c.name)}</b><span class="muted small">${st.done}/${st.mods.length} modules${c.target ? ` · target ${esc(fmtDate(c.target))}` : ""}</span></div>
-        <span class="co-btns"><button class="btn sm" type="button" data-logtime="course|${esc(c.id)}|${esc(c.name)}">${SVG(ICON.timer)}Time log</button><button class="btn sm" type="button" data-cfocus="${esc(c.id)}">${SVG(ICON.play)}Study 25m</button></span></div>
+        <span class="co-btns"><button class="btn sm" type="button" data-cnotes>${SVG(ICON.note)}Notes ${S.snotes.filter(n => n.course === c.id).length || ""}</button><button class="btn sm" type="button" data-logtime="course|${esc(c.id)}|${esc(c.name)}">${SVG(ICON.timer)}Time log</button><button class="btn sm" type="button" data-cfocus="${esc(c.id)}">${SVG(ICON.play)}Study 25m</button></span></div>
       <div class="co-bar"><span class="bar"><i style="width:${st.pct}%"></i></span><b class="mono-n">${st.pct}%</b></div>
       <div class="co-stats"><span><b>${fmtMins(st.week)}</b> this week</span><span><b>${fmtMins(st.mins)}</b> total</span><span>${SVG(ICON.flame)}<b>${st.streak}</b> day streak</span></div>
       ${st.pace ? `<p class="small" style="margin:0">${st.pace}</p>` : ""}
@@ -958,6 +958,7 @@ $("#course-form").addEventListener("submit", e => { e.preventDefault(); const n 
 document.addEventListener("click", e => {
   const card = e.target.closest("[data-course]"); if (!card) return;
   const c = S.courses.find(x => x.id === card.dataset.course); if (!c) return;
+  if (e.target.closest("[data-cnotes]")) { S.noteSpace = "self"; S.noteSubj = "c:" + c.id; S.noteEdit = null; location.hash = "#study-notes"; return; }
   if (e.target.closest("[data-cskedit]")) { S.cskEdit = c.id; renderCourses(); return; }
   if (e.target.closest("[data-cskdone]")) { S.cskEdit = null; renderCourses(); return; }
   const sk = e.target.closest("[data-csk]"); if (sk) { const has = (c.skills || []).includes(sk.dataset.csk); saveCourse({ ...c, skills: has ? c.skills.filter(t => t !== sk.dataset.csk) : [...(c.skills || []), sk.dataset.csk] }); return; }
@@ -1116,7 +1117,7 @@ function runSearch(){
   for (const c of S.courses) { const hay = [c.name, ...(c.modules || []).map(m => m.title)].join(" \n "); if (match(hay)) R.push({ g: "Courses", title: c.name, sub: `${(c.modules || []).filter(m => m.done).length}/${(c.modules || []).length} modules`, snip: match(c.name) ? "" : snippet(hay, q), act: `data-sr-view="study-courses"` }); }
   for (const hd of Object.values(S.health)) (hd.moods || []).forEach(m => { const hay = [m.note, ...(m.feel || []), ...(m.why || [])].join(" "); if (m.note && match(hay)) R.push({ g: "Mood notes", title: fmtDate(hd.date) + " · " + MOODS[m.m - 1][1], sub: (m.feel || []).join(", "), snip: snippet(m.note, q), act: `data-sr-view="health-mind"` }); });
   for (const c of S.conds) { const hay = [c.title, c.notes].join(" \n "); if (match(hay)) R.push({ g: "Health", title: c.title, sub: `${fmtDate(c.start)} · ${c.status === "resolved" ? "recovered" : "ongoing"}`, snip: match(c.title) ? "" : snippet(hay, q), act: `data-sr-view="health-log"` }); }
-  for (const n of S.snotes) { const hay = [n.title, n.body, n.url, subjLabel(n.subj)].join(" \n "); if (match(hay)) R.push({ g: "Study notes", title: n.title, sub: `${subjLabel(n.subj)} · ${(NOTE_TAGS.find(t => t[0] === n.tag) || ["", "Note"])[1]}`, snip: match(n.title) ? "" : snippet(hay, q), act: `data-sr-view="study-notes"` }); }
+  for (const n of S.snotes) { const hay = [n.title, n.body, n.url, folderLabel(nKey(n))].join(" \n "); if (match(hay)) R.push({ g: n.course ? "Course notes" : "Study notes", title: n.title, sub: `${folderLabel(nKey(n))} · ${(NOTE_TAGS.find(t => t[0] === n.tag) || ["", "Note"])[1]}`, snip: match(n.title) ? "" : snippet(hay, q), act: `data-sr-view="study-notes"` }); }
   for (const a of S.asg) { const hay = [a.title, a.notes, a.learned, (a.skills || []).join(" "), subjLabel(a.subj), (subj(a.subj) || {}).name].join(" \n "); if (match(hay)) R.push({ g: "Assignments", title: a.title, sub: `${subjLabel(a.subj)} · ${dueText(a)[0]}`, snip: match(a.title) ? "" : snippet(hay, q), act: `data-sr-view="study-assignments"` }); }
   for (const sj of S.subjects) { const hay = [sj.code, sj.name, sj.lecturer].join(" "); if (match(hay)) R.push({ g: "Subjects", title: (sj.code ? sj.code + " · " : "") + sj.name, sub: sj.lecturer || "", act: `data-sr-view="study"` }); }
   for (const x of S.exp) { const hay = [x.note, expCat(x.cat)[1]].join(" "); if (match(hay)) R.push({ g: "Expenses", title: (x.note || expCat(x.cat)[1]) + " · " + money(x.amount), sub: fmtDate(x.date) + " · " + expCat(x.cat)[1], act: `data-sr-view="money"` }); }
@@ -1976,33 +1977,61 @@ function dateHints(){ document.querySelectorAll("#v-study input[data-dhint]").fo
 document.addEventListener("input", e => { if (e.target.matches && e.target.matches("input[data-dhint]")) dateHint(e.target); });
 document.addEventListener("change", e => { if (e.target.matches && e.target.matches("input[data-dhint]")) dateHint(e.target); });
 // ----- notes subtab
+// ----- notes: a folder for each university unit and each self-study course
+S.noteSpace = "uni"; S.noteTagF = "";
+const nKey = n => n.course ? "c:" + n.course : "s:" + (n.subj || "");
+const folderLabel = k => k.startsWith("c:") ? ((S.courses.find(c => "c:" + c.id === k) || {}).name || "Course") : subjLabel(k.slice(2));
+function noteFolders(space){
+  if (space === "uni") return [...curSubjects(), ...S.subjects.filter(s => !isCur(s))].map(s => ({ k: "s:" + s.id, code: s.code || s.name, name: s.code ? s.name : "", past: !isCur(s), sem: s.sem || "", cls: subjCls(s.id) }));
+  return S.courses.map((c, i) => ({ k: "c:" + c.id, code: c.name, name: (c.skills || []).map(t => catName(t).split(/\s*\/\s*/)[0]).join(", "), past: false, cls: "ci-" + (i % 6) }));
+}
+function noteCard(n, showFolder){
+  const open = S.noteOpen === n.id, long = (n.body || "").length > 220;
+  return `<article class="note ${n.kind === "link" ? "is-link" : ""}"><div class="nt-top">${showFolder ? `<span class="tag ${n.course ? "" : subjCls(n.subj)}">${esc(folderLabel(nKey(n)))}</span>` : ""}<span class="hl-tag">${esc((NOTE_TAGS.find(t => t[0] === n.tag) || ["", "Note"])[1])}</span><span class="small muted">${esc(fmtDate(isoDay(n.updatedAt || n.createdAt)))}</span></div>
+    <h4>${n.kind === "link" ? `${SVG(ICON.link)}<a href="${esc(linkUrl(n.url || ""))}" target="_blank" rel="noopener">${esc(n.title)}</a> <span class="small muted">${esc(hostOf(n.url || ""))}</span>` : esc(n.title)}</h4>
+    ${n.body ? `<div class="nt-body ${open || !long ? "" : "clip"}">${esc(n.body)}</div>${long ? `<button type="button" class="btn sm ghost" data-note-open="${esc(n.id)}">${open ? "Show less" : "Read more"}</button>` : ""}` : ""}
+    <div class="nt-act"><button type="button" class="btn sm ghost" data-note-edit="${esc(n.id)}">Edit</button><button type="button" class="btn sm ghost danger" data-note-del="${esc(n.id)}">${S.noteDel === n.id ? "Tap again to delete" : "Delete"}</button></div></article>`;
+}
 function renderNotes(){
   const box = $("#st-notes"); if (!box) return;
-  const subs = S.subjects;
-  if (!subs.length) { box.innerHTML = `<p class="small muted" style="margin:0">Add your subjects in Timetable first, then keep notes and resources for each one here.</p>`; return; }
-  if (S.noteSubj && !subj(S.noteSubj)) S.noteSubj = "";
-  const list = S.snotes.filter(n => !S.noteSubj || n.subj === S.noteSubj).sort((a, b) => (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || ""));
+  const uni = S.noteSpace === "uni", folders = noteFolders(S.noteSpace), byK = k => S.snotes.filter(n => nKey(n) === k);
+  if (S.noteSubj && !noteFolders("uni").concat(noteFolders("self")).some(f => f.k === S.noteSubj)) S.noteSubj = "";
+  if (S.noteSubj) S.noteSpace = S.noteSubj.startsWith("c:") ? "self" : "uni";
+  const space = `<div class="seg note-space"><button type="button" data-note-space="uni" aria-pressed="${S.noteSpace === "uni"}">${SVG(ICON.class)}University units <span class="muted">${S.snotes.filter(n => !n.course).length}</span></button><button type="button" data-note-space="self" aria-pressed="${S.noteSpace === "self"}">${SVG(ICON.book)}Self-study courses <span class="muted">${S.snotes.filter(n => n.course).length}</span></button></div>`;
+  if (!S.noteSubj) {
+    const card = f => { const ns = byK(f.k), last = ns.map(n => n.updatedAt || n.createdAt || "").sort().pop();
+      return `<button type="button" class="nfolder" data-note-subj="${esc(f.k)}"><span class="nf-ic ${f.cls}">${SVG(ICON.folder)}</span><span class="nf-t"><b>${esc(f.code)}</b>${f.name ? `<span class="small muted">${esc(f.name)}</span>` : ""}</span><span class="small muted nf-n">${ns.filter(n => n.kind !== "link").length} notes · ${ns.filter(n => n.kind === "link").length} links${last ? `<br>Updated ${esc(fmtDate(isoDay(last)))}` : ""}</span></button>`; };
+    const cur = folders.filter(f => !f.past), past = folders.filter(f => f.past);
+    const recent = S.snotes.filter(n => uni ? !n.course : n.course).sort((a, b) => (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || "")).slice(0, 4);
+    box.innerHTML = space + (!folders.length ? `<p class="small muted" style="margin:0">${uni ? "Add your subjects in Timetable to get a folder for each unit." : "Add a course in Study → Courses to get a notes folder for it."}</p>`
+      : `<div class="nfolders">${cur.map(card).join("")}</div>${past.length ? `<div class="small muted" style="font-weight:600">Past semesters</div><div class="nfolders">${past.map(card).join("")}</div>` : ""}
+        ${recent.length ? `<div class="small muted" style="font-weight:600;margin-top:4px">Recently updated</div><div class="notes">${recent.map(n => noteCard(n, true)).join("")}</div>` : ""}`);
+    return;
+  }
+  const k = S.noteSubj, all = byK(k).sort((a, b) => (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || ""));
+  const tags = NOTE_TAGS.filter(([v]) => all.some(n => (n.tag || "other") === v));
+  if (S.noteTagF && !tags.some(t => t[0] === S.noteTagF)) S.noteTagF = "";
+  const list = S.noteTagF ? all.filter(n => (n.tag || "other") === S.noteTagF) : all;
   const ed = S.noteEdit && S.snotes.find(n => n.id === S.noteEdit);
   const kind = ed ? ed.kind : S.noteKind, tag = ed ? ed.tag : S.noteTag;
-  const asgFor = S.noteSubj ? S.asg.filter(a => a.subj === S.noteSubj && (a.notes || asgLinks(a).length)) : [];
-  box.innerHTML = `
-    <div class="qa-chips cwrap"><button type="button" class="qc" data-note-subj="" aria-pressed="${!S.noteSubj}">All subjects</button>${[...curSubjects(), ...subs.filter(s => !isCur(s))].map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-note-subj="${esc(s.id)}" aria-pressed="${S.noteSubj === s.id}">${esc(s.code || s.name)}${isCur(s) ? "" : ` <span class="muted">· ${esc(s.sem || "past")}</span>`}</button>`).join("")}</div>
+  const asgFor = k.startsWith("s:") ? S.asg.filter(a => a.subj === k.slice(2) && (a.notes || asgLinks(a).length)) : [];
+  const groups = S.noteTagF ? [[S.noteTagF, list]] : tags.map(([v]) => [v, list.filter(n => (n.tag || "other") === v)]);
+  const allF = [...noteFolders("uni"), ...noteFolders("self")];
+  box.innerHTML = space + `
+    <div class="arc-crumbs"><button type="button" class="crumb" data-note-subj="">${uni ? "All units" : "All courses"}</button><span class="muted">›</span><b>${esc(folderLabel(k))}</b><span class="muted small">${all.length} item${all.length === 1 ? "" : "s"}</span></div>
+    ${tags.length > 1 ? `<div class="qa-chips cwrap"><button type="button" class="qc" data-note-tagf="" aria-pressed="${!S.noteTagF}">All</button>${tags.map(([v, l]) => `<button type="button" class="qc" data-note-tagf="${v}" aria-pressed="${S.noteTagF === v}">${l} <span class="muted">${all.filter(n => (n.tag || "other") === v).length}</span></button>`).join("")}</div>` : ""}
     <form id="note-form" class="st-form" autocomplete="off">
       <div class="row"><div class="seg">${[["note","Note"],["link","Link / file"]].map(([v, l]) => `<button type="button" data-note-kind="${v}" aria-pressed="${kind === v}">${l}</button>`).join("")}</div>
-        <select id="nt-subj" class="inp" style="max-width:240px">${subjOptions(ed ? ed.subj : S.noteSubj || (curSubjects()[0] || subs[0]).id)}</select></div>
+        ${ed ? `<select id="nt-folder" class="inp" style="max-width:260px" aria-label="Folder"><optgroup label="University units">${noteFolders("uni").map(f => `<option value="${esc(f.k)}" ${nKey(ed) === f.k ? "selected" : ""}>${esc(f.code)}</option>`).join("")}</optgroup><optgroup label="Self-study courses">${noteFolders("self").map(f => `<option value="${esc(f.k)}" ${nKey(ed) === f.k ? "selected" : ""}>${esc(f.code)}</option>`).join("")}</optgroup></select>` : `<span class="small muted">Saving to <b>${esc(folderLabel(k))}</b></span>`}</div>
       <input id="nt-title" class="inp" placeholder="${kind === "link" ? "Name, e.g. Week 5 slides, Lab sheet 3" : "Title, e.g. Week 5: Decision trees"}" value="${esc(ed ? ed.title : "")}" required>
       ${kind === "link" ? `<input id="nt-url" class="inp" inputmode="url" placeholder="Paste the link (Google Drive, OneDrive, Canva, YouTube, LMS…)" value="${esc(ed ? ed.url || "" : "")}">` : ""}
       <textarea id="nt-body" class="inp" rows="${kind === "link" ? 2 : 6}" placeholder="${kind === "link" ? "What's in it? (optional)" : "Your notes: key points, definitions, examples, questions to ask…"}">${esc(ed ? ed.body || "" : "")}</textarea>
       <div class="qa-chips cwrap">${NOTE_TAGS.map(([v, l]) => `<button type="button" class="qc" data-note-tag="${v}" aria-pressed="${tag === v}">${l}</button>`).join("")}</div>
       <div class="row"><button class="btn sm primary" type="submit">${ed ? "Save changes" : kind === "link" ? "Save link" : "Save note"}</button>${ed ? `<button class="btn sm" type="button" data-note-cancel>Cancel</button>` : ""}</div>
     </form>
-    ${list.length ? `<div class="notes">${list.map(n => { const open = S.noteOpen === n.id, long = (n.body || "").length > 220;
-      return `<article class="note ${n.kind === "link" ? "is-link" : ""}"><div class="nt-top"><span class="tag ${subjCls(n.subj)}">${esc(subjLabel(n.subj))}</span><span class="hl-tag">${esc((NOTE_TAGS.find(t => t[0] === n.tag) || ["", "Note"])[1])}</span><span class="small muted">${esc(fmtDate(isoDay(n.updatedAt || n.createdAt)))}</span></div>
-        <h4>${n.kind === "link" ? `${SVG(ICON.link)}<a href="${esc(linkUrl(n.url || ""))}" target="_blank" rel="noopener">${esc(n.title)}</a> <span class="small muted">${esc(hostOf(n.url || ""))}</span>` : esc(n.title)}</h4>
-        ${n.body ? `<div class="nt-body ${open || !long ? "" : "clip"}">${esc(n.body)}</div>${long ? `<button type="button" class="btn sm ghost" data-note-open="${esc(n.id)}">${open ? "Show less" : "Read more"}</button>` : ""}` : ""}
-        <div class="nt-act"><button type="button" class="btn sm ghost" data-note-edit="${esc(n.id)}">Edit</button><button type="button" class="btn sm ghost danger" data-note-del="${esc(n.id)}">${S.noteDel === n.id ? "Tap again to delete" : "Delete"}</button></div></article>`; }).join("")}</div>`
-      : `<p class="empty" style="margin:0">No notes${S.noteSubj ? " for this subject" : ""} yet.</p>`}
-    ${asgFor.length ? `<div class="small muted" style="margin-top:6px">From this subject's assignments</div><div class="notes">${asgFor.map(a => `<article class="note"><div class="nt-top"><span class="hl-tag">${esc((ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1])}</span><b>${esc(a.title)}</b></div>${a.notes ? `<div class="nt-body clip">${esc(a.notes)}</div>` : ""}${asgLinks(a).length ? `<ul class="links">${asgLinks(a).map(l => `<li>${SVG(ICON.link)}<a href="${esc(linkUrl(l.url))}" target="_blank" rel="noopener">${esc(l.label || hostOf(l.url))}</a><span></span></li>`).join("")}</ul>` : ""}</article>`).join("")}</div>` : ""}`;
+    ${list.length ? groups.filter(g => g[1].length).map(([v, ns]) => `<div class="ng-h small"><b>${esc((NOTE_TAGS.find(t => t[0] === v) || ["", "Other"])[1])}</b> <span class="muted">${ns.length}</span></div><div class="notes">${ns.map(n => noteCard(n, false)).join("")}</div>`).join("")
+      : `<p class="empty" style="margin:0">Nothing in this folder yet. Add your first note or link above.</p>`}
+    ${asgFor.length ? `<div class="ng-h small"><b>From this unit's assignments</b></div><div class="notes">${asgFor.map(a => `<article class="note"><div class="nt-top"><span class="hl-tag">${esc((ASG_TYPES.find(x => x[0] === a.type) || ["", ""])[1])}</span><b>${esc(a.title)}</b></div>${a.notes ? `<div class="nt-body clip">${esc(a.notes)}</div>` : ""}${asgLinks(a).length ? `<ul class="links">${asgLinks(a).map(l => `<li>${SVG(ICON.link)}<a href="${esc(linkUrl(l.url))}" target="_blank" rel="noopener">${esc(l.label || hostOf(l.url))}</a><span></span></li>`).join("")}</ul>` : ""}</article>`).join("")}</div>` : ""}`;
 }
 // ----- portfolio subtab
 function pfItems(){ return S.asg.filter(a => ["submitted", "graded"].includes(a.status)).sort((a, b) => (b.doneAt || b.due || "").localeCompare(a.doneAt || a.due || "")); }
@@ -2054,11 +2083,13 @@ document.addEventListener("click", e => {
   if (d.linkAdd) { const a = linkTarget(d.linkAdd); if (!a) return; const u = (document.querySelector(`[data-link-url="${d.linkAdd}"]`).value || "").trim(); if (!u) return;
     const L = asgLinks(a); L.push({ url: u, label: (document.querySelector(`[data-link-label="${d.linkAdd}"]`).value || "").trim() }); put("assignments", a.id, { ...strip(a), links: L, link: "" }); toast("Link added"); }
   else if (d.linkDel) { const [k, id, i] = d.linkDel.split(":"); const a = linkTarget(k + ":" + id); if (!a) return; const L = asgLinks(a); L.splice(+i, 1); put("assignments", a.id, { ...strip(a), links: L, link: "" }); }
-  else if (d.noteSubj !== undefined) { S.noteSubj = d.noteSubj; renderNotes(); }
+  else if (d.noteSubj !== undefined) { S.noteSubj = d.noteSubj; S.noteTagF = ""; S.noteEdit = null; renderNotes(); }
+  else if (d.noteSpace) { S.noteSpace = d.noteSpace; S.noteSubj = ""; S.noteEdit = null; renderNotes(); }
+  else if (d.noteTagf !== undefined) { S.noteTagF = d.noteTagf; renderNotes(); }
   else if (d.noteKind) { if (S.noteEdit) return; S.noteKind = d.noteKind; renderNotes(); $("#nt-title").focus(); }
   else if (d.noteTag) { if (S.noteEdit) { const n = S.snotes.find(x => x.id === S.noteEdit); if (n) n.tag = d.noteTag; } S.noteTag = d.noteTag; t.parentElement.querySelectorAll("[data-note-tag]").forEach(b => b.setAttribute("aria-pressed", b === t)); }
   else if (d.noteOpen) { S.noteOpen = S.noteOpen === d.noteOpen ? null : d.noteOpen; renderNotes(); }
-  else if (d.noteEdit) { S.noteEdit = d.noteEdit; renderNotes(); $("#note-form").scrollIntoView({ block: "nearest", behavior: "smooth" }); $("#nt-title").focus(); }
+  else if (d.noteEdit) { S.noteEdit = d.noteEdit; const n = S.snotes.find(x => x.id === d.noteEdit); if (n) S.noteSubj = nKey(n); renderNotes(); $("#note-form").scrollIntoView({ block: "nearest", behavior: "smooth" }); $("#nt-title").focus(); }
   else if (d.noteCancel !== undefined) { S.noteEdit = null; renderNotes(); }
   else if (d.noteDel) { if (S.noteDel !== d.noteDel) { S.noteDel = d.noteDel; renderNotes(); } else { del("snotes", d.noteDel); S.noteDel = null; toast("Deleted"); } }
   else if (d.pfOpen) { S.pfOpen = S.pfOpen === d.pfOpen ? null : d.pfOpen; renderPortfolio(); }
@@ -2072,11 +2103,11 @@ document.addEventListener("click", e => {
 document.addEventListener("keydown", e => { const m = e.target.closest && e.target.closest("[data-pf-open]"); if (m && m.getAttribute("role") === "button" && (e.key === "Enter" || e.key === " ") && e.target === m) { e.preventDefault(); m.click(); } if (e.target.dataset && e.target.dataset.linkUrl && e.key === "Enter") { e.preventDefault(); document.querySelector(`[data-link-add="${e.target.dataset.linkUrl}"]`).click(); } });
 document.addEventListener("submit", e => {
   if (e.target.id !== "note-form") return; e.preventDefault();
-  const ti = $("#nt-title").value.trim(), sj = $("#nt-subj").value; if (!ti) { $("#nt-title").focus(); return; } if (!sj) { toast("Choose a subject"); return; }
+  const ti = $("#nt-title").value.trim(), fk = $("#nt-folder") ? $("#nt-folder").value : S.noteSubj; if (!ti) { $("#nt-title").focus(); return; } if (!fk) { toast("Open a folder first"); return; }
   const ed = S.noteEdit && S.snotes.find(n => n.id === S.noteEdit), kind = ed ? ed.kind : S.noteKind;
   const url = $("#nt-url") ? $("#nt-url").value.trim() : ""; if (kind === "link" && !url) { toast("Paste the link first"); $("#nt-url").focus(); return; }
-  const rec = { subj: sj, kind, title: ti, body: $("#nt-body").value, url, tag: ed ? ed.tag || S.noteTag : S.noteTag, createdAt: ed ? ed.createdAt : nowISO(), updatedAt: nowISO() };
-  put("snotes", ed ? ed.id : newId(), rec); S.noteEdit = null; S.noteSubj = sj; toast(ed ? "Saved" : kind === "link" ? "Link saved" : "Note saved");
+  const rec = { ...(fk.startsWith("c:") ? { course: fk.slice(2), subj: "" } : { subj: fk.slice(2), course: "" }), kind, title: ti, body: $("#nt-body").value, url, tag: ed ? ed.tag || S.noteTag : S.noteTag, createdAt: ed ? ed.createdAt : nowISO(), updatedAt: nowISO() };
+  put("snotes", ed ? ed.id : newId(), rec); S.noteEdit = null; S.noteSubj = fk; toast(ed ? "Saved" : kind === "link" ? "Link saved" : "Note saved");
 });
 document.addEventListener("change", e => {
   const t = e.target; if (!t.dataset) return;
