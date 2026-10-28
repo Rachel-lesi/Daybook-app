@@ -1367,6 +1367,7 @@ label.f:has(.dhint){margin-bottom:18px}
 .arc-areas button,.x-area button{flex:1 1 auto}
 
 /* ===== saved weekly reports ===== */
+.wk-areas button{flex:1 1 auto}
 .wk-saverow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
 .wk-state{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 .wk-badge{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;font-weight:600;color:var(--ok,var(--accent))}
@@ -1757,7 +1758,8 @@ label.f:has(.dhint){margin-bottom:18px}
       <div class="panel arc" id="arc"></div>
     </div>
     <div data-part="weekly" data-wide class="panel weekly">
-      <div class="wk-head"><div><h2>Weekly report</h2><p class="small muted" style="margin:0">For your supervisor or internship logbook. Built from your tasks, time and reflections.</p></div>
+      <div class="seg wk-areas" id="wk-areas" style="display:flex;flex-wrap:wrap"></div>
+      <div class="wk-head"><div><h2 id="wk-h">Weekly report</h2><p class="small muted" style="margin:0" id="wk-desc">For your supervisor or internship logbook.</p></div>
         <div class="wk-nav"><button class="btn sm" type="button" data-wk="-1" aria-label="Previous week">‹</button><span id="wk-label" class="small"></span><button class="btn sm" type="button" data-wk="1" id="wk-next" aria-label="Next week">›</button></div></div>
       <div class="wk-actions"><button class="btn sm" type="button" id="wk-copy">Copy text</button><button class="btn sm" type="button" id="wk-word">Download Word</button><button class="btn sm" type="button" id="wk-print">Print / Save PDF</button></div>
       <div class="wk-saverow"><div id="wk-state" class="wk-state"></div><button class="btn sm primary" type="button" id="wk-save">Save report</button></div>
@@ -1868,6 +1870,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=49"></script>
+<script type="module" src="app.js?v=50"></script>
 </body>
 </html>
