@@ -1233,16 +1233,19 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const hasRefl = r => r && [r.did, r.learned, r.mistakes, r.improve].some(x => (x || "").trim());
 const mondayOf = k => { const [y, m, d] = k.split("-").map(Number); const dt = new Date(y, m - 1, d); dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7)); return dkey(dt); };
 const addDays = (k, n) => { const [y, m, d] = k.split("-").map(Number); const dt = new Date(y, m - 1, d + n); return dkey(dt); };
-function reflList(){ return Object.values(S.refl).filter(hasRefl).sort((a, b) => b.date.localeCompare(a.date)); }
+S.arcArea = ""; S.xArea = "";
+function reflList(area){ return Object.values(S.refl).filter(r => area ? areaHas(reflAreas(r)[area]) : hasRefl(r)).sort((a, b) => b.date.localeCompare(a.date)); }
+const arcView = r => S.arcArea ? (reflAreas(r)[S.arcArea] || {}) : r;
 function renderArchive(){
   const box = $("#arc"); if (!box) return;
-  const all = reflList();
-  if (!all.length) { box.innerHTML = `<p class="empty" style="margin:0">Your reflections will be filed here by month and week once you save your first one.</p>`; return; }
+  const all = reflList(S.arcArea), counts = Object.fromEntries(R_AREAS.map(([k]) => [k, reflList(k).length]));
+  const tabs = `<div class="seg arc-areas">${[["", "All", reflList().length], ...R_AREAS.map(([k, l]) => [k, l, counts[k]])].map(([k, l, n]) => `<button type="button" data-arcarea="${k}" aria-pressed="${S.arcArea === k}">${l} <span class="muted">${n}</span></button>`).join("")}</div>`;
+  if (!all.length) { box.innerHTML = tabs + `<p class="empty" style="margin:0">${S.arcArea ? `No ${esc((R_AREAS.find(x => x[0] === S.arcArea) || ["", ""])[1].toLowerCase())} reflections yet.` : "Your reflections will be filed here by month and week once you save your first one."}</p>`; return; }
   if (!S.arcMonth) {
     const byMonth = {};
     all.forEach(r => (byMonth[r.date.slice(0, 7)] = byMonth[r.date.slice(0, 7)] || []).push(r));
     const years = [...new Set(Object.keys(byMonth).map(k => k.slice(0, 4)))].sort().reverse();
-    box.innerHTML = `<div class="arc-crumbs"><b>All reflections</b><span class="muted small">${all.length} saved</span></div>` + years.map(y => `
+    box.innerHTML = tabs + `<div class="arc-crumbs"><b>${S.arcArea ? esc((R_AREAS.find(x => x[0] === S.arcArea) || ["", ""])[1]) : "All reflections"}</b><span class="muted small">${all.length} saved</span></div>` + years.map(y => `
       <div class="arc-year">${y}</div>
       <div class="arc-folders">${Object.keys(byMonth).filter(k => k.startsWith(y)).sort().reverse().map(k => { const rs = byMonth[k], moods = rs.filter(r => r.mood).map(r => r.mood);
         return `<button type="button" class="folder" data-arcm="${k}"><span class="fd-ic">${SVG(ICON.folder)}</span><span class="fd-name">${MONTHS[+k.slice(5) - 1]}</span><span class="fd-meta">${rs.length} reflection${rs.length > 1 ? "s" : ""}${moods.length ? ` · energy ${(moods.reduce((a, b) => a + b, 0) / moods.length).toFixed(1)}` : ""}</span></button>`; }).join("")}</div>`).join("");
@@ -1251,17 +1254,18 @@ function renderArchive(){
   const mk = S.arcMonth, rs = all.filter(r => r.date.startsWith(mk));
   const weeks = {}; rs.forEach(r => (weeks[mondayOf(r.date)] = weeks[mondayOf(r.date)] || []).push(r));
   const wkeys = Object.keys(weeks).sort().reverse();
-  box.innerHTML = `<div class="arc-crumbs"><button type="button" class="crumb" data-arcm="">All reflections</button><span class="muted">›</span><b>${MONTHS[+mk.slice(5) - 1]} ${mk.slice(0, 4)}</b>
+  box.innerHTML = tabs + `<div class="arc-crumbs"><button type="button" class="crumb" data-arcm="">${S.arcArea ? esc((R_AREAS.find(x => x[0] === S.arcArea) || ["", ""])[1]) : "All reflections"}</button><span class="muted">›</span><b>${MONTHS[+mk.slice(5) - 1]} ${mk.slice(0, 4)}</b>
       <button type="button" class="btn sm" data-xopen="month:${mk}" style="margin-left:auto">${SVG(ICON.download)}Export month</button></div>
     ${!rs.length ? `<p class="empty" style="margin:0">No reflections this month.</p>` : wkeys.map(w => `<details class="arc-week" open>
       <summary><span class="aw-ic">${SVG(ICON.folder)}</span><span class="aw-name">Week of ${esc(shortDay(w).replace(/^\w+ /, ""))}</span><span class="muted small">${shortDay(w).replace(/^\w+ /, "")} – ${shortDay(addDays(w, 6)).replace(/^\w+ /, "")} · ${weeks[w].length} day${weeks[w].length > 1 ? "s" : ""}</span>
         <button type="button" class="btn sm ghost" data-xopen="week:${w}">${SVG(ICON.download)}Export</button></summary>
       <ul class="arc-days">${weeks[w].sort((a, b) => a.date.localeCompare(b.date)).map(r => `<li><button type="button" class="arc-day ${r.date === rDate ? "is-open" : ""}" data-rdate="${esc(r.date)}">
         <span class="ad-date"><b>${esc(shortDay(r.date).split(" ")[0])}</b><span>${+r.date.slice(8)}</span></span>
-        <span class="ad-body"><span class="ad-snip">${esc((r.learned || r.did || r.mistakes || "").slice(0, 120))}</span><span class="ad-tags">${r.did ? "<i>Did</i>" : ""}${r.learned ? "<i>Learned</i>" : ""}${r.mistakes ? "<i>Mistakes</i>" : ""}${r.improve ? "<i>Improve</i>" : ""}</span></span>
+        <span class="ad-body"><span class="ad-snip">${(() => { const v = arcView(r); return esc((v.learned || v.did || v.mistakes || v.improve || "").slice(0, 120)); })()}</span><span class="ad-tags">${arcView(r).did ? "<i>Did</i>" : ""}${arcView(r).learned ? "<i>Learned</i>" : ""}${arcView(r).mistakes ? "<i>Mistakes</i>" : ""}${arcView(r).improve ? "<i>Improve</i>" : ""}</span></span>
         ${r.mood ? `<span class="ad-mood" title="Energy">${r.mood}/5</span>` : ""}</button></li>`).join("")}</ul></details>`).join("")}`;
 }
 document.addEventListener("click", e => {
+  const aa = e.target.closest("[data-arcarea]"); if (aa) { S.arcArea = aa.dataset.arcarea; renderArchive(); return; }
   const m = e.target.closest("[data-arcm]"); if (m) { S.arcMonth = m.dataset.arcm || null; renderArchive(); return; }
 });
 
@@ -1277,12 +1281,14 @@ function exportRange(kind, val){
 function openExport(preset){
   const [kind, val] = (preset || "week:").split(":");
   const [a, b] = exportRange(kind, val);
-  $("#x-kind").value = kind; $("#x-from").value = a; $("#x-to").value = b;
+  $("#x-kind").value = kind; $("#x-from").value = a; $("#x-to").value = b; S.xArea = S.arcArea || ""; xAreaRender();
   if (!$("#xdlg").open) $("#xdlg").showModal(); updateExportCount();
 }
+function xAreaRender(){ $("#x-area").innerHTML = [["", "All"], ...R_AREAS].map(([k, l]) => `<button type="button" data-xarea="${k}" aria-pressed="${S.xArea === k}">${l}</button>`).join(""); }
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-xarea]"); if (!b) return; S.xArea = b.dataset.xarea; xAreaRender(); updateExportCount(); });
 function updateExportCount(){
   const a = $("#x-from").value, b = $("#x-to").value;
-  const n = reflList().filter(r => r.date >= a && r.date <= b).length;
+  const n = reflList(S.xArea).filter(r => r.date >= a && r.date <= b).length;
   $("#x-count").textContent = a && b ? `${n} reflection${n === 1 ? "" : "s"} between ${fmtDate(a)} and ${fmtDate(b)}${$("#x-layout").value === "logbook" ? " · plus work activity for each day" : ""}` : "";
 }
 function exportDays(a, b, layout){
@@ -1292,7 +1298,8 @@ function exportDays(a, b, layout){
     const upd = S.tasks.map(t => ({ t, e: (t.log || []).filter(l => isoDay(l.at) === k && !/^Task added/.test(l.note)) })).filter(x => x.e.length);
     const fin = S.tasks.filter(t => t.status === "done" && isoDay(t.doneAt) === k);
     const mins = S.time.filter(x => x.date === k).reduce((s, x) => s + (+x.mins || 0), 0);
-    const ok = layout === "logbook" ? (hasRefl(r) || upd.length || fin.length || mins) : hasRefl(r);
+    const has = S.xArea ? !!(r && areaHas(reflAreas(r)[S.xArea])) : hasRefl(r);
+    const ok = layout === "logbook" ? (has || upd.length || fin.length || mins) : has;
     return ok ? { k, r, upd, fin, mins } : null;
   }).filter(Boolean);
 }
@@ -1312,7 +1319,7 @@ function exportHTML(a, b, layout){
       if (d.upd.length || d.fin.length) body += `<p class="xf"><b>Work:</b></p><ul>${[...d.fin.map(t => `<li>Completed: [${esc(catName(t.category))}] ${esc(t.title)}${t.impact ? ` — ${esc(t.impact)}` : ""}</li>`), ...d.upd.filter(x => !d.fin.includes(x.t)).map(x => `<li>[${esc(catName(x.t.category))}] ${esc(x.t.title)}: ${esc(x.e.map(e => e.note).join("; "))}</li>`)].join("")}</ul>`;
       if (d.mins) body += `<p class="xf"><b>Time tracked:</b> ${fmtMins(d.mins)}</p>`;
     }
-    if (d.r) { const A = reflAreas(d.r), used = R_AREAS.filter(([k]) => areaHas(A[k]));
+    if (d.r) { const A = reflAreas(d.r), used = R_AREAS.filter(([k]) => areaHas(A[k]) && (!S.xArea || S.xArea === k));
       used.forEach(([k, l]) => { if (used.length > 1 || k !== "work") body += `<p class="xf xa"><b>${esc(l)}</b></p>`; body += block("What I did", A[k].did || "") + block("What I learned", A[k].learned || "") + block("Mistakes", A[k].mistakes || "") + block("How I'll improve", A[k].improve || ""); }); }
     body += `</div>`;
   }
@@ -2519,7 +2526,7 @@ function _oldAuto(){ const wl=workLogFor(rDate), doneTodos=[];
   $("#r-auto").innerHTML = `<b>Pulled from your tasks for ${esc(fmtDate(rDate))}</b>` + (wl.length||doneTodos.length ? `<ul>${wl.map(x=>`<li><b>${esc(x.t.title)}</b> <span class="muted">(${esc(catName(x.t.category))}, ${esc(STATUS_LABEL[x.t.status])} ${+x.t.progress||0}%)</span>${x.entries.length?": "+x.entries.map(e=>esc(e.note)).join("; "):" — added"}</li>`).join("")}${doneTodos.map(t=>`<li>${esc(t.title)} <span class="muted">(to-do done)</span></li>`).join("")}</ul>` : `<div class="muted small">No task updates logged on this day. Updates you log on work tasks appear here automatically.</div>`);
   renderArchive();
 }
-["#r-did","#r-learned","#r-mistakes","#r-improve"].forEach(s=>$(s).addEventListener("input",()=>{ rDirty=true; rSync(); $("#r-areas [aria-pressed=true]") && rDraft && (areaHas(rDraft[rArea]) !== !!$("#r-areas [aria-pressed=true] .r-dot")) && rFillTabs(); $("#r-saved").textContent="Unsaved changes"; }));
+["#r-did","#r-learned","#r-mistakes","#r-improve"].forEach(s=>$(s).addEventListener("input",()=>{ rDirty=true; rSync(); rDots(); $("#r-saved").textContent="Unsaved changes"; }));
 ["#r-did","#r-learned","#r-mistakes","#r-improve"].forEach(s=>$(s).addEventListener("blur",e=>{ if(e.relatedTarget&&e.relatedTarget.closest&&e.relatedTarget.closest("#r-areas,#v-reflect .refl textarea")) return; if(rDirty) saveRefl(true); }));
 $("#r-date").addEventListener("change",e=>{ rDelAsk=false; S.arcMonth=(e.target.value||todayKey()).slice(0,7);  if(rDirty) saveRefl(true); rDate=e.target.value||todayKey(); rDirty=false; rDraft=null; renderReflect(); });
 $("#r-mood").addEventListener("click",e=>{ const b=e.target.closest("[data-mood]"); if(!b) return; rMood=+b.dataset.mood; rDirty=true; saveRefl(true); });
@@ -2536,13 +2543,14 @@ document.addEventListener("click", e=>{
   if(!rDelAsk){ rDelAsk=true; b.textContent="Tap again to delete"; b.classList.add("armed"); setTimeout(()=>{ rDelAsk=false; if($("#r-del")){ $("#r-del").textContent="Delete"; $("#r-del").classList.remove("armed"); } },3000); return; }
   deleteRefl(rDate);
 });
-function rFillTabs(){ const h = R_AREAS.map(([k, l]) => `<button type="button" data-rarea="${k}" aria-pressed="${rArea === k}">${l}${areaHas(rDraft[k]) ? ' <i class="r-dot"></i>' : ""}</button>`).join(""); if ($("#r-areas").innerHTML !== h) $("#r-areas").innerHTML = h; }
+function rDots(){ if (!rDraft) return; document.querySelectorAll("#r-areas [data-rarea]").forEach(b => { const on = areaHas(rDraft[b.dataset.rarea]), d = b.querySelector(".r-dot"); if (on && !d) b.insertAdjacentHTML("beforeend", ' <i class="r-dot"></i>'); else if (!on && d) d.remove(); }); }
+function rFillTabs(){ const h = R_AREAS.map(([k, l]) => `<button type="button" data-rarea="${k}" aria-pressed="${rArea === k}">${l}${areaHas(rDraft[k]) ? ' <i class="r-dot"></i>' : ""}</button>`).join(""); $("#r-areas").innerHTML = h; }
 function saveRefl(quiet){
   rSync(); const areas = JSON.parse(JSON.stringify(rDraft || reflAreas(null)));
   const data={date:rDate,areas,did:combineAreas(areas,"did"),learned:combineAreas(areas,"learned"),mistakes:combineAreas(areas,"mistakes"),improve:combineAreas(areas,"improve"),mood:rMood,updatedAt:nowISO()};
   S.refl[rDate]=data; rDirty=false;
   if(db) write("reflections/"+rDate, ()=>db.doc("reflections/"+rDate).set(data));
-  if(!quiet) toast("Reflection saved"); renderReflect();
+  if(!quiet){ toast("Reflection saved"); renderReflect(); } else { $("#r-saved").textContent=`Saved ${fmtTime(data.updatedAt)}`; $("#r-del").hidden=false; rDots(); renderArchive(); }
 }
 $("#r-copy").onclick=async()=>{
   const wl=workLogFor(rDate);
@@ -2749,7 +2757,7 @@ document.addEventListener("click", e=>{
   const od=e.target.closest("[data-ovday]"); if(od){ S.calSel=od.dataset.ovday; const [y,m]=od.dataset.ovday.split("-").map(Number); S.calY=y; S.calM=m-1; location.hash="#work-calendar"; return; }
   const rf=e.target.closest("[data-rtf]"); if(rf){ S.rtFilter=rf.dataset.rtf; renderRoutine(); return; }
   const ps=e.target.closest("[data-preset]"); if(ps){ const r=S.routine.find(y=>y.id===ps.closest("[data-rid]").dataset.rid); const days={all:[0,1,2,3,4,5,6],wd:[1,2,3,4,5],we:[0,6]}[ps.dataset.preset]; if(r) saveRt({...r,days}); return; }
-  const rd=e.target.closest("[data-rdate]"); if(rd){ rDate=rd.dataset.rdate; rDirty=false; if(S.main==="journal"&&S.sub!=="reflection"){ location.hash="#journal"; } else { renderReflect(); window.scrollTo({top:0}); } }
+  const rd=e.target.closest("[data-rdate]"); if(rd){ rDate=rd.dataset.rdate; rDirty=false; rDraft=null; if(S.arcArea) rArea=S.arcArea; if(S.main==="journal"&&S.sub!=="reflection"){ location.hash="#journal"; } else { renderReflect(); window.scrollTo({top:0}); } }
 });
 document.addEventListener("change", e=>{
   const ck=e.target.closest("[data-check]");

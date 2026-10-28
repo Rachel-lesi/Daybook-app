@@ -1362,6 +1362,9 @@ label.f:has(.dhint){margin-bottom:18px}
 .r-areas{display:flex;flex-wrap:wrap}
 .r-areas button{flex:1 1 auto}
 .r-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);vertical-align:2px;margin-left:2px}
+
+.arc-areas,.x-area{display:flex;flex-wrap:wrap;margin-bottom:10px}
+.arc-areas button,.x-area button{flex:1 1 auto}
 </style>
 </head>
 <body class="locked">
@@ -1821,6 +1824,7 @@ label.f:has(.dhint){margin-bottom:18px}
   <div class="dlg-top"><h3>Export reflections</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close" title="Close">✕</button></div>
   <label class="f">Range<select id="x-kind"><option value="day">One day</option><option value="week">A week</option><option value="month">A month</option><option value="all">All reflections (whole internship)</option><option value="custom">Custom dates</option></select></label>
   <div class="grid2"><label class="f">From<input type="date" id="x-from"></label><label class="f">To<input type="date" id="x-to"></label></div>
+  <div class="f"><span class="small muted" style="font-weight:600">Include</span><div class="seg x-area" id="x-area"></div></div>
   <label class="f">Layout<select id="x-layout"><option value="journal">Journal: reflections only</option><option value="logbook">Logbook: reflections + work done, time and results each day</option></select></label>
   <p class="small muted" id="x-count" style="margin:0"></p>
   <div class="dlgfoot"><button class="btn ghost" type="button" id="x-cancel">Cancel</button><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="x-word">Download Word</button><button class="btn primary" type="button" id="x-pdf">Save as PDF</button></div></div>
@@ -1847,6 +1851,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=46"></script>
+<script type="module" src="app.js?v=48"></script>
 </body>
 </html>
