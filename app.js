@@ -135,7 +135,7 @@ const strip = o => { const c={...o}; delete c.id; return c; };
 
 // ---------- categories
 const DEFAULT_CATS = [{name:"SQL / Database",tag:"sql"},{name:"Excel / Reporting",tag:"excel"},{name:"Python / Automation",tag:"python"},{name:"Admin / Documentation",tag:"admin"}];
-function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false, cur:S.cur||"RM", budget:S.budget||0, shopHist:S.shopHist||[], semStart:S.semStart||"", semWeeks:S.semWeeks||14, prevCgpa:S.prevCgpa||"", prevCredits:S.prevCredits||"", curSem:S.curSem||""})); }
+function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false, cur:S.cur||"RM", budget:S.budget||0, shopHist:S.shopHist||[], semStart:S.semStart||"", semWeeks:S.semWeeks||14, prevCgpa:S.prevCgpa||"", prevCredits:S.prevCredits||"", curSem:S.curSem||"", semBreaks:S.semBreaks||[]})); }
 
 // ---------- look & feel helpers
 const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -1623,7 +1623,7 @@ document.addEventListener("submit", e => {
 document.addEventListener("keydown", e => { if (e.target.id === "m-amt" && e.key === "Enter" && !$("#m-note").value.trim()) { e.preventDefault(); $("#m-note").focus(); } });
 
 // ---------- Study: subjects, timetable, assignments, grades
-S.subjects = []; S.classes = []; S.asg = []; S.semStart = ""; S.semWeeks = 14; S.prevCgpa = ""; S.prevCredits = "";
+S.subjects = []; S.classes = []; S.asg = []; S.semStart = ""; S.semWeeks = 14; S.semBreaks = []; S.prevCgpa = ""; S.prevCredits = "";
 S.stEdit = null; S.asgFilter = "todo"; S.asgSubj = ""; S.asgOpen = null; S.asgType = "assignment"; S.clsType = "lecture"; S.subjForm = false; S.clsForm = false;
 const CLS_TYPES = [["lecture","Lecture"],["tutorial","Tutorial"],["lab","Lab"],["online","Online"],["other","Other"]];
 const ASG_TYPES = [["assignment","Assignment"],["quiz","Quiz"],["test","Test"],["project","Project"],["report","Lab report"],["presentation","Presentation"],["exam","Exam"]];
@@ -1633,7 +1633,18 @@ const subj = id => S.subjects.find(s => s.id === id);
 const subjCls = id => { const s = subj(id); return "cat-" + (s ? (+s.color || 0) % 6 : 5); };
 const subjLabel = id => { const s = subj(id); return s ? (s.code || s.name) : "No subject"; };
 const fmt12 = t => { if (!t) return ""; let [h, m] = t.split(":").map(Number); const ap = h >= 12 ? "pm" : "am"; h = h % 12 || 12; return h + (m ? ":" + pad(m) : "") + ap; };
-function semWeek(k){ if (!S.semStart) return null; const n = Math.floor((new Date(k + "T00:00") - new Date(S.semStart + "T00:00")) / (7 * 864e5)) + 1; return n; }
+const BREAK_KINDS = [["break","Mid-semester break"],["swotvac","SWOT VAC"],["exam","Exam period"],["other","Other break"]];
+const breakName = b => b.label || (BREAK_KINDS.find(x => x[0] === b.kind) || ["", "Break"])[1];
+function breakOn(k){ return (S.semBreaks || []).find(b => b.from && b.to && k >= b.from && k <= b.to) || null; }
+const wkMon = k => addDays(k, -((keyDow(k) + 6) % 7));
+const weekIsBreak = m => !!(breakOn(m) && breakOn(addDays(m, 4)));
+// Teaching week number: break weeks (mid-sem break, SWOT VAC, exams) aren't counted.
+function semWeek(k){ if (!S.semStart) return null; const m0 = wkMon(S.semStart), mk = wkMon(k);
+  if (mk < m0) return Math.floor((new Date(mk + "T00:00") - new Date(m0 + "T00:00")) / (7 * 864e5)) + 1;
+  let n = 0; for (let w = m0; w <= mk; w = addDays(w, 7)) if (!weekIsBreak(w)) n++; return n; }
+function semPeriod(k){ if (!S.semStart) return null; const b = breakOn(k); if (b) return { kind: b.kind, b, label: breakName(b) };
+  if (k < S.semStart) return { kind: "before", label: "Before semester" };
+  const w = semWeek(k); return w > S.semWeeks ? { kind: "after", label: "Teaching ended" } : { kind: "teach", week: w, label: `Week ${w}` }; }
 function dueText(a){
   const tk = todayKey(); if (!a.due) return ["No due date", ""];
   const d = Math.round((new Date(a.due + "T00:00") - new Date(tk + "T00:00")) / 864e5);
@@ -1643,11 +1654,24 @@ function dueText(a){
   if (d === 1) return [`Due tomorrow${a.time ? " " + fmt12(a.time) : ""}`, "soon"];
   return [`Due ${fmtDate(a.due)}${a.time ? " " + fmt12(a.time) : ""} · in ${d} days`, d <= 7 ? "week" : ""];
 }
-function inSem(k){ if (!S.semStart) return true; const w = semWeek(k); return w >= 1 && w <= S.semWeeks; }
-function classesOn(k){ if (!inSem(k)) return []; const wd = keyDow(k); const ids = new Set(S.subjects.filter(s => (s.sem || "") === (S.curSem || "")).map(s => s.id)); return S.classes.filter(c => +c.day === wd && ids.has(c.subj)).sort((a, b) => a.start.localeCompare(b.start)); }
+function inSem(k){ const p = semPeriod(k); return !p || p.kind === "teach"; }
+function classesOn(k){ if (!inSem(k)) return []; const wd = keyDow(k);
+  const ok = new Set(S.subjects.filter(s => (s.sem || "") === (S.curSem || "") && (!s.cFrom || k >= s.cFrom) && (!s.cTo || k <= s.cTo)).map(s => s.id));
+  return S.classes.filter(c => +c.day === wd && ok.has(c.subj)).sort((a, b) => a.start.localeCompare(b.start)); }
+document.addEventListener("toggle", e => { if (e.target.classList && e.target.classList.contains("st-sem")) S.semOpen = e.target.open; }, true);
+// attendance for one class on one date: "" = going/attended, "absent" = not attending, "cancelled"
+const attOf = (c, k) => ((c.att || {})[k]) || "";
+function setAtt(id, k, v){ const c = S.classes.find(x => x.id === id); if (!c) return; const att = { ...(c.att || {}) }; if (v) att[k] = v; else delete att[k]; put("classes", id, { ...strip(c), att }); toast(v === "absent" ? "Marked as not attending" : v === "cancelled" ? "Marked as cancelled" : "Marked as attending"); }
+function attendance(subjId){ const tk = todayKey(); let from = S.semStart || addDays(tk, -120), held = 0, went = 0;
+  for (let k = from; k <= tk; k = addDays(k, 1)) classesOn(k).filter(c => c.subj === subjId && (k < tk || toMin(c.start) <= new Date().getHours() * 60 + new Date().getMinutes())).forEach(c => { const a = attOf(c, k); if (a !== "cancelled") { held++; if (a !== "absent") went++; } });
+  return { held, went }; }
+const ATT_LBL = { absent: "Not attending", cancelled: "Cancelled" };
+function attBtns(c, k){ const a = attOf(c, k), id = esc(c.id);
+  return a ? `<span class="att-pill att-${a}">${ATT_LBL[a]}</span><button type="button" class="x small" data-att="${id}|${k}|">Undo</button>` : `<button type="button" class="x small" data-att="${id}|${k}|absent" title="Mark this class as not attending">Not going</button>`; }
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-att]"); if (!b) return; e.preventDefault(); e.stopPropagation(); const [id, k, v] = b.dataset.att.split("|"); setAtt(id, k, v); if (S.scPick) S.scPick = null; }, true);
 function nextClass(){
   const now = new Date(), tk = todayKey(), nowM = now.getHours() * 60 + now.getMinutes();
-  for (let i = 0; i < 8; i++) { const k = addDays(tk, i); const cs = classesOn(k).filter(c => i > 0 || toMin(c.end) > nowM); if (cs.length) return { c: cs[0], k, i, live: i === 0 && toMin(cs[0].start) <= nowM }; }
+  for (let i = 0; i < 8; i++) { const k = addDays(tk, i); const cs = classesOn(k).filter(c => (i > 0 || toMin(c.end) > nowM) && !attOf(c, k)); if (cs.length) return { c: cs[0], k, i, live: i === 0 && toMin(cs[0].start) <= nowM }; }
   return null;
 }
 function subjOptions(sel){ return `<option value="">Choose subject</option>` + S.subjects.map(s => `<option value="${esc(s.id)}" ${s.id === sel ? "selected" : ""}>${esc(s.code ? s.code + " · " : "")}${esc(s.name)}</option>`).join(""); }
@@ -1664,11 +1688,18 @@ function renderStudy(){
   const hours = []; for (let m = lo; m < hi; m += 60) hours.push(`<span style="top:${((m - lo) * ppm).toFixed(1)}px">${m === lo ? "" : fmt12(pad(Math.floor(m / 60)) + ":00")}</span>`);
   $("#st-time").innerHTML = `
     <div class="st-top">
-      <div class="st-week">${wk && wk >= 1 && wk <= S.semWeeks ? `<b>Week ${wk}</b><span class="muted small"> of ${S.semWeeks}</span>` : wk && wk > S.semWeeks ? `<b>Semester ended</b>` : wk && wk < 1 ? `<b>Semester starts ${esc(fmtDate(S.semStart))}</b>` : `<span class="small muted">Set your semester start to see the week number.</span>`}
-        <details class="st-sem"><summary class="small">${S.curSem ? esc(S.curSem) + " · " : ""}Semester settings</summary><div class="st-semf"><label class="f" style="grid-column:1/-1">Semester name<input id="st-semname" value="${esc(S.curSem)}" placeholder="e.g. Year 2 Sem 1"></label><label class="f">Starts (week 1 Monday)<input type="date" id="st-semstart" value="${esc(S.semStart)}"></label><label class="f">Weeks<input type="number" min="1" max="30" id="st-semweeks" value="${S.semWeeks}"></label></div></details></div>
+      <div class="st-week">${(() => { const p = semPeriod(tk); if (!p) return `<span class="small muted">Set your semester start to see the week number.</span>`;
+        if (p.kind === "teach") return `<b>Week ${p.week}</b><span class="muted small"> of ${S.semWeeks}</span>`;
+        if (p.kind === "before") return `<b>Semester starts ${esc(fmtDate(S.semStart))}</b>`;
+        const nx = (S.semBreaks || []).filter(b => b.from > tk).sort((a, b) => a.from.localeCompare(b.from))[0];
+        return `<b>${esc(p.label)}</b><span class="muted small"> · no classes${p.b ? ` until ${esc(fmtDate(p.b.to))}` : ""}${nx ? ` · ${esc(breakName(nx))} starts ${esc(fmtDate(nx.from))}` : ""}</span>`; })()}
+        <details class="st-sem" ${S.semOpen ? "open" : ""}><summary class="small">${S.curSem ? esc(S.curSem) + " · " : ""}Semester settings</summary><div class="st-semf"><label class="f" style="grid-column:1/-1">Semester name<input id="st-semname" value="${esc(S.curSem)}" placeholder="e.g. Year 2 Sem 1"></label><label class="f">Starts (week 1 Monday)<input type="date" id="st-semstart" value="${esc(S.semStart)}"></label><label class="f">Teaching weeks<input type="number" min="1" max="30" id="st-semweeks" value="${S.semWeeks}"></label>
+          <div class="sb-wrap"><div class="small"><b>Breaks, SWOT VAC & exams</b> <span class="muted">· no classes on these dates</span></div>
+          ${(S.semBreaks || []).slice().sort((a, b) => (a.from || "").localeCompare(b.from || "")).map(b => `<div class="sb-row" data-sbid="${esc(b.id)}"><select data-sbf="kind">${BREAK_KINDS.map(([v, l]) => `<option value="${v}" ${b.kind === v ? "selected" : ""}>${l}</option>`).join("")}</select><label class="f">From<input type="date" data-sbf="from" value="${esc(b.from || "")}"></label><label class="f">To<input type="date" data-sbf="to" value="${esc(b.to || "")}"></label><button type="button" class="x" data-sbdel="${esc(b.id)}" aria-label="Remove">✕</button></div>`).join("")}
+          <div class="qa-chips cwrap">${BREAK_KINDS.slice(0, 3).map(([v, l]) => `<button type="button" class="qc" data-sbadd="${v}">+ ${l}</button>`).join("")}</div></div></div></details></div>
       <div class="st-next">${N ? `<span class="small muted">${N.live ? "Happening now" : N.i === 0 ? "Next class today" : N.i === 1 ? "Next class tomorrow" : "Next class " + DAYS[keyDow(N.k)]}</span>
         <b><span class="tag ${subjCls(N.c.subj)}">${esc(subjLabel(N.c.subj))}</span> ${esc((subj(N.c.subj) || {}).name || "")}</b>
-        <span class="small">${esc((CLS_TYPES.find(x => x[0] === N.c.type) || ["", ""])[1])} · ${fmt12(N.c.start)}–${fmt12(N.c.end)}${clsLoc(N.c) ? " · " + esc(clsLoc(N.c)) : ""}</span>` : `<span class="small muted">No classes this week yet. Add your subjects and classes below.</span>`}</div>
+        <span class="small">${esc((CLS_TYPES.find(x => x[0] === N.c.type) || ["", ""])[1])} · ${fmt12(N.c.start)}–${fmt12(N.c.end)}${clsLoc(N.c) ? " · " + esc(clsLoc(N.c)) : ""}</span>` : `<span class="small muted">${S.classes.length ? (() => { const p = semPeriod(tk); return p && !["teach", "before"].includes(p.kind) ? `No classes during ${esc(p.label)}. Good luck!` : "No classes in the next 7 days."; })() : "No classes this week yet. Add your subjects and classes below."}</span>`}</div>
     </div>
     ${all.length ? `<div class="tt-scroll"><div class="tt" style="--cols:${days.length}">
       <div class="tt-hd"></div>${days.map(d => `<div class="tt-hd ${d === todayDow ? "today" : ""}">${DAYS[d]}</div>`).join("")}
@@ -1680,7 +1711,7 @@ function renderStudy(){
   const e = S.stEdit && S.classes.find(c => c.id === S.stEdit);
   const past = S.subjects.filter(s => !isCur(s));
   $("#st-subj").innerHTML = `
-    ${curSubjects().length ? `<ul class="subj-list">${curSubjects().map(s => S.subjEdit === s.id ? `<li class="se-li"><form id="subj-edit-form" class="st-form" autocomplete="off"><div class="grid2"><label class="f">Code<input id="se-code" value="${esc(s.code || "")}"></label><label class="f">Name<input id="se-name" value="${esc(s.name)}" required></label><label class="f">Lecturer<input id="se-lect" value="${esc(s.lecturer || "")}"></label><label class="f">Usual location<input id="se-loc" value="${esc(s.location || "")}" placeholder="e.g. Block D, DK3"></label></div><div class="row"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" data-subj-cancel>Cancel</button></div></form></li>` : `<li><span class="tag ${subjCls(s.id)}">${esc(s.code || "—")}</span><span class="hl-b" data-subj-edit="${esc(s.id)}" role="button" tabindex="0" title="Edit subject"><b>${esc(s.name)}</b>${s.lecturer ? `<span class="small muted"> · ${esc(s.lecturer)}</span>` : ""}${s.location ? `<span class="small muted"> · ${esc(s.location)}</span>` : ""}<span class="small muted"> · ${S.classes.filter(c => c.subj === s.id).length} class${S.classes.filter(c => c.subj === s.id).length === 1 ? "" : "es"}/week</span></span><button type="button" class="x" data-subj-edit="${esc(s.id)}" aria-label="Edit subject">${SVG(ICON.edit)}</button><button type="button" class="x" data-subj-del="${esc(s.id)}" aria-label="Delete subject">${S.subjDel === s.id ? "Delete?" : "✕"}</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Start by adding your subjects for this semester.</p>`}
+    ${curSubjects().length ? `<ul class="subj-list">${curSubjects().map(s => S.subjEdit === s.id ? `<li class="se-li"><form id="subj-edit-form" class="st-form" autocomplete="off"><div class="grid2"><label class="f">Code<input id="se-code" value="${esc(s.code || "")}"></label><label class="f">Name<input id="se-name" value="${esc(s.name)}" required></label><label class="f">Lecturer<input id="se-lect" value="${esc(s.lecturer || "")}"></label><label class="f">Usual location<input id="se-loc" value="${esc(s.location || "")}" placeholder="e.g. Block D, DK3"></label><label class="f">Classes start <span class="muted">(optional)</span><input type="date" id="se-from" value="${esc(s.cFrom || "")}"></label><label class="f">Classes end <span class="muted">(optional)</span><input type="date" id="se-to" value="${esc(s.cTo || "")}"></label></div><p class="small muted" style="margin:0">Only needed if this unit's classes don't run for the whole semester.</p><div class="row"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" data-subj-cancel>Cancel</button></div></form></li>` : `<li><span class="tag ${subjCls(s.id)}">${esc(s.code || "—")}</span><span class="hl-b" data-subj-edit="${esc(s.id)}" role="button" tabindex="0" title="Edit subject"><b>${esc(s.name)}</b>${s.lecturer ? `<span class="small muted"> · ${esc(s.lecturer)}</span>` : ""}${s.location ? `<span class="small muted"> · ${esc(s.location)}</span>` : ""}<span class="small muted"> · ${S.classes.filter(c => c.subj === s.id).length} class${S.classes.filter(c => c.subj === s.id).length === 1 ? "" : "es"}/week</span>${(() => { const a = attendance(s.id); return a.held ? `<span class="small ${a.went / a.held < 0.8 ? "att-low" : "muted"}"> · attended ${a.went}/${a.held}</span>` : ""; })()}${s.cFrom || s.cTo ? `<span class="small muted"> · classes ${s.cFrom ? esc(fmtDate(s.cFrom)) : "start"}–${s.cTo ? esc(fmtDate(s.cTo)) : "end"}</span>` : ""}</span><button type="button" class="x" data-subj-edit="${esc(s.id)}" aria-label="Edit subject">${SVG(ICON.edit)}</button><button type="button" class="x" data-subj-del="${esc(s.id)}" aria-label="Delete subject">${S.subjDel === s.id ? "Delete?" : "✕"}</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Start by adding your subjects for this semester.</p>`}
     ${S.subjForm ? `<form id="subj-form" class="st-form" autocomplete="off"><input id="sj-code" class="inp" placeholder="Code, e.g. BIT2023" style="max-width:150px"><input id="sj-name" class="inp" placeholder="Subject name, e.g. Data Mining" required><input id="sj-lect" class="inp" placeholder="Lecturer (optional)"><input id="sj-loc" class="inp" placeholder="Usual location, e.g. Block D, DK3 (optional)"><div class="row"><button class="btn sm primary" type="submit">Add subject</button><button class="btn sm" type="button" data-subj-form="0">Done</button></div></form>`
       : `<button type="button" class="btn sm" data-subj-form="1">+ Add subject</button>`}
     ${past.length ? `<details class="small"><summary>Past semesters (${past.length} subject${past.length === 1 ? "" : "s"})</summary><ul class="subj-list">${past.map(s => `<li><span class="tag ${subjCls(s.id)}">${esc(s.code || "—")}</span><span class="hl-b">${esc(s.name)} <span class="muted">· ${esc(s.sem || "")}${s.grade ? " · " + esc(s.grade) : ""}</span></span><span></span></li>`).join("")}</ul></details>` : ""}
@@ -1747,8 +1778,9 @@ function studyTodayHtml(){
   if (!S.subjects.length && !S.asg.length) return "";
   const tk = todayKey(), nowM = new Date().getHours() * 60 + new Date().getMinutes();
   const cs = classesOn(tk), due = S.asg.filter(a => !["submitted", "graded"].includes(a.status) && a.due && a.due <= addDays(tk, 3)).sort((a, b) => (a.due + (a.time || "")).localeCompare(b.due + (b.time || "")));
-  if (!cs.length && !due.length) return `<p class="small muted" style="margin:0">No classes today and nothing due in the next 3 days.</p>`;
-  return `${cs.length ? `<ul class="hlist">${cs.map(c => `<li class="${toMin(c.end) < nowM ? "past" : ""}"><span class="hl-t">${fmt12(c.start)}</span><span class="tag ${subjCls(c.subj)}">${esc(subjLabel(c.subj))}</span><span class="hl-b">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${clsLoc(c) ? " · " + esc(clsLoc(c)) : ""}</span><span></span></li>`).join("")}</ul>` : ""}
+  const per = semPeriod(tk), brk = per && per.kind !== "teach" && per.kind !== "before" ? `<p class="small" style="margin:0"><b>${esc(per.label)}</b> <span class="muted">· no classes today</span></p>` : "";
+  if (!cs.length && !due.length) return brk || `<p class="small muted" style="margin:0">No classes today and nothing due in the next 3 days.</p>`;
+  return `${brk}${cs.length ? `<ul class="hlist">${cs.map(c => `<li class="${toMin(c.end) < nowM ? "past" : ""} ${attOf(c, tk) ? "att-off" : ""}"><span class="hl-t">${fmt12(c.start)}</span><span class="tag ${subjCls(c.subj)}">${esc(subjLabel(c.subj))}</span><span class="hl-b">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}${clsLoc(c) ? " · " + esc(clsLoc(c)) : ""}</span><span class="hl-act">${attBtns(c, tk)}</span></li>`).join("")}</ul>` : ""}
     ${due.length ? `<div class="small muted" style="margin-top:4px">Due soon</div><ul class="hlist">${due.map(a => { const [dt, cls] = dueText(a); return `<li><span class="tag ${subjCls(a.subj)}">${esc(subjLabel(a.subj))}</span><span class="hl-b">${esc(a.title)}</span><span class="asg-due ${cls} small">${esc(dt.replace(/ · in \d+ days/, ""))}</span><span></span></li>`; }).join("")}</ul>` : ""}`;
 }
 let studyNotesT = null;
@@ -1785,6 +1817,7 @@ document.addEventListener("submit", e => {
 });
 document.addEventListener("change", e => {
   const t = e.target; if (!t.closest || !t.closest("#v-study")) return;
+  if (t.dataset && t.dataset.sbf) { const id = t.closest("[data-sbid]").dataset.sbid; S.semBreaks = (S.semBreaks || []).map(b => b.id === id ? { ...b, [t.dataset.sbf]: t.value } : b); const b = S.semBreaks.find(x => x.id === id); if (b && b.from && b.to && b.to < b.from) { b.to = b.from; } saveCats(); renderStudy(); return; }
   if (t.id === "st-semstart") { S.semStart = t.value; saveCats(); renderStudy(); }
   else if (t.id === "st-semweeks") { S.semWeeks = Math.max(1, +t.value || 14); saveCats(); renderStudy(); }
   else if (t.id === "st-pcgpa") { S.prevCgpa = t.value; saveCats(); renderStudy(); }
@@ -1966,7 +1999,7 @@ document.addEventListener("change", e => {
 });
 
 // ---------- study calendar (classes, tests and deadlines; kept apart from the work calendar)
-S.scMode = "week"; S.scSel = todayKey(); S.subjEdit = null;
+S.scMode = "week"; S.scSel = todayKey(); S.subjEdit = null; S.scPick = null;
 const clsLoc = c => (c && (c.room || (subj(c.subj) || {}).location)) || "";
 const monKey = k => addDays(k, -((keyDow(k) + 6) % 7));
 const asgOpenOn = k => S.asg.filter(a => a.due === k && !["submitted", "graded"].includes(a.status)).sort((a, b) => (a.time || "99").localeCompare(b.time || "99"));
@@ -1978,8 +2011,7 @@ function scDue(a, short){ const ty = (ASG_TYPES.find(x => x[0] === a.type) || ["
 function renderStudyCal(){
   const box = $("#st-cal"); if (!box) return;
   const tk = todayKey(), sel = S.scSel || tk, week = S.scMode === "week";
-  const wk = semWeek(monKey(sel));
-  const semTxt = wk === null ? "" : wk < 1 ? "Before semester" : wk > S.semWeeks ? "After semester" : `Week ${wk}`;
+  const sp = semPeriod(addDays(monKey(sel), 2)), semTxt = sp ? sp.label : "";
   let label, body;
   if (week) {
     const m0 = monKey(sel), keys = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(m0, i));
@@ -1996,19 +2028,23 @@ function renderStudyCal(){
       ${anyDue ? `<div class="sc-lbl">Due</div>${cols.map(i => `<div class="sc-dues">${dues[i].map(a => scDue(a)).join("")}</div>`).join("")}` : ""}
       <div class="sch-times" style="height:${H}px">${hours.join("")}</div>
       ${cols.map(i => `<div class="sch-col tt-col ${keys[i] === tk ? "is-today" : ""}" style="height:${H}px;--hr:${60 * ppm}px">${cls[i].map(c => { const top = (toMin(c.start) - lo) * ppm, h = Math.max((toMin(c.end) - toMin(c.start)) * ppm, 24), s = subj(c.subj), loc = clsLoc(c);
-        return `<button type="button" class="ev tt-ev sc-ev ${subjCls(c.subj)}" style="top:${top}px;height:${h}px;left:2px;width:calc(100% - 4px)" data-sc-cls="${esc(c.id)}" title="${esc(s ? s.name : "")} · ${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])} · ${fmt12(c.start)}–${fmt12(c.end)}${loc ? " · " + esc(loc) : ""}"><span class="ev-t">${esc(subjLabel(c.subj))}</span>${h > 30 && loc ? `<span class="ev-s ev-loc">${SVG(ICON.pin)}${esc(loc)}</span>` : ""}${h > 46 ? `<span class="ev-s">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}</span>` : ""}${h > 62 ? `<span class="ev-s">${fmt12(c.start)}–${fmt12(c.end)}</span>` : ""}</button>`; }).join("")}
+        return `<button type="button" class="ev tt-ev sc-ev ${subjCls(c.subj)} ${attOf(c, keys[i]) ? "att-" + attOf(c, keys[i]) : ""} ${S.scPick === c.id + "|" + keys[i] ? "is-pick" : ""}" style="top:${top}px;height:${h}px;left:2px;width:calc(100% - 4px)" data-sc-cls="${esc(c.id)}|${keys[i]}" title="${esc(s ? s.name : "")} · ${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])} · ${fmt12(c.start)}–${fmt12(c.end)}${loc ? " · " + esc(loc) : ""}"><span class="ev-t">${esc(subjLabel(c.subj))}</span>${h > 30 && loc ? `<span class="ev-s ev-loc">${SVG(ICON.pin)}${esc(loc)}</span>` : ""}${h > 46 ? `<span class="ev-s">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])}</span>` : ""}${h > 62 ? `<span class="ev-s">${fmt12(c.start)}–${fmt12(c.end)}</span>` : ""}</button>`; }).join("")}
         ${keys[i] === tk && nowM >= lo && nowM <= hi ? `<b class="sch-now" style="top:${((nowM - lo) * ppm).toFixed(1)}px"></b>` : ""}</div>`).join("")}
     </div></div>
-    ${cls.flat().length ? "" : `<p class="small muted" style="margin:0">${S.classes.length ? "No classes this week." : "Add your classes in Timetable and they'll appear here every week."}</p>`}`;
+    ${(() => { if (!S.scPick) return ""; const [pid, pk] = S.scPick.split("|"), c = S.classes.find(x => x.id === pid); if (!c) return ""; const s = subj(c.subj), a = attOf(c, pk);
+      return `<div class="sc-pick"><div><b>${esc(subjLabel(c.subj))}</b> ${esc(s ? s.name : "")}<div class="small muted">${esc((CLS_TYPES.find(x => x[0] === c.type) || ["", ""])[1])} · ${esc(fmtDate(pk))} · ${fmt12(c.start)}–${fmt12(c.end)}${clsLoc(c) ? " · " + esc(clsLoc(c)) : ""}</div></div>
+        <div class="seg"><button type="button" data-att="${esc(c.id)}|${pk}|" aria-pressed="${!a}">${pk <= todayKey() ? "Attended" : "Going"}</button><button type="button" data-att="${esc(c.id)}|${pk}|absent" aria-pressed="${a === "absent"}">Not attending</button><button type="button" data-att="${esc(c.id)}|${pk}|cancelled" aria-pressed="${a === "cancelled"}">Cancelled</button></div>
+        <div class="row"><button type="button" class="btn sm" data-sc-edit="${esc(c.id)}">Edit class</button><button type="button" class="btn sm ghost" data-sc-pickx>Close</button></div></div>`; })()}
+    ${cls.flat().length ? "" : `<p class="small muted" style="margin:0">${sp && sp.kind !== "teach" && sp.kind !== "before" ? `<b>${esc(sp.label)}</b>: no classes this week.` : S.classes.length ? "No classes this week." : "Add your classes in Timetable and they'll appear here every week."}</p>`}`;
   } else {
     const [y, mo] = sel.split("-").map(Number), first = dkey(new Date(y, mo - 1, 1)), nDays = new Date(y, mo, 0).getDate();
     label = new Date(y, mo - 1, 1).toLocaleString("en-GB", { month: "long", year: "numeric" });
     let h = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => `<span class="cal-dow">${d.slice(0, 1)}<span class="dow-rest">${d.slice(1)}</span></span>`).join("");
     for (let i = 0; i < (keyDow(first) + 6) % 7; i++) h += `<span class="cal-blank"></span>`;
-    for (let d = 1; d <= nDays; d++) { const k = dkey(new Date(y, mo - 1, d)), cs = classesOn(k), ds = asgAllOn(k), w = keyDow(k) === 1 ? semWeek(k) : null;
-      h += `<div class="sc-day ${k === tk ? "is-today" : ""} ${isWeekend(keyDow(k)) ? "is-we" : ""}" data-sc-day="${k}" role="button" tabindex="0" aria-label="${esc(fmtDate(k))}">
-        <span class="sc-n">${d}${w && w >= 1 && w <= S.semWeeks ? `<small>W${w}</small>` : ""}</span>
-        ${cs.length ? `<span class="sc-dots">${cs.map(c => `<i class="${subjCls(c.subj)}"></i>`).join("")}</span>` : ""}
+    for (let d = 1; d <= nDays; d++) { const k = dkey(new Date(y, mo - 1, d)), cs = classesOn(k), ds = asgAllOn(k), p = keyDow(k) === 1 ? semPeriod(addDays(k, 2)) : null, bk = breakOn(k);
+      h += `<div class="sc-day ${k === tk ? "is-today" : ""} ${isWeekend(keyDow(k)) ? "is-we" : ""} ${bk ? "is-brk brk-" + bk.kind : ""}" data-sc-day="${k}" role="button" tabindex="0" aria-label="${esc(fmtDate(k))}">
+        <span class="sc-n">${d}${p ? `<small>${p.kind === "teach" ? "W" + p.week : p.kind === "swotvac" ? "SWOT" : p.kind === "exam" ? "Exams" : p.kind === "break" ? "Break" : ""}</small>` : ""}</span>
+        ${cs.length ? `<span class="sc-dots">${cs.map(c => `<i class="${subjCls(c.subj)} ${attOf(c, k) ? "off" : ""}"></i>`).join("")}</span>` : ""}
         ${ds.slice(0, 3).map(a => scDue(a, true)).join("")}${ds.length > 3 ? `<span class="small muted">+${ds.length - 3}</span>` : ""}</div>`; }
     body = `<div class="sc-month">${h}</div><div class="tl-legend"><span><i class="lg sc-lg-dot"></i>Class</span><span><b>!</b> or red: test, quiz or exam</span><span>Faded: submitted</span><span class="muted">Tap a day to see its week</span></div>`;
   }
@@ -2023,13 +2059,19 @@ function renderStudyCal(){
 }
 document.addEventListener("click", e => {
   if (S.view !== "study") return;
-  const t = e.target.closest("[data-sc-nav],[data-sc-today],[data-sc-mode],[data-sc-day],[data-sc-cls],[data-sc-asg],[data-subj-edit],[data-subj-cancel]"); if (!t || !t.closest("#v-study")) return;
+  const t = e.target.closest("[data-sc-nav],[data-sc-today],[data-sc-mode],[data-sc-day],[data-sc-cls],[data-sc-asg],[data-subj-edit],[data-subj-cancel],[data-sc-edit],[data-sc-pickx],[data-sbadd],[data-sbdel]"); if (!t || !t.closest("#v-study")) return;
   const d = t.dataset;
   if (d.scNav) { const [y, m, dd] = S.scSel.split("-").map(Number); S.scSel = S.scMode === "week" ? addDays(S.scSel, 7 * +d.scNav) : dkey(new Date(y, m - 1 + +d.scNav, 1)); renderStudyCal(); }
   else if (d.scToday !== undefined) { S.scSel = todayKey(); renderStudyCal(); }
   else if (d.scMode) { S.scMode = d.scMode; renderStudyCal(); }
   else if (d.scAsg) { e.stopPropagation(); S.asgOpen = d.scAsg; S.asgFilter = "all"; location.hash = "#study-assignments"; }
-  else if (d.scCls) { S.stEdit = d.scCls; S.clsForm = true; const c = S.classes.find(x => x.id === d.scCls); if (c) S.clsType = c.type; location.hash = "#study-timetable"; setTimeout(() => $("#cls-form") && $("#cls-form").scrollIntoView({ block: "center" }), 120); }
+  else if (d.scCls) { S.scPick = S.scPick === d.scCls ? null : d.scCls; renderStudyCal(); }
+  else if (d.scPickx !== undefined) { S.scPick = null; renderStudyCal(); }
+  else if (d.sbadd) { const br = (S.semBreaks || []).slice(), last = br.map(b => b.to).sort().pop();
+    let from = d.sbadd === "break" ? wkMon(addDays(todayKey(), 7)) : last && last >= (S.semStart || "") ? wkMon(addDays(last, 7)) : S.semStart ? addDays(wkMon(S.semStart), 7 * (S.semWeeks + br.filter(b => b.kind === "break").length)) : wkMon(addDays(todayKey(), 7));
+    const len = d.sbadd === "exam" ? 13 : 6; br.push({ id: newId(), kind: d.sbadd, from, to: addDays(from, len) }); S.semBreaks = br; saveCats(); renderStudy(); toast("Added. Check the dates match your university calendar."); }
+  else if (d.sbdel) { S.semBreaks = (S.semBreaks || []).filter(b => b.id !== d.sbdel); saveCats(); renderStudy(); }
+  else if (d.scEdit) { S.scPick = null; S.stEdit = d.scEdit; S.clsForm = true; const c = S.classes.find(x => x.id === d.scEdit); if (c) S.clsType = c.type; location.hash = "#study-timetable"; setTimeout(() => $("#cls-form") && $("#cls-form").scrollIntoView({ block: "center" }), 120); }
   else if (d.scDay) { if (S.scMode === "month") { S.scSel = d.scDay; S.scMode = "week"; renderStudyCal(); } }
   else if (d.subjEdit) { S.subjEdit = d.subjEdit; S.subjForm = false; renderStudy(); $("#se-name") && $("#se-name").focus(); }
   else if (d.subjCancel !== undefined) { S.subjEdit = null; renderStudy(); }
@@ -2038,7 +2080,7 @@ document.addEventListener("keydown", e => { const m = e.target.closest && e.targ
 document.addEventListener("submit", e => {
   if (e.target.id !== "subj-edit-form") return; e.preventDefault();
   const s = subj(S.subjEdit), n = $("#se-name").value.trim(); if (!s || !n) return;
-  put("subjects", s.id, { ...strip(s), code: $("#se-code").value.trim().toUpperCase(), name: n, lecturer: $("#se-lect").value.trim(), location: $("#se-loc").value.trim() });
+  put("subjects", s.id, { ...strip(s), code: $("#se-code").value.trim().toUpperCase(), name: n, lecturer: $("#se-lect").value.trim(), location: $("#se-loc").value.trim(), cFrom: $("#se-from").value, cTo: $("#se-to").value });
   S.subjEdit = null; toast("Subject updated");
 }, true);
 document.addEventListener("change", e => { if (e.target.id === "cl-subj" && $("#cl-room")) { const l = (subj(e.target.value) || {}).location; $("#cl-room").placeholder = l ? `Location (blank = ${l})` : "Location, e.g. DK3, Lab 2 or Zoom link"; } });
@@ -2114,7 +2156,7 @@ function timeInsights(keys){
   const add = (name, m) => { if (m > 0) seg[name] = (seg[name] || 0) + m; };
   days.forEach(k => {
     add("Sleep", sleepMins(hDoc(k).sleep) || 0);
-    classesOn(k).forEach(c => add("Classes", toMin(c.end) - toMin(c.start)));
+    classesOn(k).filter(c => !attOf(c, k)).forEach(c => add("Classes", toMin(c.end) - toMin(c.start)));
     S.time.filter(x => x.date === k).forEach(x => { const m = +x.mins || 0;
       if (x.type === "task") { const t = S.tasks.find(y => y.id === x.ref); add("Work · " + catName(t ? t.category : ""), m); }
       else if (x.type === "course") add("Self-study & courses", m);
@@ -2528,7 +2570,7 @@ function startData(){
   db.collection("courses").onSnapshot(s => { S.courses = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("time").orderBy("start", "desc").limit(1500).onSnapshot(s => { S.time = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.doc("settings/timer").onSnapshot(s => { const t = s.exists ? s.data() : null; const changed = JSON.stringify(t) !== JSON.stringify(S.timer); S.timer = t && t.start ? t : null; if (changed) render(); }, fail);
-  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (s.exists) { const sd = s.data(); if (sd.cur) S.cur = sd.cur; if (sd.budget) S.budget = sd.budget; if (Array.isArray(sd.shopHist)) S.shopHist = sd.shopHist; if (sd.semStart !== undefined) S.semStart = sd.semStart || ""; if (sd.semWeeks) S.semWeeks = sd.semWeeks; if (sd.prevCgpa !== undefined) S.prevCgpa = sd.prevCgpa; if (sd.prevCredits !== undefined) S.prevCredits = sd.prevCredits; if (sd.curSem !== undefined) S.curSem = sd.curSem || ""; } if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
+  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (s.exists) { const sd = s.data(); if (sd.cur) S.cur = sd.cur; if (sd.budget) S.budget = sd.budget; if (Array.isArray(sd.shopHist)) S.shopHist = sd.shopHist; if (sd.semStart !== undefined) S.semStart = sd.semStart || ""; if (sd.semWeeks) S.semWeeks = sd.semWeeks; if (sd.prevCgpa !== undefined) S.prevCgpa = sd.prevCgpa; if (sd.prevCredits !== undefined) S.prevCredits = sd.prevCredits; if (sd.curSem !== undefined) S.curSem = sd.curSem || ""; if (Array.isArray(sd.semBreaks)) S.semBreaks = sd.semBreaks; } if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(1000).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
   watchChecks = () => { const k = viewKey(); if (k === watchedDay) return; watchedDay = k; if (unsubCheck) unsubCheck(); unsubCheck = db.doc("checks/" + k).onSnapshot(s => { const d = s.exists ? s.data() : {}; S.day[k] = { done: d.done || {}, skip: d.skip || {}, extra: d.extra || [] }; render(); }, fail); };

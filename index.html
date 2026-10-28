@@ -1252,12 +1252,33 @@ label.f:has(.dhint){margin-bottom:18px}
 /* ===== dd/mm/yyyy date fields ===== */
 .dd-wrap{position:relative;display:flex;align-items:center;min-width:0;width:100%}
 .qrow .dd-wrap,.row .dd-wrap{width:auto;flex:1 1 140px}
-.dd-wrap .dd-text{width:100%;min-width:0;padding-right:36px!important}
+.dd-wrap .dd-text{width:100%;min-width:0;padding-right:30px!important}
+.sb-row .dd-text{padding-left:8px!important;font-size:.88rem}
 .dd-wrap .dd-text.dd-bad{border-color:var(--crit)!important}
 .dd-pick{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:30px;height:30px;display:grid;place-items:center;border:0;background:none;color:var(--muted);cursor:pointer;border-radius:6px;padding:0}
 .dd-pick:hover{background:var(--sunk);color:var(--ink)}
 .dd-pick svg{width:16px;height:16px}
 .dd-native{position:absolute!important;right:0;bottom:0;width:1px!important;height:1px!important;opacity:0;pointer-events:none;padding:0!important;border:0!important}
+
+/* ===== attendance + semester breaks ===== */
+.att-pill{font-size:.7rem;font-weight:600;padding:2px 7px;border-radius:99px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.att-pill.att-absent{background:color-mix(in srgb,var(--crit) 14%,var(--surface));color:var(--crit)}
+.hlist li.att-off .hl-b,.hlist li.att-off .hl-t{text-decoration:line-through;color:var(--muted)}
+.sc-ev.att-absent,.sc-ev.att-cancelled{opacity:.5}
+.sc-ev.att-absent .ev-t,.sc-ev.att-cancelled .ev-t{text-decoration:line-through}
+.sc-ev.att-cancelled{border-style:dashed}
+.sc-ev.is-pick{box-shadow:0 0 0 2px var(--accent)}
+.sc-pick{display:grid;gap:8px;padding:12px;border:1px solid var(--accent);border-radius:12px;background:var(--surface)}
+.sc-pick .seg{display:flex;flex-wrap:wrap}
+.sc-pick .row{display:flex;gap:8px}
+.sc-dots i.off{opacity:.3}
+.sc-day.is-brk{background:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--muted) 10%,transparent) 6px 12px)}
+.sc-day.brk-exam{background:repeating-linear-gradient(135deg,transparent 0 6px,color-mix(in srgb,var(--crit) 10%,transparent) 6px 12px)}
+.sb-wrap{grid-column:1/-1;display:grid;gap:6px;border-top:1px dashed var(--line);padding-top:8px}
+.sb-row{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:end}
+.sb-row select{font:inherit;font-size:.85rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:8px 6px;min-width:0}
+@media (max-width:560px){.sb-row{grid-template-columns:1fr 1fr auto}.sb-row select{grid-column:1/-1}}
+.att-low{color:var(--crit)}
 </style>
 </head>
 <body class="locked">
@@ -1730,6 +1751,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=35"></script>
+<script type="module" src="app.js?v=36"></script>
 </body>
 </html>
