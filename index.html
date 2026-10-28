@@ -1302,6 +1302,19 @@ label.f:has(.dhint){margin-bottom:18px}
 .co-mini .grow{display:grid;gap:4px;min-width:0}
 .co-mini b{font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .co-mini .btn svg{width:12px;height:12px}
+
+/* ===== log time + edit to-do ===== */
+.co-btns{display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.co-head{flex-wrap:wrap}
+.co-mini li{grid-template-columns:minmax(0,1fr) auto auto}
+.lg-cus{display:flex;align-items:center;gap:8px;margin-top:6px}
+.lg-cus input{width:110px;font:inherit;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 10px}
+#td-form .td-study,#td-form .td-self{display:grid;gap:6px}
+#td-form .td-study[hidden],#td-form .td-self[hidden]{display:none}
+.rows .tl-ed svg{width:14px;height:14px}
+.dlgfoot .btn{display:inline-flex;align-items:center;gap:5px}
+.dlgfoot .btn svg{width:14px;height:14px}
+.sk-list li.sk-self{cursor:pointer}
 </style>
 </head>
 <body class="locked">
@@ -1748,6 +1761,13 @@ label.f:has(.dhint){margin-bottom:18px}
 <nav class="bottomnav" id="bottomnav" aria-label="Main"></nav>
 <dialog id="dlg"><form class="dlg" id="tf" method="dialog"></form></dialog>
 <dialog id="sdlg" class="sdlg"><div class="s-wrap"><div class="s-bar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg><input id="s-q" type="search" placeholder="Search everything… e.g. VLOOKUP, scrap report" autocomplete="off" aria-label="Search"><button type="button" class="btn sm ghost" id="s-close">Close</button></div><div id="s-res" class="s-res"></div></div></dialog>
+<dialog id="logdlg" class="xdlg"><form class="dlg" id="lg-form" autocomplete="off">
+  <div class="dlg-top"><h3><span class="small muted" style="display:block;font-weight:500">Log time for</span><span id="lg-title"></span></h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close">✕</button></div>
+  <div class="f"><span class="small muted" style="font-weight:600">How long?</span><div class="qa-chips cwrap" id="lg-chips"></div><label class="small muted lg-cus">or minutes <input type="number" id="lg-custom" min="1" max="1440" inputmode="numeric" placeholder="e.g. 70"></label></div>
+  <div class="grid2"><label class="f">Day<input type="date" id="lg-date"></label><label class="f">Finished at<input type="time" id="lg-end"></label></div>
+  <div class="dlgfoot"><span class="small muted">Counts towards your streak, totals and Insights.</span><span style="display:flex;gap:8px"><button class="btn" type="button" data-dlg-x>Cancel</button><button class="btn primary" type="submit">Log</button></span></div>
+</form></dialog>
+<dialog id="tddlg" class="xdlg"><form class="dlg" id="td-form" autocomplete="off"></form></dialog>
 <dialog id="xdlg" class="xdlg"><form class="dlg" method="dialog" onsubmit="return false">
   <div class="dlg-top"><h3>Export reflections</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close" title="Close">✕</button></div>
   <label class="f">Range<select id="x-kind"><option value="day">One day</option><option value="week">A week</option><option value="month">A month</option><option value="all">All reflections (whole internship)</option><option value="custom">Custom dates</option></select></label>
@@ -1778,6 +1798,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=38"></script>
+<script type="module" src="app.js?v=39"></script>
 </body>
 </html>
