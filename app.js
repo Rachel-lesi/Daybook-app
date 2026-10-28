@@ -233,13 +233,14 @@ function parseQuick(text){
   return out;
 }
 // ---------- quick add with tap chips (typing shortcuts still work)
-S.qa = { cat: "", urg: "medium", due: todayKey(), adding: false };
-function qaDefaults(){ S.qa = { cat: "", urg: "medium", due: S.mode === "work" ? "" : todayKey(), adding: false }; }
+S.qa = { cat: "", urg: "medium", due: todayKey(), adding: false, subj: "", skind: "todo" };
+function qaDefaults(){ S.qa = { cat: "", urg: "medium", due: S.mode === "work" ? "" : todayKey(), adding: false, subj: (S.qa && S.qa.subj) || "", skind: "todo" }; }
+const QA_SKIND = [["todo","To-do"],["assignment","Assignment"],["quiz","Quiz"],["test","Test"],["project","Project"],["exam","Exam"]];
 const QA_URG = [["critical","Critical"],["high","High"],["medium","Medium"],["low","Low"]];
 function qaEffective(){
   const p = parseQuick($("#q").value);
   const work = S.mode === "work";
-  return { p, work, cat: p.cat || (p.newCat ? "__new" : S.qa.cat), urg: p.urg || S.qa.urg, due: p.due !== null && p.due !== undefined ? p.due : S.qa.due };
+  return { p, work, study: S.mode === "study", cat: p.cat || (p.newCat ? "__new" : S.qa.cat), urg: p.urg || S.qa.urg, due: p.due !== null && p.due !== undefined ? p.due : S.qa.due };
 }
 function dueChoices(){
   const tk = todayKey(), out = [[tk, "Today"], [addDays(tk, 1), "Tomorrow"]];
@@ -250,16 +251,21 @@ function renderQA(){
   const box = $("#qa"); if (!box) return;
   const E = qaEffective(), ch = (attr, val, label, on, extra = "") => `<button type="button" class="qc ${extra}" ${attr}="${esc(val)}" aria-pressed="${on}">${label}</button>`;
   const dues = dueChoices(), customDue = E.due && !dues.some(d => d[0] === E.due);
-  let h = `<div class="qa-row"><span class="qa-lbl">Type</span><div class="qa-chips">${ch("data-qa-type", "todo", "To-do", !E.work)}${ch("data-qa-type", "work", "Work task", E.work)}</div></div>`;
+  let h = `<div class="qa-row"><span class="qa-lbl">Type</span><div class="qa-chips">${ch("data-qa-type", "todo", "To-do", !E.work && !E.study)}${ch("data-qa-type", "work", "Work task", E.work)}${ch("data-qa-type", "study", "Study", E.study)}</div></div>`;
+  if (E.study) {
+    const subs = typeof curSubjects === "function" ? curSubjects() : [];
+    h += `<div class="qa-row"><span class="qa-lbl">Subject</span><div class="qa-chips">${subs.length ? subs.map(s => ch("data-qa-subj", s.id, esc(s.code || s.name), S.qa.subj === s.id, "ci-" + ((+s.color || 0) % 6))).join("") : `<a class="qc ghost" href="#study-timetable">Add subjects first</a>`}</div></div>`;
+    h += `<div class="qa-row"><span class="qa-lbl">Kind</span><div class="qa-chips">${QA_SKIND.map(([v, l]) => ch("data-qa-skind", v, l, S.qa.skind === v)).join("")}</div></div>`;
+  }
   if (E.work) {
     h += `<div class="qa-row"><span class="qa-lbl">Category</span><div class="qa-chips">${S.cats.map((c, i) => ch("data-qa-cat", c.tag, esc(c.name.split(/\s*\/\s*/)[0]), E.cat === c.tag, "ci-" + (i % 6))).join("")}
       ${E.cat === "__new" ? `<span class="qc on">${esc(E.p.newCat)} (new)</span>` : ""}
       ${S.qa.adding ? `<span class="qc-new"><input id="qa-newcat" placeholder="New category" aria-label="New category name"><button type="button" class="qc" data-qa-newsave>Add</button></span>` : ch("data-qa-newcat", "1", "+ New", false, "ghost")}</div></div>`;
     h += `<div class="qa-row"><span class="qa-lbl">Urgency</span><div class="qa-chips">${QA_URG.map(([v, l]) => ch("data-qa-urg", v, l, E.urg === v, "u-" + v)).join("")}</div></div>`;
   }
-  h += `<div class="qa-row"><span class="qa-lbl">${E.work ? "Due" : "When"}</span><div class="qa-chips">${E.work ? ch("data-qa-due", "", "No date", !E.due) : ""}${dues.map(([k, l]) => ch("data-qa-due", k, l, E.due === k)).join("")}
+  h += `<div class="qa-row"><span class="qa-lbl">${E.work || (E.study && S.qa.skind !== "todo") ? "Due" : "When"}</span><div class="qa-chips">${E.work || (E.study && S.qa.skind !== "todo") ? ch("data-qa-due", "", "No date", !E.due) : ""}${dues.map(([k, l]) => ch("data-qa-due", k, l, E.due === k)).join("")}
     <label class="qc pick ${customDue ? "on" : ""}" aria-pressed="${customDue}">${SVG(ICON.calendar)}${customDue ? esc(fmtDate(E.due)) : "Pick date"}<input type="date" id="qa-pick" data-native value="${esc(E.due || "")}" aria-label="Pick a date"></label></div></div>`;
-  h += `<p class="qa-tip">Shortcut: you can also type <code>#excel</code> <code>!high</code> <code>@fri</code> in the box.</p>`;
+  h += E.study ? `<p class="qa-tip">${S.qa.skind === "todo" ? "Study to-dos show in the Study list on Today." : "Saved to Study → Assignments, due at 11:59pm. Edit it there to change the time or weight."}</p>` : `<p class="qa-tip">Shortcut: you can also type <code>#excel</code> <code>!high</code> <code>@fri</code> in the box.</p>`;
   box.innerHTML = h;
 }
 // remove typed tokens for a field when its chip is tapped, so the chip choice wins
@@ -271,7 +277,9 @@ $("#q").addEventListener("input", updateHint);
 $("#qa").addEventListener("pointerdown", e => { if (e.target.closest("button.qc")) e.preventDefault(); });
 $("#qa").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
-  if (b.dataset.qaType) { if (b.dataset.qaType === "todo") stripTokens(/^[#!]\S+/); S.mode = b.dataset.qaType; S.autoWork = false; if (S.mode === "todo" && !S.qa.due) S.qa.due = todayKey(); }
+  if (b.dataset.qaType) { if (b.dataset.qaType !== "work") stripTokens(/^[#!]\S+/); S.mode = b.dataset.qaType; S.autoWork = false; if (S.mode !== "work" && !S.qa.due) S.qa.due = todayKey(); }
+  else if (b.dataset.qaSubj) { S.qa.subj = S.qa.subj === b.dataset.qaSubj ? "" : b.dataset.qaSubj; }
+  else if (b.dataset.qaSkind) { const was = S.qa.skind; S.qa.skind = b.dataset.qaSkind; if (was === "todo" && S.qa.skind !== "todo" && S.qa.due === todayKey()) S.qa.due = addDays(todayKey(), 7); if (S.qa.skind === "todo" && !S.qa.due) S.qa.due = todayKey(); }
   else if (b.dataset.qaCat !== undefined) { stripTokens(/^#\S+/); S.qa.cat = S.qa.cat === b.dataset.qaCat ? "" : b.dataset.qaCat; }
   else if (b.dataset.qaUrg) { stripTokens(/^!\S+/); S.qa.urg = b.dataset.qaUrg; }
   else if (b.dataset.qaDue !== undefined) { stripTokens(/^@\S+/); S.qa.due = b.dataset.qaDue; }
@@ -300,6 +308,12 @@ $("#quick").addEventListener("submit", e => {
     if (p.newCat) { const tag = p.newCat.toLowerCase().replace(/[^a-z0-9-]/g, ""); const name = p.newCat.charAt(0).toUpperCase() + p.newCat.slice(1); if (!S.cats.find(c => c.tag === tag)) { S.cats.push({ name, tag }); saveCats(); } cat = tag; }
     put("tasks", newId(), { title: p.title, desc: "", category: cat || "", urgency: E.urg || "medium", status: "todo", progress: 0, bottleneck: "", assignedBy: "", due: E.due || "", createdAt: nowISO(), updatedAt: nowISO(), doneAt: "", log: [{ at: nowISO(), note: "Task added" }] });
     toast(`Work task added${cat ? " · " + catName(cat).split(/\s*\/\s*/)[0] : ""}${E.due ? " · due " + fmtDate(E.due) : ""}`);
+  } else if (E.study) {
+    const sj = S.qa.subj, kind = S.qa.skind;
+    if (kind === "todo") { put("todos", newId(), { title: p.title, date: E.due || todayKey(), done: false, doneAt: "", createdAt: nowISO(), kind: "study", subj: sj || "" }); toast(`Study to-do added${sj ? " · " + subjLabel(sj) : ""}${E.due && E.due !== todayKey() ? " for " + fmtDate(E.due) : ""}`); }
+    else { if (!sj) { toast("Pick a subject first"); return; }
+      put("assignments", newId(), { subj: sj, title: p.title, type: kind, due: E.due || "", time: E.due ? "23:59" : "", weight: "", status: "todo", mark: "", notes: "", link: "", createdAt: nowISO(), doneAt: "" });
+      toast(`${(QA_SKIND.find(x => x[0] === kind) || ["", "Item"])[1]} added · ${subjLabel(sj)}${E.due ? " · due " + fmtDate(E.due) : ""}`); }
   } else {
     put("todos", newId(), { title: p.title, date: E.due || todayKey(), done: false, doneAt: "", createdAt: nowISO() });
     toast(`To-do added${E.due && E.due !== todayKey() ? " for " + fmtDate(E.due) : ""}`);
@@ -354,7 +368,7 @@ function applyParts(){
 function route(){
   const R = parseRoute(), changed = R.main !== S.main || R.sub !== S.sub;
   S.main = R.main; S.sub = R.sub; S.view = R.view;
-  if (S.view === "work") setMode("work"); else if (S.view === "today") setMode("todo");
+  if (S.view === "work") setMode("work"); else if (S.view === "study") setMode("study"); else if (S.view === "today") setMode("todo");
   renderNav(); applyParts(); render();
   if (changed) window.scrollTo(0, 0);
 }
@@ -520,18 +534,21 @@ function renderToday(){
     <span class="tl-acts"><button class="x tl-ed" type="button" data-rtedit="${esc(r.id)}" aria-label="Edit ${esc(r.label)}" title="Edit">${SVG(ICON.edit)}</button>${r.extra ? `<button class="x" type="button" data-delextra="${esc(r.id)}" aria-label="Remove ${esc(r.label)}">✕</button>`
       : `<button class="x small" type="button" data-skip="${esc(r.id)}">${sk?"Undo":"Skip"}</button>`}</span></li>`; }).join("")
     : `<li class="empty" style="display:block">${S.ready?"Nothing scheduled for this day.":"Loading…"}</li>`;
-  const open=S.todos.filter(t=>!t.done && (!t.date||t.date<=tk)).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  const later=S.todos.filter(t=>!t.done && t.date>tk).sort((a,b)=>a.date.localeCompare(b.date));
+  const mine=S.todos.filter(t=>t.kind!=="study");
+  const open=mine.filter(t=>!t.done && (!t.date||t.date<=tk)).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  const later=mine.filter(t=>!t.done && t.date>tk).sort((a,b)=>a.date.localeCompare(b.date));
   $("#todo-meta").textContent = later.length?`${later.length} scheduled later`:"";
   const row = t => `<li class="${t.done?"done":""}"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done?"checked":""} aria-label="Done: ${esc(t.title)}">
-    <span class="grow"><span>${esc(t.title)}</span>${t.date&&t.date!==tk?`<div class="sub ${t.date<tk&&!t.done?"overdue":""}">${t.date<tk?"From ":""}${esc(fmtDate(t.date))}</div>`:""}</span>
+    <span class="grow"><span>${t.kind==="study"&&t.subj?`<span class="tag ${subjCls(t.subj)}">${esc(subjLabel(t.subj))}</span> `:""}${esc(t.title)}</span>${t.date&&t.date!==tk?`<div class="sub ${t.date<tk&&!t.done?"overdue":""}">${t.date<tk?"From ":""}${esc(fmtDate(t.date))}</div>`:""}</span>
     <button class="x" type="button" data-deltodo="${esc(t.id)}" aria-label="Delete">✕</button></li>`;
   $("#todos").innerHTML = (open.length||later.length) ? open.map(row).join("") + (later.length?`<li class="sub" style="background:var(--sunk)">Later</li>`+later.map(row).join(""):"")
     : `<li class="empty">${S.ready?"Nothing to do. Add one in the box above.":"Loading…"}</li>`;
-  { const sh = studyTodayHtml(); $("#today-study-wrap").hidden = !sh; $("#today-study").innerHTML = sh; }
+  { const sh = studyTodayHtml(), st = S.todos.filter(t=>t.kind==="study"&&!t.done).sort((a,b)=>(a.date||"").localeCompare(b.date||"")), now = st.filter(t=>!t.date||t.date<=addDays(tk,1)), lat = st.length - now.length;
+    $("#today-study-wrap").hidden = !sh && !st.length && !S.subjects.length;
+    $("#today-study").innerHTML = (sh || "") + (now.length ? `<div class="small muted" style="margin-top:6px">Study to-dos</div><ul class="rows st-todos">${now.map(row).join("")}</ul>` : "") + (lat ? `<p class="small muted" style="margin:4px 0 0">${lat} more study to-do${lat===1?"":"s"} later this week or after · <a href="#study-assignments">see all</a></p>` : "") + (!sh && !st.length ? `<p class="small muted" style="margin:0">Nothing for study today. Add one with the box above: choose <b>Study</b>.</p>` : ""); }
   const focus=sortTasks(S.tasks.filter(t=>t.status!=="done")).slice(0,3);
   $("#focus").innerHTML = focus.length?focus.map(taskCard).join(""):`<div class="panel empty">${S.ready?"No open work tasks. Switch the box above to Work to add one.":"Loading…"}</div>`;
-  const doneT=S.todos.filter(t=>t.done&&isoDay(t.doneAt)===tk).map(t=>({l:t.title,s:"To-do",at:t.doneAt}));
+  const doneT=S.todos.filter(t=>t.done&&isoDay(t.doneAt)===tk).map(t=>({l:t.title,s:t.kind==="study"?"Study"+(t.subj?" · "+subjLabel(t.subj):""):"To-do",at:t.doneAt}));
   const doneW=S.tasks.filter(t=>t.status==="done"&&isoDay(t.doneAt)===tk).map(t=>({l:t.title,s:catName(t.category),at:t.doneAt}));
   const all=[...doneW,...doneT].sort((a,b)=>b.at.localeCompare(a.at));
   $("#done-meta").textContent = all.length?`${all.length} completed`:"";
@@ -1736,6 +1753,8 @@ function renderStudy(){
       <div class="qa-chips cwrap">${ASG_TYPES.map(([v, l]) => `<button type="button" class="qc" data-asg-type="${v}" aria-pressed="${S.asgType === v}">${l}</button>`).join("")}</div>
       <div class="asg-row2"><label class="f">Due date<input type="date" id="as-due" data-dhint value="${addDays(tk, 7)}"><span class="dhint"></span></label><label class="f">Time<input type="time" id="as-time" value="23:59"></label><label class="f">Weight %<input type="number" id="as-weight" min="0" max="100" placeholder="e.g. 20"></label><button class="btn primary" type="submit">Add</button></div></form>`
       : `<p class="small muted" style="margin:0">Add your subjects in Timetable first, then track assignments here.</p>`}
+    ${(() => { const st = S.todos.filter(t => t.kind === "study" && (!t.done || isoDay(t.doneAt) === tk)).filter(t => !S.asgSubj || t.subj === S.asgSubj).sort((a, b) => (a.done - b.done) || (a.date || "").localeCompare(b.date || ""));
+      return st.length ? `<details class="st-todo-box" open><summary class="small"><b>Study to-dos</b> <span class="muted">(${st.filter(t => !t.done).length})</span></summary><ul class="rows">${st.map(t => `<li class="${t.done ? "done" : ""}"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="Done: ${esc(t.title)}"><span class="grow"><span>${t.subj ? `<span class="tag ${subjCls(t.subj)}">${esc(subjLabel(t.subj))}</span> ` : ""}${esc(t.title)}</span>${t.date ? `<div class="sub ${t.date < tk && !t.done ? "overdue" : ""}">${esc(fmtDate(t.date))}</div>` : ""}</span><button class="x" type="button" data-deltodo="${esc(t.id)}" aria-label="Delete">✕</button></li>`).join("")}</ul></details>` : ""; })()}
     <div class="asg-filter"><div class="seg">${[["todo", `To do (${openN})`], ["done", "Submitted & graded"], ["all", "All"]].map(([v, l]) => `<button type="button" data-asg-f="${v}" aria-pressed="${S.asgFilter === v}">${l}</button>`).join("")}</div>
       ${S.subjects.length > 1 ? `<div class="qa-chips cwrap"><button type="button" class="qc" data-asg-s="" aria-pressed="${!S.asgSubj}">All subjects</button>${S.subjects.map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-asg-s="${esc(s.id)}" aria-pressed="${S.asgSubj === s.id}">${esc(s.code || s.name)}</button>`).join("")}</div>` : ""}</div>
     ${list.length ? `<div class="asg-list">${list.map(a => { const [dt, cls] = dueText(a), open = S.asgOpen === a.id;

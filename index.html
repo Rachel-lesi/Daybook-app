@@ -1279,6 +1279,14 @@ label.f:has(.dhint){margin-bottom:18px}
 .sb-row select{font:inherit;font-size:.85rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:8px 6px;min-width:0}
 @media (max-width:560px){.sb-row{grid-template-columns:1fr 1fr auto}.sb-row select{grid-column:1/-1}}
 .att-low{color:var(--crit)}
+
+/* ===== study to-dos ===== */
+.st-todos{margin:0;padding:0}
+.st-todos li{padding-left:0;padding-right:0}
+.st-todo-box{border:1px solid var(--line);border-radius:10px;padding:6px 10px;background:var(--surface)}
+.st-todo-box summary{cursor:pointer;padding:2px 0}
+.st-todo-box .rows{margin:4px 0 0;padding:0}
+#todos .tag,.st-todos .tag,.st-todo-box .tag{font-size:.68rem;vertical-align:1px}
 </style>
 </head>
 <body class="locked">
@@ -1427,7 +1435,7 @@ label.f:has(.dhint){margin-bottom:18px}
     <nav class="subtabs" id="subtabs" aria-label="Section" hidden></nav>
     <form class="quick" id="quick" autocomplete="off">
       <div class="qrow">
-        <input id="q" placeholder="Add a to-do or work task…" aria-label="Quick add" enterkeyhint="done">
+        <input id="q" placeholder="Add a to-do, work task or study item…" aria-label="Quick add" enterkeyhint="done">
         <button class="btn primary" type="submit">Add</button>
       </div>
       <div class="qa" id="qa" hidden></div>
@@ -1449,21 +1457,21 @@ label.f:has(.dhint){margin-bottom:18px}
       </div>
     </div>
     <div class="t-side">
-    <div id="today-study-wrap" hidden>
-      <div class="sechead"><h2>Classes & deadlines</h2><a class="meta" href="#study">Study</a></div>
-      <div class="panel hcard" id="today-study"></div>
-    </div>
-    <div>
-      <div class="sechead"><h2>Focus timer</h2><span class="meta">Pomodoro</span></div>
-      <div class="panel focusbox" id="focusbox"></div>
-    </div>
     <div>
       <div class="sechead"><h2>To-do</h2><span class="meta" id="todo-meta"></span></div>
       <div class="panel"><ul class="rows" id="todos"></ul></div>
     </div>
     <div>
-      <div class="sechead"><h2>Work focus</h2><a class="meta" href="#work">All tasks</a></div>
+      <div class="sechead"><h2>Work</h2><a class="meta" href="#work">All tasks</a></div>
       <div class="tasks" id="focus"></div>
+    </div>
+    <div id="today-study-wrap" hidden>
+      <div class="sechead"><h2>Study</h2><a class="meta" href="#study">Classes, deadlines & study to-dos</a></div>
+      <div class="panel hcard" id="today-study"></div>
+    </div>
+    <div>
+      <div class="sechead"><h2>Focus timer</h2><span class="meta">Pomodoro</span></div>
+      <div class="panel focusbox" id="focusbox"></div>
     </div>
     <div>
       <div class="sechead"><h2>Done today</h2><span class="meta" id="done-meta"></span></div>
@@ -1751,6 +1759,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=36"></script>
+<script type="module" src="app.js?v=37"></script>
 </body>
 </html>
