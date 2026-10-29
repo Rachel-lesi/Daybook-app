@@ -826,12 +826,14 @@ function unlockAudio(){ try { audioCtx = audioCtx || new (window.AudioContext ||
 function timerTargetLabel(type, ref){
   if (type === "task") { const t = S.tasks.find(x => x.id === ref); return t ? t.title : "Task"; }
   if (type === "course") { const c = S.courses.find(x => x.id === ref); return c ? c.name : "Study"; }
+  if (type === "asg") { const a = S.asg.find(x => x.id === ref); return a ? `${subjLabel(a.subj)} ${a.title}` : "Assignment"; }
+  if (type === "study" || type === "self" || type === "todo") { const t = S.todos.find(x => x.id === ref); return t ? (t.kind === "study" && t.subj ? subjLabel(t.subj) + " " : "") + t.title : "To-do"; }
   return ref || "Focus";
 }
-function startTimer({ type, ref, label, mode = "stopwatch", dur = 0 }){
+function startTimer({ type, ref, label, mode = "stopwatch", dur = 0, mod = "" }){
   unlockAudio();
   if (S.timer) stopTimer(false);
-  S.timer = { type, ref: ref || "", label: label || timerTargetLabel(type, ref), mode, dur, start: nowISO() };
+  S.timer = { type, ref: ref || "", label: label || timerTargetLabel(type, ref), mode, dur, start: nowISO(), ...(mod ? { mod } : {}) };
   if (db) write("settings/timer", () => db.doc("settings/timer").set(S.timer));
   render(); tickTimer();
 }
@@ -844,7 +846,7 @@ function stopTimer(finishedFocus){
   if (db) write("settings/timer", () => db.doc("settings/timer").delete());
   if (mins >= 1) {
     const id = "t" + startMs.toString(36);   // same id on every device, so a session is never logged twice
-    const rec = { start: T.start, end: nowISO(), mins: Math.round(mins), date: isoDay(T.start), type: T.type, ref: T.ref || "", label: T.label || "", via: T.mode };
+    const rec = { start: T.start, end: nowISO(), mins: Math.round(mins), date: isoDay(T.start), type: T.type, ref: T.ref || "", label: T.label || "", via: T.mode, ...(T.mod ? { mod: T.mod } : {}) };
     if (!S.time.some(x => x.id === id)) S.time.unshift({ ...rec, id });
     if (db) write("time/" + id, () => db.doc("time/" + id).set(rec));
     if (T.type === "task") { const t = S.tasks.find(x => x.id === T.ref); if (t) put("tasks", t.id, { ...strip(t), log: [...(t.log || []), { at: nowISO(), note: `Worked ${fmtMins(rec.mins)}${T.mode === "focus" ? " (focus session)" : ""}` }].slice(-200), updatedAt: nowISO() }); }
@@ -898,9 +900,16 @@ function renderFocus(){
     return;
   }
   const open = sortTasks(S.tasks.filter(t => t.status !== "done"));
+  const tk0 = todayKey(), td = kind => S.todos.filter(t => (t.kind || "") === kind && !t.done).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const asgOpen = S.asg.filter(a => !["submitted", "graded"].includes(a.status)).sort((a, b) => ((a.due || "9999") + (a.time || "")).localeCompare((b.due || "9999") + (b.time || "")));
+  const grp = (label, list) => list.length ? [`<optgroup label="${label}">${list.join("")}</optgroup>`] : [];
   const opts = [`<option value="other:">Just focus (no task)</option>`]
-    .concat(open.length ? [`<optgroup label="Work tasks">${open.map(t => `<option value="task:${esc(t.id)}">${esc(t.title)}</option>`).join("")}</optgroup>`] : [])
-    .concat(S.courses.length ? [`<optgroup label="Courses">${S.courses.map(c => `<option value="course:${esc(c.id)}">${esc(c.name)}</option>`).join("")}</optgroup>`] : []);
+    .concat(grp("Work tasks", open.map(t => `<option value="task:${esc(t.id)}">${esc(t.title)}</option>`)))
+    .concat(grp("Assignments & tests", asgOpen.map(a => { const p = a.parent && S.asg.find(x => x.id === a.parent); return `<option value="asg:${esc(a.id)}">${esc(subjLabel(a.subj))} · ${p ? esc(p.title) + " › " : ""}${esc(a.title)}${a.due ? " (due " + esc(fmtDate(a.due).replace(/^\w+, /, "")) + ")" : ""}</option>`; })))
+    .concat(grp("Study to-dos", td("study").map(t => `<option value="study:${esc(t.id)}">${t.subj ? esc(subjLabel(t.subj)) + " · " : ""}${esc(t.title)}</option>`)))
+    .concat(grp("Self-study", td("self").map(t => `<option value="self:${esc(t.id)}">${t.cat ? esc(catName(t.cat).split(/\s*\/\s*/)[0]) + " · " : ""}${esc(t.title)}</option>`)))
+    .concat(grp("Courses", S.courses.flatMap(c => [`<option value="course:${esc(c.id)}">${esc(c.name)}</option>`, ...(c.modules || []).filter(m => !m.done).slice(0, 8).map(m => `<option value="course:${esc(c.id)}|${esc(m.id)}">${esc(c.name)} › ${esc(m.title)}</option>`)])))
+    .concat(grp("To-dos", td("").filter(t => !t.date || t.date <= addDays(tk0, 1)).map(t => `<option value="todo:${esc(t.id)}">${esc(t.title)}</option>`)));
   const today = S.time.filter(x => x.date === todayKey()).reduce((a, x) => a + (+x.mins || 0), 0);
   box.innerHTML = `<div class="fx-set">
     <label class="f" style="flex:1;min-width:0">Focus on<select id="fx-what">${opts.join("")}</select></label>
@@ -911,7 +920,7 @@ function renderFocus(){
 }
 document.addEventListener("click", e => {
   const m = e.target.closest("#fx-len [data-m]"); if (m) { S.focusMins = +m.dataset.m; renderFocus(); return; }
-  if (e.target.closest("#fx-start")) { const [type, ref] = $("#fx-what").value.split(/:(.*)/s); startTimer({ type, ref, label: type === "other" ? "Focus session" : timerTargetLabel(type, ref), mode: "focus", dur: S.focusMins }); return; }
+  if (e.target.closest("#fx-start")) { const [type, ref0] = $("#fx-what").value.split(/:(.*)/s), [ref, mod] = (ref0 || "").split("|"); startTimer({ type, ref, label: type === "other" ? "Focus session" : mod ? `${timerTargetLabel(type, ref)} › ${((S.courses.find(c => c.id === ref) || {}).modules || []).find(m => m.id === mod)?.title || ""}` : timerTargetLabel(type, ref), mod, mode: "focus", dur: S.focusMins }); return; }
   if (e.target.closest("#fx-stop")) { stopTimer(false); return; }
 });
 
@@ -1100,7 +1109,7 @@ function studyReport(off){
   const sTodos = S.todos.filter(t => t.kind === "study" && t.done && inW(isoDay(t.doneAt))), selfT = S.todos.filter(t => t.kind === "self" && t.done && inW(isoDay(t.doneAt)));
   const att = {}; keys.filter(k => k <= tk).forEach(k => classesOn(k).forEach(c => { const st = attOf(c, k); if (st === "cancelled") return; const r = att[c.subj] = att[c.subj] || { held: 0, went: 0, miss: [] }; r.held++; if (st === "absent") r.miss.push(shortDay(k)); else r.went++; }));
   const held = Object.values(att).reduce((s, r) => s + r.held, 0), went = Object.values(att).reduce((s, r) => s + r.went, 0);
-  const tW = S.time.filter(x => inW(x.date) && ["course", "self", "study"].includes(x.type)), mins = tW.reduce((s, x) => s + (+x.mins || 0), 0);
+  const tW = S.time.filter(x => inW(x.date) && ["course", "self", "study", "asg"].includes(x.type)), mins = tW.reduce((s, x) => s + (+x.mins || 0), 0);
   const courseRows = S.courses.map(c => { const m = tW.filter(x => x.type === "course" && x.ref === c.id).reduce((s, x) => s + (+x.mins || 0), 0), md = (c.modules || []).filter(x => x.done && inW(isoDay(x.doneAt))); return m || md.length ? `${c.name}: ${[m ? fmtMins(m) : "", md.length ? `modules done: ${md.map(x => x.title).join(", ")}` : ""].filter(Boolean).join(" · ")} (${courseStats(c).pct}% overall)` : null; }).filter(Boolean);
   const R = areaRefl(keys, "study"), nk = weekKeys(off + 1);
   const learnedAsg = subm.filter(x => (x.learned || "").trim()).map(x => `${x.title}: ${x.learned.trim()}`);
@@ -2417,48 +2426,61 @@ function routineCat(r){
 }
 function timeCat(x){
   if (x.type === "task") { const t = S.tasks.find(y => y.id === x.ref); return "Work"; }
-  if (x.type === "course" || x.type === "self" || x.type === "study") return "Study & courses";
+  if (["course", "self", "study", "asg"].includes(x.type)) return "Study & courses";
+  if (x.type === "todo") return "Personal to-dos";
   return "Focus sessions";
 }
 function dayTimeline(k){
-  const T = new Array(1440).fill(null), fill = (a, b, c, force) => { a = Math.max(0, Math.round(a)); b = Math.min(1440, Math.round(b)); for (let i = a; i < b; i++) if (force || !T[i]) T[i] = c; };
+  const T = new Array(1440).fill(null), L = new Array(1440).fill(""), fill = (a, b, c, force, lb) => { a = Math.max(0, Math.round(a)); b = Math.min(1440, Math.round(b)); for (let i = a; i < b; i++) if (force || !T[i]) { T[i] = c; L[i] = lb || c; } };
   // sleep: the night that ended this morning, and the night that started this evening
-  const s0 = hDoc(k).sleep; if (s0 && s0.bed && s0.wake) { const b = toMin(s0.bed), w = toMin(s0.wake); if (b > w) fill(0, w, "Sleep", true); else fill(b, w, "Sleep", true); }
-  const s1 = hDoc(addDays(k, 1)).sleep; if (s1 && s1.bed && s1.wake && toMin(s1.bed) > toMin(s1.wake)) fill(toMin(s1.bed), 1440, "Sleep", true);
+  const s0 = hDoc(k).sleep; if (s0 && s0.bed && s0.wake) { const b = toMin(s0.bed), w = toMin(s0.wake); const lb = `Sleep ${fmt12(s0.bed)}–${fmt12(s0.wake)}`; if (b > w) fill(0, w, "Sleep", true, lb); else fill(b, w, "Sleep", true, lb); }
+  const s1 = hDoc(addDays(k, 1)).sleep; if (s1 && s1.bed && s1.wake && toMin(s1.bed) > toMin(s1.wake)) fill(toMin(s1.bed), 1440, "Sleep", true, `Sleep ${fmt12(s1.bed)}–${fmt12(s1.wake)}`);
   // timed and logged sessions
-  S.time.filter(x => x.date === k && x.start).forEach(x => { const a = minsOfISO(x.start), m = +x.mins || 0; fill(a, Math.min(1440, a + m), timeCat(x)); });
+  S.time.filter(x => x.date === k && x.start).forEach(x => { const a = minsOfISO(x.start), m = +x.mins || 0; fill(a, Math.min(1440, a + m), timeCat(x), false, (x.label || (x.type === "task" ? "Work task" : "Study")) + (x.via === "manual" ? " (logged)" : " (timer)")); });
   // classes you attended
-  classesOn(k).filter(c => !attOf(c, k)).forEach(c => fill(toMin(c.start), toMin(c.end), "Classes"));
+  classesOn(k).filter(c => !attOf(c, k)).forEach(c => fill(toMin(c.start), toMin(c.end), "Classes", false, `${subjLabel(c.subj)} ${(CLS_TYPES.find(x => x[0] === c.type) || ["", "class"])[1].toLowerCase()}`));
   // routine items you ticked: each runs until the next item starts (at most 4 hours)
   const dd = dayDoc(k), done = dd.done || {}, skip = dd.skip || {}, items = routineFor(k).filter(r => !skip[r.id]).sort((a, b) => a.time.localeCompare(b.time));
-  items.forEach((r, i) => { if (!done[r.id]) return; const cat = routineCat(r); if (!cat) return; const a = toMin(r.time), nx = items[i + 1] ? toMin(items[i + 1].time) : a + 60; fill(a, Math.min(nx, a + ({ "Meals": 60, "Getting ready": 45 }[cat] || 240)), cat); });
-  return T;
+  items.forEach((r, i) => { if (!done[r.id]) return; const cat = routineCat(r); if (!cat) return; const a = toMin(r.time), nx = items[i + 1] ? toMin(items[i + 1].time) : a + 60; fill(a, Math.min(nx, a + ({ "Meals": 60, "Getting ready": 45 }[cat] || 240)), cat, false, r.label); });
+  T.labels = L; return T;
+}
+// the events behind each category, e.g. Chores & errands → Shopping 6pm–9pm
+function dayEventsByCat(k){ const T = dayTimeline(k), L = T.labels, out = {}; let i = 0;
+  while (i < 1440) { if (!T[i]) { i++; continue; } const c = T[i], l = L[i]; let j = i; while (j < 1440 && T[j] === c && L[j] === l) j++; (out[c] = out[c] || []).push({ label: l, a: i, b: j, k }); i = j; }
+  return out; }
+function evListHtml(cat, evs, week){
+  if (!evs || !evs.length) return "";
+  if (week) { const by = {}; evs.forEach(e => { const n = e.label.replace(/ \((logged|timer)\)$/, ""); const r = by[n] = by[n] || { m: 0, days: new Set() }; r.m += e.b - e.a; r.days.add(e.k); });
+    return `<b>${esc(cat)}</b><ul>${Object.entries(by).sort((x, y) => y[1].m - x[1].m).slice(0, 12).map(([n, r]) => `<li><span>${esc(n)}</span><span class="muted">${fmtHM(r.m)}${r.days.size > 1 ? ` · ${r.days.size} days` : ""}</span></li>`).join("")}</ul>`; }
+  return `<b>${esc(cat)}</b><ul>${evs.map(e => `<li><span>${esc(e.label)}</span><span class="muted">${fmt12(hm(e.a))}–${fmt12(hm(e.b % 1440))} · ${fmtHM(e.b - e.a)}</span></li>`).join("")}</ul>`;
 }
 function timeOfDay(k){ const seg = {}; dayTimeline(k).forEach(c => { if (c) seg[c] = (seg[c] || 0) + 1; }); return seg; }
-const TV_FIXED = { "Sleep": "#4a6fa5", "Work": "#465c47", "Study & courses": "#86659f", "Classes": "#3f8789", "Meals": "#d08a3e", "Exercise & health": "#c0646f", "Travel": "#8a8f5a", "Chores & errands": "#a07a5a", "Leisure & screen time": "#e0a1b0", "Breaks & rest": "#9bb3a0", "Getting ready": "#b7a8d6", "Focus sessions": "#c9a227", "Not tracked": "var(--line)" };
+const TV_FIXED = { "Sleep": "#4a6fa5", "Work": "#465c47", "Study & courses": "#86659f", "Classes": "#3f8789", "Meals": "#d08a3e", "Exercise & health": "#c0646f", "Travel": "#8a8f5a", "Chores & errands": "#a07a5a", "Leisure & screen time": "#e0a1b0", "Breaks & rest": "#9bb3a0", "Getting ready": "#b7a8d6", "Focus sessions": "#c9a227", "Personal to-dos": "#7c9cbf", "Not tracked": "var(--line)" };
 const TV_EXTRA = ["#6f8fb8", "#b88b6f", "#7a9e7e", "#a678a0", "#c7a35b", "#5f9ea0"];
 function tvColor(n){ if (TV_FIXED[n]) return TV_FIXED[n]; let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return TV_EXTRA[h % TV_EXTRA.length]; }
 function pieSvg(items, center, sub, workNames){
   const sum = items.reduce((a, x) => a + x[1], 0) || 1, R = 70, C = 2 * Math.PI * R; let off = 0;
-  const arcs = items.map(([n, m]) => { const len = m / sum * C, col = tvColor(n, workNames); const a = `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${col}" stroke-width="34" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"><title>${esc(n)}: ${fmtHM(Math.round(m))}</title></circle>`; off += len; return a; });
+  const arcs = items.map(([n, m]) => { const len = m / sum * C, col = tvColor(n, workNames), ev = (S.tvEv && S.tvEv[n]) || []; const a = `<circle data-tvcat="${esc(n)}" r="${R}" cx="90" cy="90" fill="none" stroke="${col}" stroke-width="34" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}"><title>${esc(n)}: ${fmtHM(Math.round(m))}${ev.length ? "\n" + [...new Set(ev.map(e => e.label))].slice(0, 8).join("\n") : ""}</title></circle>`; off += len; return a; });
   return `<svg viewBox="0 0 180 180" class="pie" role="img" aria-label="Where your time went"><g transform="rotate(-90 90 90)">${arcs.join("")}</g><text x="90" y="86" text-anchor="middle" class="pie-n">${center}</text><text x="90" y="104" text-anchor="middle" class="pie-s">${sub}</text></svg>`;
 }
 function timeInsights(){
   const tk = todayKey(), st = startKey(), day = S.tvMode === "day";
   const head = `<div class="tv-head"><div class="seg"><button type="button" data-tvmode="day" aria-pressed="${day}">Day</button><button type="button" data-tvmode="week" aria-pressed="${!day}">Weekly average</button></div>`;
   if (day) {
-    const k = S.tvDay && S.tvDay <= tk ? S.tvDay : tk, seg = timeOfDay(k), workNames = Object.keys(seg).filter(n => n.startsWith("Work"));
+    const k = S.tvDay && S.tvDay <= tk ? S.tvDay : tk, seg = timeOfDay(k), workNames = Object.keys(seg).filter(n => n.startsWith("Work")); S.tvEv = dayEventsByCat(k); S.tvWeek = false;
     let items = Object.entries(seg).sort((a, b) => b[1] - a[1]); const tracked = items.reduce((a, x) => a + x[1], 0);
     if (S.ovUntracked && tracked < 1440) items = [...items, ["Not tracked", 1440 - tracked]];
     const nav = `<div class="tv-nav"><button class="btn sm" type="button" data-tvday="-1" aria-label="Previous day">‹</button><span class="small"><b>${k === tk ? "Today" : k === addDays(tk, -1) ? "Yesterday" : esc(DAYS[keyDow(k)])}</b> ${esc(fmtDate(k).replace(/^\w+, /, ""))}</span><button class="btn sm" type="button" data-tvday="1" ${k >= tk ? "disabled" : ""} aria-label="Next day">›</button></div></div>`;
     if (!tracked) return head + nav + `<p class="small muted" style="margin:0">Nothing tracked on this day. Time comes from your sleep log, class timetable, and timers or time logs on tasks and courses.</p>`;
-    const TL = dayTimeline(k), runs = []; TL.forEach((c, i) => { const last = runs[runs.length - 1]; if (last && last.c === c) last.n++; else runs.push({ c, a: i, n: 1 }); });
-    const strip = `<div class="tv-strip">${runs.map(r => `<i style="flex:${r.n};background:${r.c ? tvColor(r.c) : "transparent"}" title="${r.c ? esc(r.c) : "Not tracked"} ${hm(r.a)}–${hm(r.a + r.n)}"></i>`).join("")}</div><div class="tv-ticks">${[0, 6, 12, 18, 24].map(h => `<span>${h === 24 ? "" : fmt12(pad(h % 24) + ":00").replace(":00", "")}</span>`).join("")}</div>`;
+    const TL = dayTimeline(k), LB = TL.labels, runs = []; TL.forEach((c, i) => { const last = runs[runs.length - 1]; if (last && last.c === c && last.l === LB[i]) last.n++; else runs.push({ c, l: LB[i], a: i, n: 1 }); });
+    const strip = `<div class="tv-strip">${runs.map(r => `<i ${r.c ? `data-tvcat="${esc(r.c)}"` : ""} style="flex:${r.n};background:${r.c ? tvColor(r.c) : "transparent"}" title="${r.c ? esc(r.l) : "Not tracked"} · ${fmt12(hm(r.a))}–${fmt12(hm((r.a + r.n) % 1440))}"></i>`).join("")}</div><div class="tv-ticks">${[0, 6, 12, 18, 24].map(h => `<span>${h === 24 ? "" : fmt12(pad(h % 24) + ":00").replace(":00", "")}</span>`).join("")}</div>`;
     return head + nav + strip + `<div class="pie-wrap">${pieSvg(items, fmtHM(tracked), "tracked", workNames)}
-      <ul class="pie-leg">${items.map(([n, m]) => `<li><i style="background:${tvColor(n, workNames)}"></i><span>${esc(n)}</span><b>${fmtHM(Math.round(m))}</b><span class="muted small">${Math.round(m / (S.ovUntracked ? 1440 : tracked) * 100)}%</span></li>`).join("")}</ul></div>
+      <ul class="pie-leg">${items.map(([n, m]) => `<li data-tvcat="${esc(n)}" tabindex="0" class="${S.tvSel === n ? "is-sel" : ""}"><i style="background:${tvColor(n, workNames)}"></i><span>${esc(n)}</span><b>${fmtHM(Math.round(m))}</b><span class="muted small">${Math.round(m / (S.ovUntracked ? 1440 : tracked) * 100)}%</span></li>`).join("")}</ul></div>
+      <div class="tv-ev" id="tv-ev">${S.tvSel && S.tvEv[S.tvSel] ? evListHtml(S.tvSel, S.tvEv[S.tvSel]) : `<span class="small muted">Hover or tap a colour to see the exact events.</span>`}</div>
       <label class="small muted pie-tog"><input type="checkbox" data-ovuntracked ${S.ovUntracked ? "checked" : ""}> Show the rest of the 24 hours (${fmtHM(Math.max(0, 1440 - tracked))} not tracked)</label>`;
   }
   const keys = weekKeys(S.tvWk), days = keys.filter(k => k >= st && k <= tk), segs = days.map(timeOfDay), tot = {};
+  S.tvEv = {}; days.forEach(k => Object.entries(dayEventsByCat(k)).forEach(([c, L]) => (S.tvEv[c] = S.tvEv[c] || []).push(...L))); S.tvWeek = true;
   segs.forEach(sg => Object.entries(sg).forEach(([n, m]) => tot[n] = (tot[n] || 0) + m));
   const nights = segs.filter(sg => sg.Sleep).length, workNames = Object.keys(tot).filter(n => n.startsWith("Work"));
   const avgOf = n => n === "Sleep" ? (nights ? tot[n] / nights : 0) : tot[n] / Math.max(1, days.length);
@@ -2470,11 +2492,18 @@ function timeInsights(){
   const bars = `<div class="tv-bars">${keys.map(k => { const i = days.indexOf(k), sg = i >= 0 ? segs[i] : {}, t = Object.values(sg).reduce((a, b) => a + b, 0);
       return `<button type="button" class="tv-bar ${k > tk ? "is-fut" : ""}" ${k > tk ? "disabled" : `data-tvgo="${k}"`} title="${esc(fmtDate(k))}: ${fmtHM(Math.round(t))} tracked"><span class="tv-stack" style="height:${(t / maxD * 100).toFixed(1)}%">${names.filter(n => sg[n]).map(n => `<i style="flex:${sg[n]};background:${tvColor(n, workNames)}"></i>`).join("")}</span><span class="tv-lbl">${DAYS[keyDow(k)].slice(0, 2)}</span><span class="tv-h">${t ? (Math.round(t / 6) / 10) + "h" : ""}</span></button>`; }).join("")}</div>`;
   return head + nav + `<div class="pie-wrap">${pieSvg(items, fmtHM(Math.round(tracked)), "average / day", workNames)}
-      <ul class="pie-leg">${items.map(([n, m]) => `<li><i style="background:${tvColor(n, workNames)}"></i><span>${esc(n)}</span><b>${fmtHM(Math.round(m))}</b><span class="muted small">${n === "Not tracked" ? "a day" : n === "Sleep" ? `a night · ${nights} logged` : `a day · ${fmtHM(Math.round(tot[n]))} total`}</span></li>`).join("")}</ul></div>
+      <ul class="pie-leg">${items.map(([n, m]) => `<li data-tvcat="${esc(n)}" tabindex="0" class="${S.tvSel === n ? "is-sel" : ""}"><i style="background:${tvColor(n, workNames)}"></i><span>${esc(n)}</span><b>${fmtHM(Math.round(m))}</b><span class="muted small">${n === "Not tracked" ? "a day" : n === "Sleep" ? `a night · ${nights} logged` : `a day · ${fmtHM(Math.round(tot[n]))} total`}</span></li>`).join("")}</ul></div>
+    <div class="tv-ev" id="tv-ev">${S.tvSel && S.tvEv[S.tvSel] ? evListHtml(S.tvSel, S.tvEv[S.tvSel], true) : `<span class="small muted">Hover or tap a colour to see what it was made of this week.</span>`}</div>
     <div class="small muted" style="font-weight:600">Each day <span style="font-weight:400">· tap a day to see it</span></div>${bars}
     <label class="small muted pie-tog"><input type="checkbox" data-ovuntracked ${S.ovUntracked ? "checked" : ""}> Show the rest of the 24 hours</label>
     <p class="small muted" style="margin:0">Averages use the ${plural(days.length, "day")} so far this week${nights && nights < days.length ? `; sleep uses the ${plural(nights, "night")} you logged` : ""}.</p>`;
 }
+S.tvSel = null;
+function tvShow(cat){ const box = $("#tv-ev"); if (!box) return; S.tvSel = cat; box.innerHTML = S.tvEv && S.tvEv[cat] ? evListHtml(cat, S.tvEv[cat], S.tvWeek) : `<b>${esc(cat)}</b> <span class="small muted">${cat === "Not tracked" ? "Time with nothing logged, timed or ticked." : ""}</span>`;
+  document.querySelectorAll("#ov-time [data-tvcat]").forEach(x => { const on = x.dataset.tvcat === cat; if (x.tagName === "LI") x.classList.toggle("is-sel", on); else x.classList.toggle("is-sel", on); }); }
+document.addEventListener("mouseover", e => { const t = e.target.closest && e.target.closest("#ov-time [data-tvcat]"); if (t && S.tvSel !== t.dataset.tvcat) tvShow(t.dataset.tvcat); });
+document.addEventListener("focusin", e => { const t = e.target.closest && e.target.closest("#ov-time [data-tvcat]"); if (t) tvShow(t.dataset.tvcat); });
+document.addEventListener("click", e => { const t = e.target.closest && e.target.closest("#ov-time [data-tvcat]"); if (t) tvShow(t.dataset.tvcat); });
 document.addEventListener("click", e => {
   const t = e.target.closest && e.target.closest("[data-tvmode],[data-tvday],[data-tvwk],[data-tvgo]"); if (!t) return; const d = t.dataset, tk = todayKey();
   if (d.tvmode) S.tvMode = d.tvmode;

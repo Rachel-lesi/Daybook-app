@@ -1457,6 +1457,14 @@ label.f:has(.dhint){margin-bottom:18px}
 .tv-strip{display:flex;height:22px;border-radius:6px;overflow:hidden;background:var(--sunk);border:1px solid var(--line)}
 .tv-strip i{display:block;min-width:0}
 .tv-ticks{display:flex;justify-content:space-between;font-size:.66rem;color:var(--muted);margin-top:-6px}
+
+.tv-ev{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg);min-height:44px;font-size:.88rem}
+.tv-ev ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
+.tv-ev li{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.pie-leg li[data-tvcat]{cursor:pointer;border-radius:6px;padding:2px 4px;margin:0 -4px}
+.pie-leg li.is-sel,.pie-leg li[data-tvcat]:hover{background:var(--sunk)}
+.pie circle[data-tvcat]{cursor:pointer}
+.pie circle.is-sel{stroke-width:40}
 </style>
 </head>
 <body class="locked">
@@ -1959,6 +1967,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=55"></script>
+<script type="module" src="app.js?v=57"></script>
 </body>
 </html>
