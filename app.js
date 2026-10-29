@@ -2980,8 +2980,16 @@ $("#rt-confirm").addEventListener("click", async e => {
   } catch (err) { console.error(err); toast("Couldn't update your routine. Check your connection and try again."); b.disabled = false; }
 });
 $("#rt-add").onclick=()=>{ put("routine", newId(), {time:"12:00",label:"New item",kind:"other",days: S.rtFilter==="wd"?[1,2,3,4,5]:S.rtFilter==="we"?[0,6]:[0,1,2,3,4,5,6]}); toast("Item added. Edit its time and name below."); };
-$("#addonce").addEventListener("submit", e=>{ e.preventDefault(); const l=$("#ao-l").value.trim(), t=$("#ao-t").value||"12:00"; if(!l){ toast("Type what's happening first"); return; }
-  const k=viewKey(), dd=dayDoc(k); saveDay(k, {...dd, extra:[...(dd.extra||[]), {id:newId(), time:t, label:l, kind:"other"}]}); $("#ao-l").value=""; toast("Added for "+fmtDate(k)); });
+// guess the type from the name, e.g. "Brunch" → Meal, "Interns related work" → Work
+function guessKind(l){ const c = routineCat({ label: l, kind: "other" }); return { "Meals": "meal", "Work": "work", "Study & courses": "study", "Exercise & health": "health", "Breaks & rest": "break", "Getting ready": "other" }[c] || "other"; }
+let aoKindTouched = false;
+function aoFillOpts(){ const k = $("#ao-k"), ln = $("#ao-link"); if (k && k.options.length < 2) k.innerHTML = KINDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(""); if (ln) { const cur = ln.value; ln.innerHTML = `<option value="">Not linked</option>` + targetOptions(cur); } }
+$("#ao-l").addEventListener("focus", aoFillOpts);
+$("#ao-l").addEventListener("input", () => { if (!aoKindTouched) { aoFillOpts(); $("#ao-k").value = guessKind($("#ao-l").value); } });
+$("#ao-k").addEventListener("change", () => { aoKindTouched = true; });
+$("#addonce").addEventListener("submit", e=>{ e.preventDefault(); aoFillOpts(); const l=$("#ao-l").value.trim(), t=$("#ao-t").value||"12:00"; if(!l){ toast("Type what's happening first"); return; }
+  const kind=$("#ao-k").value||guessKind(l), link=$("#ao-link").value||"";
+  const k=viewKey(), dd=dayDoc(k); saveDay(k, {...dd, extra:[...(dd.extra||[]), {id:newId(), time:t, label:l, kind, ...(link?{link}:{})}]}); $("#ao-l").value=""; $("#ao-link").value=""; aoKindTouched=false; $("#ao-k").value="other"; toast("Added for "+fmtDate(k)); });
 $("#cat-form").addEventListener("submit",e=>{ e.preventDefault(); const n=$("#cat-new").value.trim(); if(!n) return; let tag=n.split(/[\s\/]+/)[0].toLowerCase().replace(/[^a-z0-9-]/g,"")||"cat"; while(S.cats.find(c=>c.tag===tag)) tag+="2"; S.cats.push({name:n,tag}); saveCats(); $("#cat-new").value=""; renderRoutine(); });
 $("#cat-edit").addEventListener("click",e=>{ const b=e.target.closest("[data-delcat]"); if(!b) return; S.cats=S.cats.filter(c=>c.tag!==b.dataset.delcat); saveCats(); renderRoutine(); });
 

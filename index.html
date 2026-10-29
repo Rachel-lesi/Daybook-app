@@ -1470,6 +1470,23 @@ label.f:has(.dhint){margin-bottom:18px}
 .tle-link select{font:inherit;font-size:.92rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:7px 10px;width:100%}
 .asg-time{font-size:.74rem;font-weight:600;color:var(--muted);font-family:var(--f-mono)}
 .pill-link{background:var(--accent-soft,var(--sunk));color:var(--accent)}
+
+/* ===== add-for-this-day: type and link ===== */
+.addonce{flex-wrap:wrap;align-items:center}
+.addonce select{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:7px;padding:6px 8px;font:inherit;font-size:.88rem;min-width:0}
+#ao-k{flex:0 0 auto;max-width:130px}
+.ao-link{flex:1 1 100%;display:flex;align-items:center;gap:8px}
+.ao-link select{flex:1;min-width:0}
+@media (max-width:560px){ .addonce #ao-l{flex:1 1 100%;width:auto;order:3} #ao-k{order:2;flex:1 1 auto;max-width:none} .addonce button{order:2} .ao-link{order:4} }
+
+/* ===== add-for-today: type and link ===== */
+.addonce{flex-wrap:wrap;align-items:center}
+.addonce select{font:inherit;font-size:.88rem;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:7px;padding:6px 8px;min-width:0}
+.addonce #ao-k{flex:0 0 auto;max-width:130px}
+.addonce input[type="time"]{width:122px!important}
+.ao-link{flex:1 1 100%;display:flex;align-items:center;gap:8px}
+.ao-link select{flex:1 1 auto;width:0}
+@media (max-width:520px){.addonce #ao-l{flex:1 1 140px;width:auto}}
 </style>
 </head>
 <body class="locked">
@@ -1636,7 +1653,8 @@ label.f:has(.dhint){margin-bottom:18px}
       <div class="sechead"><h2 id="rt-title">Routine</h2><span class="meta" id="rt-meta"></span></div>
       <div class="pager" id="daypager"></div>
       <div class="panel"><ol class="timeline" id="timeline"></ol>
-        <form class="addonce" id="addonce" autocomplete="off"><input type="time" id="ao-t" value="14:00" aria-label="Time"><input id="ao-l" placeholder="Add just for this day, e.g. Dentist, family dinner" aria-label="One-off item"><button class="btn sm" type="submit">Add</button></form>
+        <form class="addonce" id="addonce" autocomplete="off"><input type="time" id="ao-t" value="14:00" aria-label="Time"><input id="ao-l" placeholder="Add just for this day, e.g. Dentist, family dinner" aria-label="One-off item"><select id="ao-k" aria-label="Type"><option value="other">Other</option></select><button class="btn sm" type="submit">Add</button>
+          <label class="ao-link small muted">Linked to <select id="ao-link" aria-label="Linked to"><option value="">Not linked</option></select></label></form>
       </div>
     </div>
     <div class="t-side">
@@ -1972,6 +1990,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=58"></script>
+<script type="module" src="app.js?v=59"></script>
 </body>
 </html>
