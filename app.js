@@ -522,7 +522,7 @@ function rtEditRow(r0, k, draft){
   return `<li class="tl-edit"><form id="tl-edit-form" data-rid="${esc(r.id)}" autocomplete="off">
     <div class="tle-row"><input type="time" id="tle-t" value="${esc(r.time)}" aria-label="Time" required><input id="tle-l" value="${esc(r.label)}" aria-label="Name" required></div>
     <select id="tle-k" aria-label="Type">${KINDS.map(([v,l])=>`<option value="${v}" ${v===(r.kind||"other")?"selected":""}>${l}</option>`).join("")}</select>
-    <label class="f tle-link">Linked to <span class="muted" style="font-weight:400">· when ticked, this block's time is logged to it</span><select id="tle-link" aria-label="Linked to"><option value="">Not linked</option>${targetOptions(r.link || "")}</select></label>
+    <label class="f tle-link">Linked to <span class="muted" style="font-weight:400">· when ticked, this block's time is logged to it</span><select id="tle-link" aria-label="Linked to"><option value="">Not linked</option>${targetOptions(r.link || "", k)}</select></label>
     ${r.extra ? `<p class="small muted" style="margin:0">${r.from ? `Changed for ${esc(fmtDate(k))} only. Tap ✕ on it to go back to the usual one.` : `This item is for ${esc(fmtDate(k))} only.`}</p>` : `<div class="seg tle-scope"><button type="button" data-rtscope="always" aria-pressed="${S.rtScope==="always"}">Change routine (${esc(usual)})</button><button type="button" data-rtscope="day" aria-pressed="${S.rtScope==="day"}">Just ${esc(fmtDate(k))}</button></div>`}
     <div class="row"><button class="btn sm primary" type="submit">Save</button><button class="btn sm" type="button" data-rtedit-x>Cancel</button>${r.extra?"":`<a class="small" href="#settings-routine">More options (days, alarm) ›</a>`}</div>
   </form></li>`;
@@ -910,17 +910,19 @@ document.addEventListener("keydown", e => {
   if (c && (e.key === "Enter" || e.key === " ") && e.target === c) { e.preventDefault(); openTask(c.dataset.task); }
 });
 // focus panel on Today
-function targetOptions(sel){
+function targetOptions(sel, day){
   const open = sortTasks(S.tasks.filter(t => t.status !== "done"));
-  const tk0 = todayKey(), td = kind => S.todos.filter(t => (t.kind || "") === kind && !t.done).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  // keep the list short: to-dos around this day only (study plan sessions would otherwise add hundreds)
+  const tk0 = day || todayKey(), lo = addDays(tk0, -3), hi = addDays(tk0, 1), selId = (sel || "").split(/:(.*)/s)[1] || "";
+  const td = kind => S.todos.filter(t => (t.kind || "") === kind && (t.id === selId || (!t.done && (!t.date || (t.date >= lo && t.date <= hi))))).sort((a, b) => (a.date || "").localeCompare(b.date || "")).slice(0, 12);
   const asgOpen = S.asg.filter(a => !["submitted", "graded"].includes(a.status)).sort((a, b) => ((a.due || "9999") + (a.time || "")).localeCompare((b.due || "9999") + (b.time || "")));
   const grp = (label, list) => list.length ? [`<optgroup label="${label}">${list.join("")}</optgroup>`] : [];
   const opts = []
     .concat(grp("Work tasks", open.map(t => `<option value="task:${esc(t.id)}">${esc(t.title)}</option>`)))
     .concat(grp("Assignments & tests", asgOpen.map(a => { const p = a.parent && S.asg.find(x => x.id === a.parent); return `<option value="asg:${esc(a.id)}">${esc(subjLabel(a.subj))} · ${p ? esc(p.title) + " › " : ""}${esc(a.title)}${a.due ? " (due " + esc(fmtDate(a.due).replace(/^\w+, /, "")) + ")" : ""}</option>`; })))
     .concat(grp("Study to-dos", td("study").map(t => `<option value="study:${esc(t.id)}">${t.subj ? esc(subjLabel(t.subj)) + " · " : ""}${esc(t.title)}</option>`)))
-    .concat(grp("Self-study", td("self").map(t => `<option value="self:${esc(t.id)}">${t.cat ? esc(catName(t.cat).split(/\s*\/\s*/)[0]) + " · " : ""}${esc(t.title)}</option>`)))
-    .concat(grp("Courses", S.courses.flatMap(c => [`<option value="course:${esc(c.id)}">${esc(c.name)}</option>`, ...(c.modules || []).filter(m => !m.done).slice(0, 8).map(m => `<option value="course:${esc(c.id)}|${esc(m.id)}">${esc(c.name)} › ${esc(m.title)}</option>`)])))
+    .concat(grp("Self-study", td("self").map(t => `<option value="self:${esc(t.id)}">${t.date && t.date !== tk0 ? esc(fmtDate(t.date).replace(/^\w+, /, "")) + " · " : ""}${t.cat ? esc(catName(t.cat).split(/\s*\/\s*/)[0]) + " · " : ""}${esc(t.title.length > 70 ? t.title.slice(0, 68) + "…" : t.title)}</option>`)))
+    .concat(grp("Courses", S.courses.flatMap(c => [`<option value="course:${esc(c.id)}">${esc(c.name)}</option>`, ...(c.modules || []).filter(m => !m.done || ("course:" + c.id + "|" + m.id) === sel).slice(0, 2).map(m => `<option value="course:${esc(c.id)}|${esc(m.id)}">${esc(c.name)} › ${esc(m.title)}</option>`)])))
     .concat(grp("To-dos", td("").filter(t => !t.date || t.date <= addDays(tk0, 1)).map(t => `<option value="todo:${esc(t.id)}">${esc(t.title)}</option>`)));
   let h = opts.join(""); if (sel) h = h.replace(`value="${esc(sel)}"`, `value="${esc(sel)}" selected`); return h;
 }
@@ -1073,23 +1075,27 @@ function renderCourses(){
   renderStudyPlanBox();
   const sums = S.courses.map(courseStats), tw = sums.reduce((a, x) => a + x.week, 0), md = sums.reduce((a, x) => a + x.done, 0), mt = sums.reduce((a, x) => a + x.mods.length, 0);
   $("#co-sum").innerHTML = S.courses.length ? `<span><b>${S.courses.length}</b> course${S.courses.length === 1 ? "" : "s"}</span><span><b>${md}/${mt}</b> modules done</span><span><b>${fmtMins(tw)}</b> this week</span><span><b>${fmtMins(sums.reduce((a, x) => a + x.mins, 0))}</b> total</span>` : "";
-  $("#courses").innerHTML = S.courses.length ? S.courses.slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")).map(c => { const st = courseStats(c);
-    return `<div class="panel course" data-course="${esc(c.id)}">
-      <div class="co-head"><span class="co-ic">${SVG(ICON.book)}</span><div class="co-title"><b>${esc(c.name)}</b><span class="muted small">${st.done}/${st.mods.length} modules${c.target ? ` · target ${esc(fmtDate(c.target))}` : ""}</span></div>
-        <span class="co-btns"><button class="btn sm" type="button" data-cnotes>${SVG(ICON.note)}Notes ${S.snotes.filter(n => n.course === c.id).length || ""}</button><button class="btn sm" type="button" data-logtime="course|${esc(c.id)}|${esc(c.name)}">${SVG(ICON.timer)}Time log</button><button class="btn sm" type="button" data-cfocus="${esc(c.id)}">${SVG(ICON.play)}Study 25m</button></span></div>
-      <div class="co-bar"><span class="bar"><i style="width:${st.pct}%"></i></span><b class="mono-n">${st.pct}%</b></div>
-      <div class="co-stats"><span><b>${fmtMins(st.week)}</b> this week</span><span><b>${fmtMins(st.mins)}</b> total</span><span>${SVG(ICON.flame)}<b>${st.streak}</b> day streak</span></div>
-      ${st.pace ? `<p class="small" style="margin:0">${st.pace}</p>` : ""}
-      ${(() => { const nx = st.mods.find(m => !m.done); return nx ? `<div class="co-next"><span class="small muted">Next up</span><b>${esc(nx.title)}</b><span class="co-next-b"><button type="button" class="btn sm" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(nx.id)}">${SVG(ICON.timer)}Log</button><button type="button" class="btn sm" data-cmod-done="${st.mods.indexOf(nx)}">✓ Done</button></span></div>` : ""; })()}
-      <div class="co-skills"><span class="small muted">Skills:</span>${S.cskEdit === c.id ? `${S.cats.map((k, i) => `<button type="button" class="qc ci-${i % 6}" data-csk="${esc(k.tag)}" aria-pressed="${(c.skills || []).includes(k.tag)}">${esc(k.name.split(/\s*\/\s*/)[0])}</button>`).join("")}<span class="qc-new"><input data-csknew placeholder="New skill" aria-label="New skill"><button type="button" class="qc" data-csknewadd>Add</button></span><button type="button" class="btn sm" data-cskdone>Done</button>`
-        : `${(c.skills || []).map(t => catTag(t)).join("")}<button type="button" class="linkbtn small" data-cskedit>${(c.skills || []).length ? "Edit" : "+ Link skills"}</button>`}</div>
-      <details class="co-mods" data-cid="${esc(c.id)}" ${(S.modOpen[c.id] ?? st.mods.length <= 12) ? "open" : ""}><summary class="small">Modules</summary>
-        ${st.mods.length ? `<ul class="subs">${st.mods.map((m, i) => `<li class="${m.done ? "done" : ""}"><input type="checkbox" data-cmod="${i}" ${m.done ? "checked" : ""} aria-label="Module done: ${esc(m.title)}"><span class="grow">${esc(m.title)}${(() => { const mm = S.time.filter(x => x.type === "course" && x.ref === c.id && x.mod === m.id).reduce((a, x) => a + (+x.mins || 0), 0); return mm ? ` <span class="small muted">· ${fmtMins(mm)}</span>` : ""; })()}</span><button type="button" class="x tl-ed" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(m.id)}" aria-label="Log time for ${esc(m.title)}" title="Log time for this module">${SVG(ICON.timer)}</button><button type="button" class="x" data-cmoddel="${i}" aria-label="Remove module">✕</button></li>`).join("")}</ul>` : `<p class="small muted">No modules yet. Paste them below, one per line.</p>`}
+  const tk = todayKey(), order = c => { const x = courseStats(c); return (x.pct >= 100 ? "1" : "0") + (c.target || "9999"); };
+  $("#courses").innerHTML = S.courses.length ? S.courses.slice().sort((a, b) => order(a).localeCompare(order(b)) || (a.createdAt || "").localeCompare(b.createdAt || "")).map(c => { const st = courseStats(c);
+    const nx = st.mods.find(m => !m.done), todayS = S.todos.filter(t => t.kind === "self" && t.course === c.id && t.date === tk), nextS = todayS.length ? null : S.todos.filter(t => t.kind === "self" && t.course === c.id && !t.done && t.date > tk).sort((a, b) => a.date.localeCompare(b.date))[0];
+    const noteN = S.snotes.filter(n => n.course === c.id).length, late = c.target && st.pct < 100 && c.target < tk;
+    return `<div class="panel course ${st.pct >= 100 ? "is-done" : ""}" data-course="${esc(c.id)}">
+      <div class="co-head"><span class="co-ic">${SVG(ICON.book)}</span><div class="co-title"><b>${esc(c.name)}</b><span class="co-sub">${(c.skills || []).map(t => catTag(t)).join("")}${c.target ? `<span class="small ${late ? "overdue" : "muted"}">${st.pct >= 100 ? "Finished" : "by " + esc(fmtDate(c.target))}</span>` : ""}</span></div>
+        <span class="co-btns"><button class="iconbtn sm" type="button" data-cnotes title="Notes" aria-label="Notes">${SVG(ICON.note)}${noteN ? `<i class="co-badge">${noteN}</i>` : ""}</button><button class="iconbtn sm" type="button" data-logtime="course|${esc(c.id)}|${esc(c.name)}" title="Time log" aria-label="Time log">${SVG(ICON.timer)}</button><button class="btn sm primary" type="button" data-cfocus="${esc(c.id)}">${SVG(ICON.play)}25m</button></span></div>
+      <div class="co-bar"><span class="bar"><i style="width:${st.pct}%"></i></span><span class="small mono-n">${st.done}/${st.mods.length} · ${st.pct}%</span></div>
+      <div class="co-line small"><span><b>${fmtMins(st.week)}</b> this week</span><span><b>${fmtMins(st.mins)}</b> total</span><span class="co-fl">${SVG(ICON.flame)}<b>${st.streak}</b></span>${st.pace ? `<span class="co-pace muted">${st.pace.replace(/<[^>]+>/g, "").replace(/^Need about /, "~").replace(/ to finish by [^·]+/, "")}</span>` : ""}</div>
+      ${todayS.length ? `<ul class="rows co-today">${todayS.map(t => `<li class="${t.done ? "done" : ""}"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="Done: ${esc(t.title)}"><span class="grow"><span class="small muted">Today</span> ${esc(t.title.replace(/^[^:]+:\s*/, ""))}</span></li>`).join("")}</ul>`
+        : nx ? `<div class="co-next"><span class="small muted">${nextS ? "Next session " + esc(fmtDate(nextS.date).replace(/^\w+, /, "")) : "Next up"}</span><b title="${esc(nx.title)}">${esc(nx.title)}</b><span class="co-next-b"><button type="button" class="iconbtn sm" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(nx.id)}" title="Log time" aria-label="Log time">${SVG(ICON.timer)}</button><button type="button" class="btn sm" data-cmod-done="${st.mods.indexOf(nx)}">✓ Done</button></span></div>` : ""}
+      <div class="co-folds">
+      <details class="co-mods" data-cid="${esc(c.id)}" ${S.modOpen[c.id] ? "open" : ""}><summary class="small">Modules <span class="muted">${st.done}/${st.mods.length}</span></summary>
+        ${st.mods.length ? `<ul class="subs">${st.mods.map((m, i) => `<li class="${m.done ? "done" : ""}"><input type="checkbox" data-cmod="${i}" ${m.done ? "checked" : ""} aria-label="Module done: ${esc(m.title)}"><span class="grow">${esc(m.title)}${(() => { const mm = S.time.filter(x => x.type === "course" && x.ref === c.id && x.mod === m.id).reduce((a, x) => a + (+x.mins || 0), 0); return mm ? ` <span class="small muted">· ${fmtMins(mm)}</span>` : ""; })()}</span><button type="button" class="x tl-ed" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(m.id)}" aria-label="Log time for ${esc(m.title)}" title="Log time for this module">${SVG(ICON.timer)}</button><button type="button" class="x" data-cmoddel="${i}" aria-label="Remove module">✕</button></li>`).join("")}</ul>` : `<p class="small muted">No modules yet. Add them under Edit.</p>`}
       </details>
-      <details class="co-more" data-cmore="${esc(c.id)}" ${S.coMore === c.id || !st.mods.length ? "open" : ""}><summary class="small">${st.mods.length ? "Add modules · target date · delete" : "Add modules"}</summary>
-        <textarea class="inp" data-cmodnew rows="3" placeholder="Paste module names, one per line"></textarea>
-        <div class="co-foot"><button class="btn sm primary" type="button" data-cmodadd>Add modules</button><label class="small muted co-tgt">Target date <input type="date" data-ctarget value="${esc(c.target || "")}"></label><button class="btn sm ghost danger" type="button" data-cdel>${courseDel === c.id ? "Tap again to delete" : "Delete course"}</button></div>
-      </details></div>`; }).join("")
+      <details class="co-more" data-cmore="${esc(c.id)}" ${S.coMore === c.id || !st.mods.length ? "open" : ""}><summary class="small">Edit</summary>
+        <div class="co-skills"><span class="small muted">Skills:</span>${S.cskEdit === c.id ? `${S.cats.map((k, i) => `<button type="button" class="qc ci-${i % 6}" data-csk="${esc(k.tag)}" aria-pressed="${(c.skills || []).includes(k.tag)}">${esc(k.name.split(/\s*\/\s*/)[0])}</button>`).join("")}<span class="qc-new"><input data-csknew placeholder="New skill" aria-label="New skill"><button type="button" class="qc" data-csknewadd>Add</button></span><button type="button" class="btn sm" data-cskdone>Done</button>`
+          : `${(c.skills || []).map(t => catTag(t)).join("")}<button type="button" class="linkbtn small" data-cskedit>${(c.skills || []).length ? "Change" : "+ Link skills"}</button>`}</div>
+        <textarea class="inp" data-cmodnew rows="3" placeholder="Add modules: paste names, one per line"></textarea>
+        <div class="co-foot"><button class="btn sm primary" type="button" data-cmodadd>Add modules</button><label class="small muted co-tgt">Target <input type="date" data-ctarget value="${esc(c.target || "")}"></label><button class="btn sm ghost danger" type="button" data-cdel>${courseDel === c.id ? "Tap again to delete" : "Delete course"}</button></div>
+      </details></div></div>`; }).join("")
     : `<div class="panel empty">No courses yet. Add your Google certificate above to track modules, study hours and a streak.</div>`;
 }
 function saveCourse(c){ put("courses", c.id, strip(c)); }
@@ -3088,7 +3094,7 @@ $("#rt-add").onclick=()=>{ put("routine", newId(), {time:"12:00",label:"New item
 // guess the type from the name, e.g. "Brunch" → Meal, "Interns related work" → Work
 function guessKind(l){ const c = routineCat({ label: l, kind: "other" }); return { "Meals": "meal", "Work": "work", "Study & courses": "study", "Exercise & health": "health", "Breaks & rest": "break", "Getting ready": "other" }[c] || "other"; }
 let aoKindTouched = false;
-function aoFillOpts(){ const k = $("#ao-k"), ln = $("#ao-link"); if (k && k.options.length < 2) k.innerHTML = KINDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(""); if (ln) { const cur = ln.value; ln.innerHTML = `<option value="">Not linked</option>` + targetOptions(cur); } }
+function aoFillOpts(){ const k = $("#ao-k"), ln = $("#ao-link"); if (k && k.options.length < 2) k.innerHTML = KINDS.map(([v, l]) => `<option value="${v}">${l}</option>`).join(""); if (ln) { const cur = ln.value; ln.innerHTML = `<option value="">Not linked</option>` + targetOptions(cur, viewKey()); } }
 $("#ao-l").addEventListener("focus", aoFillOpts);
 $("#ao-l").addEventListener("input", () => { if (!aoKindTouched) { aoFillOpts(); $("#ao-k").value = guessKind($("#ao-l").value); } });
 $("#ao-k").addEventListener("change", () => { aoKindTouched = true; });

@@ -1521,6 +1521,40 @@ label.f:has(.dhint){margin-bottom:18px}
   .subtabs .subgroups a.sg{flex:1 1 50%;justify-content:center}
   .sg-sep{display:none}
 }
+
+/* ===== compact course cards ===== */
+.co-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),1fr));gap:14px}
+.course{gap:10px;padding:14px 16px}
+.course.is-done{opacity:.8}
+.co-head{display:flex;gap:10px;align-items:flex-start;flex-wrap:nowrap}
+.co-title{display:grid;gap:4px;min-width:0;flex:1}
+.co-title b{font-size:1rem;line-height:1.25}
+.co-sub{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.co-sub .tag{font-size:.66rem}
+.co-btns{display:inline-flex;gap:4px;flex:none;margin-left:0}
+.co-btns .iconbtn{position:relative;width:32px;height:32px}
+.co-btns .iconbtn svg{width:15px;height:15px;fill:none!important;stroke:currentColor!important}
+.co-badge{position:absolute;top:-4px;right:-4px;font-style:normal;font-size:.6rem;font-weight:700;background:var(--accent);color:#fff;border-radius:99px;padding:0 5px;line-height:15px}
+.co-btns .btn.primary svg{fill:currentColor;stroke:none;width:12px;height:12px}
+.co-bar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.co-line{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--muted)}
+.co-line b{color:var(--ink);font-family:var(--f-mono);font-weight:500}
+.co-fl{display:inline-flex;align-items:center;gap:3px}
+.co-fl svg{width:12px;height:12px;color:var(--high)}
+.co-pace{flex-basis:100%}
+.co-next{padding:8px 10px;gap:2px 8px}
+.co-next b{font-size:.9rem}
+.co-next .iconbtn{width:30px;height:30px}
+.co-next .iconbtn svg{width:14px;height:14px}
+.co-today{margin:0;padding:0;border-radius:10px;background:var(--accent-soft,var(--sunk))}
+.co-today li{padding:7px 10px;border:0}
+.co-folds{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:flex-start;border-top:1px dashed var(--line);padding-top:8px}
+.co-folds details{flex:0 0 auto}
+.co-folds details[open]{flex:1 1 100%}
+.co-folds summary{cursor:pointer;color:var(--muted);font-weight:600}
+.co-mods .subs{max-height:300px;overflow:auto;margin-top:6px}
+.co-more{display:grid;gap:8px}
+@media (max-width:520px){.co-head{flex-wrap:wrap}.co-btns{width:100%;justify-content:flex-end}}
 </style>
 </head>
 <body class="locked">
@@ -2029,6 +2063,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=64"></script>
+<script type="module" src="app.js?v=65"></script>
 </body>
 </html>
