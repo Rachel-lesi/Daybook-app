@@ -922,10 +922,33 @@ function targetOptions(sel, day){
     .concat(grp("Assignments & tests", asgOpen.map(a => { const p = a.parent && S.asg.find(x => x.id === a.parent); return `<option value="asg:${esc(a.id)}">${esc(subjLabel(a.subj))} · ${p ? esc(p.title) + " › " : ""}${esc(a.title)}${a.due ? " (due " + esc(fmtDate(a.due).replace(/^\w+, /, "")) + ")" : ""}</option>`; })))
     .concat(grp("Study to-dos", td("study").map(t => `<option value="study:${esc(t.id)}">${t.subj ? esc(subjLabel(t.subj)) + " · " : ""}${esc(t.title)}</option>`)))
     .concat(grp("Self-study", td("self").map(t => `<option value="self:${esc(t.id)}">${t.date && t.date !== tk0 ? esc(fmtDate(t.date).replace(/^\w+, /, "")) + " · " : ""}${t.cat ? esc(catName(t.cat).split(/\s*\/\s*/)[0]) + " · " : ""}${esc(t.title.length > 70 ? t.title.slice(0, 68) + "…" : t.title)}</option>`)))
-    .concat(grp("Courses", S.courses.flatMap(c => [`<option value="course:${esc(c.id)}">${esc(c.name)}</option>`, ...(c.modules || []).filter(m => !m.done || ("course:" + c.id + "|" + m.id) === sel).slice(0, 2).map(m => `<option value="course:${esc(c.id)}|${esc(m.id)}">${esc(c.name)} › ${esc(m.title)}</option>`)])))
+    .concat(grp("Courses", S.courses.flatMap(c => [`<option value="course:${esc(c.id)}">${esc(c.name)}</option>`, ...(c.modules || []).filter(m => ("course:" + c.id + "|" + m.id) === sel).map(m => modOpt(c, m))])))
     .concat(grp("To-dos", td("").filter(t => !t.date || t.date <= addDays(tk0, 1)).map(t => `<option value="todo:${esc(t.id)}">${esc(t.title)}</option>`)));
   let h = opts.join(""); if (sel) h = h.replace(`value="${esc(sel)}"`, `value="${esc(sel)}" selected`); return h;
 }
+// courses list only names; the module is picked in a small second select beside the link list
+const modOpt = (c, m) => `<option value="course:${esc(c.id)}|${esc(m.id)}">${esc(c.name)} › ${esc(m.title.length > 50 ? m.title.slice(0, 48) + "…" : m.title)}</option>`;
+const TGT_SEL = "#fx-what, #tle-link, #ao-link";
+function modSync(sel){
+  if (!sel || !sel.isConnected) return;
+  let ms = sel.nextElementSibling && sel.nextElementSibling.classList.contains("tgt-mod") ? sel.nextElementSibling : null;
+  const [type, ref0] = (sel.value || "").split(/:(.*)/s), [cid, mid] = (ref0 || "").split("|"), c = type === "course" && S.courses.find(x => x.id === cid);
+  if (!c || !(c.modules || []).length) { if (ms) ms.hidden = true; return; }
+  if (!ms) { ms = document.createElement("select"); ms.className = "tgt-mod"; ms.setAttribute("aria-label", "Module"); sel.after(ms); }
+  const mods = c.modules.filter(m => !m.done || m.id === mid);
+  ms.innerHTML = `<option value="">Whole course</option>` + mods.map(m => `<option value="${esc(m.id)}">${esc(m.title)}</option>`).join("");
+  ms.value = mods.some(m => m.id === mid) ? mid : ""; ms.dataset.cid = c.id; ms.hidden = false;
+}
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.matches && t.matches(TGT_SEL)) { modSync(t); return; }
+  if (t.classList && t.classList.contains("tgt-mod")) { const sel = t.previousElementSibling, c = S.courses.find(x => x.id === t.dataset.cid); if (!sel || !c) return;
+    [...sel.querySelectorAll('option[value^="course:"]')].forEach(o => { if (o.value.includes("|")) o.remove(); });
+    if (!t.value) { sel.value = "course:" + c.id; return; }
+    const m = c.modules.find(x => x.id === t.value), base = sel.querySelector(`option[value="course:${CSS.escape(c.id)}"]`); if (!m || !base) return;
+    base.insertAdjacentHTML("afterend", modOpt(c, m)); sel.value = "course:" + c.id + "|" + m.id; }
+}, true);
+new MutationObserver(() => document.querySelectorAll(TGT_SEL).forEach(sel => { const ms = sel.nextElementSibling, has = ms && ms.classList.contains("tgt-mod"); const want = (sel.value || "").startsWith("course:"); if (want && (!has || ms.hidden || ms.dataset.cid !== sel.value.slice(7).split("|")[0])) modSync(sel); else if (!want && has && !ms.hidden) ms.hidden = true; })).observe(document.documentElement, { childList: true, subtree: true });
 S.focusMins = 25;
 function renderFocus(){
   const box = $("#focusbox"); if (!box) return;
@@ -937,7 +960,7 @@ function renderFocus(){
     return;
   }
   const open = sortTasks(S.tasks.filter(t => t.status !== "done"));
-  const opts = [`<option value="other:">Just focus (no task)</option>`, targetOptions()];
+  const opts = [`<option value="other:">Just focus (no task)</option>`, targetOptions(prevSel && prevSel !== "other:" ? prevSel : "")];
   const today = S.time.filter(x => x.date === todayKey()).reduce((a, x) => a + (+x.mins || 0), 0);
   box.innerHTML = `<div class="fx-set">
     <label class="f" style="flex:1;min-width:0">Focus on<select id="fx-what">${opts.join("")}</select></label>
