@@ -1001,7 +1001,7 @@ document.addEventListener("click", e => {
   renderPlanCal();
 });
 // ---------- 16-week study plan: courses + one self-study to-do per session
-const SP_CAT_NAMES = { python: "Python / Automation", sql: "SQL / Database", data: "Data analysis", dsa: "DSA", ml: "Machine learning" };
+const SP_CAT_NAMES = { python: "Python / Automation", sql: "SQL / Database", excel: "Excel / Reporting", cs: "CS fundamentals", data: "Data analysis", dsa: "DSA", ml: "Machine learning" };
 const spSlug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
 S.spBusy = false; S.spAsk = null;
 const spTodos = () => S.todos.filter(t => t.plan === "sp16");
@@ -1022,14 +1022,18 @@ async function importStudyPlan(){
       cOps.push(["set", id, { ...(ex ? strip(ex) : { createdAt: nowISO() }), name: ex ? ex.name : c.name, target: c.target, modules: mods, skills: [...new Set([...((ex && ex.skills) || []), c.skill])] }]);
     }
     await batchColl("courses", cOps);
-    const have = new Set(spTodos().map(t => t.id)), tOps = [];
+    const V = STUDY_PLAN.v || 1, pre = V > 1 ? "s" + V + "-" : "sp";
+    const stale = spTodos().filter(t => (t.planV || 1) !== V), doneTitles = new Set(stale.filter(t => t.done).map(t => t.title));
+    if (stale.length) await batchColl("todos", stale.filter(t => !t.done).map(t => ["delete", t.id]));
+    const have = new Set(spTodos().filter(t => (t.planV || 1) === V).map(t => t.id)), tOps = [];
     STUDY_PLAN.days.forEach(([date, its]) => its.forEach(([c, mod, task, mins, fin], i) => {
-      const id = "sp" + date.replace(/-/g, "") + "x" + i; if (have.has(id)) return;
+      const id = pre + date.replace(/-/g, "") + "x" + i; if (have.has(id)) return;
+      if (doneTitles.has(`${mod}: ${task} (${fmtMins(mins)})`)) { doneTitles.delete(`${mod}: ${task} (${fmtMins(mins)})`); return; }
       const course = STUDY_PLAN.courses.find(x => x.id === c);
-      tOps.push(["set", id, { title: `${mod}: ${task} (${fmtMins(mins)})`, date, done: false, doneAt: "", createdAt: nowISO(), kind: "self", cat: course ? course.skill : "", course: c ? cid[c] : "", plan: "sp16", mins, ...(c ? { mod: mid[c][mod], finMod: !!fin } : {}) }]);
+      tOps.push(["set", id, { title: `${mod}: ${task} (${fmtMins(mins)})`, date, done: false, doneAt: "", createdAt: nowISO(), kind: "self", cat: course ? course.skill : "", course: c ? cid[c] : "", plan: "sp16", planV: V, mins, ...(c ? { mod: mid[c][mod], finMod: !!fin } : {}) }]);
     }));
     await batchColl("todos", tOps);
-    toast(`Study plan added: ${tOps.length} sessions across ${STUDY_PLAN.courses.length} courses`);
+    toast(stale.length ? `Study plan updated: ${tOps.length} new sessions` : `Study plan added: ${tOps.length} sessions across ${STUDY_PLAN.courses.length} courses`);
   } catch (e) { console.error(e); toast("Couldn't add the plan. Check your connection and try again."); }
   S.spBusy = false; renderStudyPlanBox();
 }
@@ -1052,11 +1056,12 @@ function spTicked(t, on){
 function renderStudyPlanBox(){
   const box = $("#sp-box"); if (!box) return;
   const all = spTodos(), dn = all.filter(t => t.done), tk = todayKey(), behind = all.filter(t => !t.done && t.date < tk).length, total = spTotal();
-  if (!all.length) { box.innerHTML = `<div class="sp-txt"><b>16-week study plan</b><span class="small muted">Adds Python, SQL, pandas, DSA and ML as courses, plus a self-study to-do for each day from 9 Nov to 26 Feb (${total} sessions). Each day's session shows on Today and in the calendar.</span></div><span class="sp-act"><button class="btn sm primary" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>${S.spBusy ? "Adding…" : "Add study plan"}</button></span>`; return; }
+  if (!all.length) { box.innerHTML = `<div class="sp-txt"><b>16-week study plan</b><span class="small muted">Adds SQL, Excel, Python, pandas, DSA, ML and CS knowledge as courses, plus a self-study to-do for each day from 9 Nov to 26 Feb (${total} sessions). Each day's session shows on Today and in the calendar.</span></div><span class="sp-act"><button class="btn sm primary" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>${S.spBusy ? "Adding…" : "Add study plan"}</button></span>`; return; }
+  const outdated = all.some(t => (t.planV || 1) !== (STUDY_PLAN.v || 1) && !t.done);
   const next = all.filter(t => !t.done).sort((a, b) => a.date.localeCompare(b.date))[0];
   box.innerHTML = `<div class="sp-txt"><b>16-week study plan</b><span class="small muted">${dn.length} of ${all.length} sessions done · ${behind ? `<span class="warn-t">${behind} overdue</span>` : `<span class="ok-t">on track</span>`}${next ? ` · next: ${esc(fmtDate(next.date))}` : ""}</span><span class="bar"><i style="width:${Math.round(dn.length / all.length * 100)}%"></i></span></div>
     <span class="sp-act"><a class="btn sm" href="#study-plan">Open calendar</a>${S.spAsk === "rm" ? `<span class="small">Remove ${all.length - dn.length} unfinished sessions?</span><button class="btn sm solid-danger" type="button" data-sp="rm-yes" ${S.spBusy ? "disabled" : ""}>Remove</button><button class="btn sm" type="button" data-sp="cancel">Cancel</button>`
-      : `${all.length < total ? `<button class="btn sm" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>Add missing sessions</button>` : ""}<button class="btn sm ghost danger" type="button" data-sp="rm">Remove plan</button>`}</span>`;
+      : `${outdated ? `<button class="btn sm primary" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>${S.spBusy ? "Updating…" : "Update plan"}</button>` : all.filter(t => (t.planV || 1) === (STUDY_PLAN.v || 1)).length < total && !all.some(t => t.done) ? `<button class="btn sm" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>Add missing sessions</button>` : ""}<button class="btn sm ghost danger" type="button" data-sp="rm">Remove plan</button>`}</span>`;
 }
 document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-sp]"); if (!b) return; const a = b.dataset.sp;
   if (a === "add") importStudyPlan(); else if (a === "rm") { S.spAsk = "rm"; renderStudyPlanBox(); } else if (a === "cancel") { S.spAsk = null; renderStudyPlanBox(); } else if (a === "rm-yes") removeStudyPlan(); });
