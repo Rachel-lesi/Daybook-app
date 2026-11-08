@@ -342,7 +342,9 @@ const VIEWS=["today","work","calendar","overview","growth","study","health","mon
 const NAV = {
   today:    { label: "Today", icon: "sun", subs: [["today", "Today", "today"]] },
   work:     { label: "Work", icon: "work", subs: [["tasks", "Tasks", "work"], ["calendar", "Calendar", "calendar"], ["skills", "Skills", "growth"]] },
-  study:    { label: "Study", icon: "class", subs: [["timetable", "Timetable", "study"], ["plan", "Study plan", "study"], ["calendar", "Calendar", "study"], ["assignments", "Assignments", "study"], ["notes", "Notes", "study"], ["portfolio", "Portfolio", "study"], ["grades", "Grades", "study"], ["courses", "Courses", "growth"]] },
+  study:    { label: "Study", icon: "class", groups: [["school", "School", "class"], ["self", "Self-study", "book"]],
+    subs: [["timetable", "Timetable", "study", "school"], ["calendar", "Calendar", "study", "school"], ["assignments", "Assignments", "study", "school"], ["notes", "Notes", "study", "school"], ["grades", "Grades", "study", "school"], ["portfolio", "Portfolio", "study", "school"],
+           ["plan", "Study plan", "study", "self"], ["courses", "Courses", "growth", "self"], ["selfnotes", "Notes", "study", "self"]] },
   health:   { label: "Health", icon: "health", subs: [["body", "Body", "health"], ["mind", "Mind", "health"], ["cycle", "Cycle", "health"], ["log", "Health log", "health"]] },
   money:    { label: "Money", icon: "wallet", subs: [["expenses", "Expenses", "money"], ["shopping", "Shopping", "money"]] },
   journal:  { label: "Journal", icon: "book", subs: [["reflection", "Reflection", "reflect"], ["archive", "Archive", "reflect"], ["weekly", "Weekly report", "reflect"]] },
@@ -367,9 +369,10 @@ function buildNav(){
 function renderNav(){
   document.querySelectorAll("[data-m]").forEach(a => { if (a.dataset.m === S.main) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current"); });
   $("#settings-btn").classList.toggle("on", S.main === "settings");
-  const subs = NAV[S.main].subs;
+  const N = NAV[S.main], subs = N.subs, cur = subs.find(x => x[0] === S.sub) || subs[0], grp = cur[3];
   $("#subtabs").hidden = subs.length < 2;
-  $("#subtabs").innerHTML = (S.main === "settings" ? `<span class="st-title">Settings</span>` : "") + (subs.length < 2 ? "" : subs.map(([k, l], i) => `<a href="${subHref(S.main, i, k)}" ${k === S.sub ? 'aria-current="page"' : ""}>${l}</a>`).join(""));
+  const groups = N.groups ? `<span class="subgroups" role="group" aria-label="Study area">${N.groups.map(([g, l, ic]) => { const first = subs.findIndex(x => x[3] === g); return `<a href="${subHref(S.main, first, subs[first][0])}" class="sg ${g === grp ? "on" : ""}" ${g === grp ? 'aria-current="true"' : ""}>${SVG(ICON[ic])}${l}</a>`; }).join("")}</span><span class="sg-sep" aria-hidden="true"></span>` : "";
+  $("#subtabs").innerHTML = (S.main === "settings" ? `<span class="st-title">Settings</span>` : "") + groups + (subs.length < 2 ? "" : subs.map(([k, l, , g], i) => !grp || g === grp ? `<a href="${subHref(S.main, i, k)}" ${k === S.sub ? 'aria-current="page"' : ""}>${l}</a>` : "").join(""));
   const open = S.tasks.filter(t => t.status !== "done").length;
   document.querySelectorAll("[data-cwork]").forEach(c => { c.textContent = open; c.hidden = !open; });
 }
@@ -383,6 +386,7 @@ function applyParts(){
 function route(){
   const R = parseRoute(), changed = R.main !== S.main || R.sub !== S.sub;
   S.main = R.main; S.sub = R.sub; S.view = R.view;
+  if (R.main === "study" && (R.sub === "notes" || R.sub === "selfnotes")) { const want = R.sub === "selfnotes" ? "self" : "uni"; if (S.noteSpace !== want) { S.noteSpace = want; if (S.noteSubj && (S.noteSubj.startsWith("c:") ? "self" : "uni") !== want) S.noteSubj = ""; } }
   if (S.view === "work") setMode("work"); else if (S.view === "study") setMode("study"); else if (S.view === "growth") setMode("self"); else if (S.view === "today") setMode("todo");
   renderNav(); applyParts(); render();
   if (changed) window.scrollTo(0, 0);
@@ -1095,7 +1099,7 @@ document.addEventListener("click", e => {
   const card = e.target.closest("[data-course]"); if (!card) return;
   const c = S.courses.find(x => x.id === card.dataset.course); if (!c) return;
   const cdn = e.target.closest("[data-cmod-done]"); if (cdn) { const mods = c.modules.map(m => ({ ...m })), m = mods[+cdn.dataset.cmodDone]; m.done = true; m.doneAt = nowISO(); saveCourse({ ...c, modules: mods }); toast("Module done"); return; }
-  if (e.target.closest("[data-cnotes]")) { S.noteSpace = "self"; S.noteSubj = "c:" + c.id; S.noteEdit = null; location.hash = "#study-notes"; return; }
+  if (e.target.closest("[data-cnotes]")) { S.noteSpace = "self"; S.noteSubj = "c:" + c.id; S.noteEdit = null; location.hash = "#study-selfnotes"; return; }
   if (e.target.closest("[data-cskedit]")) { S.cskEdit = c.id; renderCourses(); return; }
   if (e.target.closest("[data-cskdone]")) { S.cskEdit = null; renderCourses(); return; }
   const sk = e.target.closest("[data-csk]"); if (sk) { const has = (c.skills || []).includes(sk.dataset.csk); saveCourse({ ...c, skills: has ? c.skills.filter(t => t !== sk.dataset.csk) : [...(c.skills || []), sk.dataset.csk] }); return; }
@@ -1366,7 +1370,7 @@ function runSearch(){
   for (const c of S.courses) { const hay = [c.name, ...(c.modules || []).map(m => m.title)].join(" \n "); if (match(hay)) R.push({ g: "Courses", title: c.name, sub: `${(c.modules || []).filter(m => m.done).length}/${(c.modules || []).length} modules`, snip: match(c.name) ? "" : snippet(hay, q), act: `data-sr-view="study-courses"` }); }
   for (const hd of Object.values(S.health)) (hd.moods || []).forEach(m => { const hay = [m.note, ...(m.feel || []), ...(m.why || [])].join(" "); if (m.note && match(hay)) R.push({ g: "Mood notes", title: fmtDate(hd.date) + " · " + MOODS[m.m - 1][1], sub: (m.feel || []).join(", "), snip: snippet(m.note, q), act: `data-sr-view="health-mind"` }); });
   for (const c of S.conds) { const hay = [c.title, c.notes].join(" \n "); if (match(hay)) R.push({ g: "Health", title: c.title, sub: `${fmtDate(c.start)} · ${c.status === "resolved" ? "recovered" : "ongoing"}`, snip: match(c.title) ? "" : snippet(hay, q), act: `data-sr-view="health-log"` }); }
-  for (const n of S.snotes) { const hay = [n.title, n.body, n.url, folderLabel(nKey(n))].join(" \n "); if (match(hay)) R.push({ g: n.course ? "Course notes" : "Study notes", title: n.title, sub: `${folderLabel(nKey(n))} · ${(NOTE_TAGS.find(t => t[0] === n.tag) || ["", "Note"])[1]}`, snip: match(n.title) ? "" : snippet(hay, q), act: `data-sr-view="study-notes"` }); }
+  for (const n of S.snotes) { const hay = [n.title, n.body, n.url, folderLabel(nKey(n))].join(" \n "); if (match(hay)) R.push({ g: n.course ? "Course notes" : "Study notes", title: n.title, sub: `${folderLabel(nKey(n))} · ${(NOTE_TAGS.find(t => t[0] === n.tag) || ["", "Note"])[1]}`, snip: match(n.title) ? "" : snippet(hay, q), act: `data-sr-view="${n.course ? "study-selfnotes" : "study-notes"}"` }); }
   for (const a of S.asg) { const hay = [a.title, a.notes, a.learned, (a.skills || []).join(" "), subjLabel(a.subj), (subj(a.subj) || {}).name].join(" \n "); if (match(hay)) R.push({ g: "Assignments", title: a.title, sub: `${subjLabel(a.subj)} · ${dueText(a)[0]}`, snip: match(a.title) ? "" : snippet(hay, q), act: `data-sr-view="study-assignments"` }); }
   for (const sj of S.subjects) { const hay = [sj.code, sj.name, sj.lecturer].join(" "); if (match(hay)) R.push({ g: "Subjects", title: (sj.code ? sj.code + " · " : "") + sj.name, sub: sj.lecturer || "", act: `data-sr-view="study"` }); }
   for (const x of S.exp) { const hay = [x.note, expCat(x.cat)[1]].join(" "); if (match(hay)) R.push({ g: "Expenses", title: (x.note || expCat(x.cat)[1]) + " · " + money(x.amount), sub: fmtDate(x.date) + " · " + expCat(x.cat)[1], act: `data-sr-view="money"` }); }
@@ -2254,7 +2258,8 @@ function renderNotes(){
   const uni = S.noteSpace === "uni", folders = noteFolders(S.noteSpace), byK = k => S.snotes.filter(n => nKey(n) === k);
   if (S.noteSubj && !noteFolders("uni").concat(noteFolders("self")).some(f => f.k === S.noteSubj)) S.noteSubj = "";
   if (S.noteSubj) S.noteSpace = S.noteSubj.startsWith("c:") ? "self" : "uni";
-  const space = `<div class="seg note-space"><button type="button" data-note-space="uni" aria-pressed="${S.noteSpace === "uni"}">${SVG(ICON.class)}University units <span class="muted">${S.snotes.filter(n => !n.course).length}</span></button><button type="button" data-note-space="self" aria-pressed="${S.noteSpace === "self"}">${SVG(ICON.book)}Self-study courses <span class="muted">${S.snotes.filter(n => n.course).length}</span></button></div>`;
+  $("#notes-h").textContent = S.noteSpace === "self" ? "Course notes" : "Unit notes"; $("#notes-meta").textContent = S.noteSpace === "self" ? "A folder for each self-study course" : "A folder for each university unit";
+  const space = "";
   if (!S.noteSubj) {
     const card = f => { const ns = byK(f.k), last = ns.map(n => n.updatedAt || n.createdAt || "").sort().pop();
       return `<button type="button" class="nfolder" data-note-subj="${esc(f.k)}"><span class="nf-ic ${f.cls}">${SVG(ICON.folder)}</span><span class="nf-t"><b>${esc(f.code)}</b>${f.name ? `<span class="small muted">${esc(f.name)}</span>` : ""}</span><span class="small muted nf-n">${ns.filter(n => n.kind !== "link").length} notes · ${ns.filter(n => n.kind === "link").length} links${last ? `<br>Updated ${esc(fmtDate(isoDay(last)))}` : ""}</span></button>`; };

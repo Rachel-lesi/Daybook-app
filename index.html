@@ -1508,6 +1508,19 @@ label.f:has(.dhint){margin-bottom:18px}
 .sp-txt{display:grid;gap:4px;flex:1 1 260px;min-width:0}
 .sp-txt .bar{max-width:360px}
 .sp-act{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+
+/* ===== Study: School / Self-study groups ===== */
+.subgroups{display:inline-flex;flex:none;padding:3px;border-radius:99px;background:var(--sunk);border:1px solid var(--line);gap:2px}
+.subtabs .subgroups a.sg{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:5px 12px;color:var(--muted)}
+.subtabs .subgroups a.sg svg{width:15px;height:15px}
+.subtabs .subgroups a.sg.on{background:var(--accent);color:#fff;box-shadow:var(--shadow)}
+.sg-sep{flex:none;width:1px;height:22px;background:var(--line);margin:0 2px}
+@media (max-width:640px){
+  .subtabs:has(.subgroups){flex-wrap:wrap;row-gap:6px;overflow:visible}
+  .subgroups{flex:1 1 100%;display:flex}
+  .subtabs .subgroups a.sg{flex:1 1 50%;justify-content:center}
+  .sg-sep{display:none}
+}
 </style>
 </head>
 <body class="locked">
@@ -1803,8 +1816,8 @@ label.f:has(.dhint){margin-bottom:18px}
       <div class="sechead"><h2>Assignments</h2><span class="meta">Assignments, quizzes, projects and exams</span></div>
       <div class="panel hcard" id="st-asg"></div>
     </div>
-    <div data-part="notes" data-wide>
-      <div class="sechead"><h2>Notes & resources</h2><span class="meta">A folder for each unit and course</span></div>
+    <div data-part="notes selfnotes" data-wide>
+      <div class="sechead"><h2 id="notes-h">Notes & resources</h2><span class="meta" id="notes-meta">A folder for each unit and course</span></div>
       <div class="panel hcard" id="st-notes"></div>
     </div>
     <div data-part="portfolio" data-wide>
@@ -2016,6 +2029,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=63"></script>
+<script type="module" src="app.js?v=64"></script>
 </body>
 </html>
