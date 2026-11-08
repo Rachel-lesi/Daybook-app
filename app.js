@@ -342,7 +342,7 @@ const VIEWS=["today","work","calendar","overview","growth","study","health","mon
 const NAV = {
   today:    { label: "Today", icon: "sun", subs: [["today", "Today", "today"]] },
   work:     { label: "Work", icon: "work", subs: [["tasks", "Tasks", "work"], ["calendar", "Calendar", "calendar"], ["skills", "Skills", "growth"]] },
-  study:    { label: "Study", icon: "class", subs: [["timetable", "Timetable", "study"], ["calendar", "Calendar", "study"], ["assignments", "Assignments", "study"], ["notes", "Notes", "study"], ["portfolio", "Portfolio", "study"], ["grades", "Grades", "study"], ["courses", "Courses", "growth"]] },
+  study:    { label: "Study", icon: "class", subs: [["timetable", "Timetable", "study"], ["plan", "Study plan", "study"], ["calendar", "Calendar", "study"], ["assignments", "Assignments", "study"], ["notes", "Notes", "study"], ["portfolio", "Portfolio", "study"], ["grades", "Grades", "study"], ["courses", "Courses", "growth"]] },
   health:   { label: "Health", icon: "health", subs: [["body", "Body", "health"], ["mind", "Mind", "health"], ["cycle", "Cycle", "health"], ["log", "Health log", "health"]] },
   money:    { label: "Money", icon: "wallet", subs: [["expenses", "Expenses", "money"], ["shopping", "Shopping", "money"]] },
   journal:  { label: "Journal", icon: "book", subs: [["reflection", "Reflection", "reflect"], ["archive", "Archive", "reflect"], ["weekly", "Weekly report", "reflect"]] },
@@ -967,6 +967,39 @@ function courseStats(c){
   } else if (mods.length && done === mods.length) pace = `<span class="ok-t">Completed. Well done!</span>`;
   return { mods, done, pct: mods.length ? Math.round(done / mods.length * 100) : 0, mins, week, streak, pace };
 }
+// ---------- Study plan calendar (Study → Study plan): self-study sessions by day
+S.plM = null; S.plSel = null;
+function renderPlanCal(){
+  const box = $("#st-plan"); if (!box) return;
+  const items = S.todos.filter(t => t.kind === "self" && t.date), tk = todayKey();
+  if (!items.length) { box.innerHTML = `<p class="small muted" style="margin:0">No study sessions yet. Add the 16-week plan and every session appears here on its day.</p><div><button class="btn sm primary" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>${S.spBusy ? "Adding…" : "Add study plan"}</button></div>`; return; }
+  const dates = items.map(t => t.date).sort(), lo = dates[0].slice(0, 7), hi = dates[dates.length - 1].slice(0, 7);
+  if (!S.plM) S.plM = tk.slice(0, 7) < lo ? lo : tk.slice(0, 7) > hi ? hi : tk.slice(0, 7);
+  if (!S.plSel) S.plSel = items.some(t => t.date === tk) ? tk : (items.filter(t => t.date >= tk).map(t => t.date).sort()[0] || dates[0]);
+  const [y, m] = S.plM.split("-").map(Number), first = new Date(y, m - 1, 1), n = new Date(y, m, 0).getDate(), lead = (first.getDay() + 6) % 7;
+  const by = {}; items.forEach(t => (by[t.date] = by[t.date] || []).push(t));
+  const short = t => (t.title || "").split(":")[0].replace(/^Kaggle Learn – /, "Kaggle ").replace(/^LeetCode SQL 50 – /, "SQL50 ");
+  let g = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => `<span class="cal-dow">${d.slice(0, 1)}<span class="dow-rest">${d.slice(1)}</span></span>`).join("");
+  for (let i = 0; i < lead; i++) g += `<span></span>`;
+  for (let d = 1; d <= n; d++) {
+    const k = dkey(new Date(y, m - 1, d)), ts = (by[k] || []).sort((a, b) => a.id.localeCompare(b.id)), all = ts.length && ts.every(t => t.done);
+    const late = ts.some(t => !t.done) && k < tk;
+    g += `<button type="button" class="pl-day ${isWeekend(keyDow(k)) ? "is-we" : ""} ${k === tk ? "is-today" : ""} ${k === S.plSel ? "is-sel" : ""} ${late ? "is-late" : ""}" data-plday="${k}" aria-label="${esc(fmtDate(k))}"><span class="pl-n">${d}${all ? ' <span class="ok-t">✓</span>' : ""}</span>${ts.map(t => `<span class="pl-ch cat-${catIdx(t.cat)} ${t.done ? "done" : ""}">${esc(short(t))}</span>`).join("")}</button>`;
+  }
+  const sel = (by[S.plSel] || []).sort((a, b) => a.id.localeCompare(b.id)), mins = sel.reduce((a, t) => a + (+t.mins || 0), 0);
+  const prevOk = S.plM > lo, nextOk = S.plM < hi;
+  box.innerHTML = `<div class="pl-head"><button class="btn sm" type="button" data-plm="-1" ${prevOk ? "" : "disabled"} aria-label="Previous month">‹</button><h2>${esc(first.toLocaleString("en-GB", { month: "long", year: "numeric" }))}</h2><button class="btn sm" type="button" data-plm="1" ${nextOk ? "" : "disabled"} aria-label="Next month">›</button><button class="btn sm ghost" type="button" data-pltoday>Today</button></div>
+    <div class="pl-grid">${g}</div>
+    <div class="pl-detail"><div class="sechead" style="margin:0"><h3>${esc(fmtDate(S.plSel))}${S.plSel === tk ? " · Today" : ""}</h3><span class="meta">${sel.length ? fmtMins(mins) + " planned" : "Nothing planned"}</span></div>
+      ${sel.length ? `<ul class="rows">${sel.map(t => `<li class="${t.done ? "done" : ""}"><input type="checkbox" data-todo="${esc(t.id)}" ${t.done ? "checked" : ""} aria-label="Done: ${esc(t.title)}"><span class="grow"><span>${t.cat ? catTag(t.cat) + " " : ""}${esc(t.title)}</span>${t.finMod ? `<div class="sub ok-t">Finishes this module</div>` : ""}</span><button class="x tl-ed" type="button" data-todoedit="${esc(t.id)}" aria-label="Edit">${SVG(ICON.edit)}</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Rest day, or a holiday.</p>`}</div>`;
+}
+document.addEventListener("click", e => {
+  const t = e.target.closest && e.target.closest("[data-plm],[data-pltoday],[data-plday]"); if (!t) return;
+  if (t.dataset.plm) { const [y, m] = S.plM.split("-").map(Number), d = new Date(y, m - 1 + +t.dataset.plm, 1); S.plM = dkey(d).slice(0, 7); }
+  else if (t.dataset.pltoday !== undefined) { S.plM = null; S.plSel = null; }
+  else S.plSel = t.dataset.plday;
+  renderPlanCal();
+});
 // ---------- 16-week study plan: courses + one self-study to-do per session
 const SP_CAT_NAMES = { python: "Python / Automation", sql: "SQL / Database", data: "Data analysis", dsa: "DSA", ml: "Machine learning" };
 const spSlug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
@@ -1022,7 +1055,7 @@ function renderStudyPlanBox(){
   if (!all.length) { box.innerHTML = `<div class="sp-txt"><b>16-week study plan</b><span class="small muted">Adds Python, SQL, pandas, DSA and ML as courses, plus a self-study to-do for each day from 9 Nov to 26 Feb (${total} sessions). Each day's session shows on Today and in the calendar.</span></div><span class="sp-act"><button class="btn sm primary" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>${S.spBusy ? "Adding…" : "Add study plan"}</button></span>`; return; }
   const next = all.filter(t => !t.done).sort((a, b) => a.date.localeCompare(b.date))[0];
   box.innerHTML = `<div class="sp-txt"><b>16-week study plan</b><span class="small muted">${dn.length} of ${all.length} sessions done · ${behind ? `<span class="warn-t">${behind} overdue</span>` : `<span class="ok-t">on track</span>`}${next ? ` · next: ${esc(fmtDate(next.date))}` : ""}</span><span class="bar"><i style="width:${Math.round(dn.length / all.length * 100)}%"></i></span></div>
-    <span class="sp-act">${S.spAsk === "rm" ? `<span class="small">Remove ${all.length - dn.length} unfinished sessions?</span><button class="btn sm solid-danger" type="button" data-sp="rm-yes" ${S.spBusy ? "disabled" : ""}>Remove</button><button class="btn sm" type="button" data-sp="cancel">Cancel</button>`
+    <span class="sp-act"><a class="btn sm" href="#study-plan">Open calendar</a>${S.spAsk === "rm" ? `<span class="small">Remove ${all.length - dn.length} unfinished sessions?</span><button class="btn sm solid-danger" type="button" data-sp="rm-yes" ${S.spBusy ? "disabled" : ""}>Remove</button><button class="btn sm" type="button" data-sp="cancel">Cancel</button>`
       : `${all.length < total ? `<button class="btn sm" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>Add missing sessions</button>` : ""}<button class="btn sm ghost danger" type="button" data-sp="rm">Remove plan</button>`}</span>`;
 }
 document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-sp]"); if (!b) return; const a = b.dataset.sp;
@@ -2011,7 +2044,7 @@ function renderStudy(){
       ${S.subjects.length > 1 ? `<div class="qa-chips cwrap"><button type="button" class="qc" data-asg-s="" aria-pressed="${!S.asgSubj}">All subjects</button>${S.subjects.map(s => `<button type="button" class="qc ci-${(+s.color || 0) % 6}" data-asg-s="${esc(s.id)}" aria-pressed="${S.asgSubj === s.id}">${esc(s.code || s.name)}</button>`).join("")}</div>` : ""}</div>
     ${list.length ? `<div class="asg-list">${asgGroups(list).map(g => { const td = asgTodos(g.a.id); return g.kids.length || td.length ? `<div class="asg-group">${asgItem(g.a, g.kids)}<div class="asg-kids">${g.kids.map(k => asgItem(k)).join("")}${td.length ? `<ul class="rows asg-todos">${td.map(asgTodoLi).join("")}</ul>` : ""}</div></div>` : asgItem(g.a); }).join("")}</div>`
       : `<div class="empty">${S.asgFilter === "todo" ? "Nothing due. Nice!" : "No assignments here yet."}</div>`}`;
-  renderNotes(); renderPortfolio(); renderStudyCal(); dateHints();
+  renderNotes(); renderPortfolio(); renderStudyCal(); renderPlanCal(); dateHints();
   // ----- grades
   const rows = curSubjects().map(s => { const gr = GRADES.find(g => g[0] === s.grade); const cr = +s.credits || 0;
     const ga = S.asg.filter(a => a.subj === s.id && a.status === "graded" && a.mark !== "" && a.mark != null && +a.weight);
