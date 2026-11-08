@@ -1487,6 +1487,12 @@ label.f:has(.dhint){margin-bottom:18px}
 .ao-link{flex:1 1 100%;display:flex;align-items:center;gap:8px}
 .ao-link select{flex:1 1 auto;width:0}
 @media (max-width:520px){.addonce #ao-l{flex:1 1 140px;width:auto}}
+
+/* ===== 16-week study plan box ===== */
+.sp-box{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 16px;margin-bottom:12px;background:linear-gradient(135deg,var(--hero-a),var(--hero-b))}
+.sp-txt{display:grid;gap:4px;flex:1 1 260px;min-width:0}
+.sp-txt .bar{max-width:360px}
+.sp-act{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 </style>
 </head>
 <body class="locked">
@@ -1738,6 +1744,7 @@ label.f:has(.dhint){margin-bottom:18px}
     <div class="g-col">
       <div data-part="courses" data-wide>
         <div class="sechead"><h2>Courses</h2><span class="meta">Certificates and self-study courses</span></div>
+        <div class="panel sp-box" id="sp-box"></div>
         <div class="co-sum" id="co-sum"></div>
         <form id="course-form" class="panel course-form" autocomplete="off"><input id="course-name" class="inp" placeholder="Course name, e.g. Google Data Analytics Certificate"><label class="small muted cf-date">Target<input type="date" id="course-target" class="inp"></label><button class="btn sm primary" type="submit">Add course</button></form>
         <div id="courses" class="co-grid"></div>
@@ -1990,6 +1997,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=59"></script>
+<script type="module" src="app.js?v=60"></script>
 </body>
 </html>

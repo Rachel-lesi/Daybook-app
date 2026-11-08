@@ -7,6 +7,7 @@ import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/
 import * as CFG from "./firebase-config.js";
 const firebaseConfig = CFG.firebaseConfig;
 import { SEED } from "./seed.js";
+import { STUDY_PLAN } from "./study-plan.js";
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -966,7 +967,68 @@ function courseStats(c){
   } else if (mods.length && done === mods.length) pace = `<span class="ok-t">Completed. Well done!</span>`;
   return { mods, done, pct: mods.length ? Math.round(done / mods.length * 100) : 0, mins, week, streak, pace };
 }
+// ---------- 16-week study plan: courses + one self-study to-do per session
+const SP_CAT_NAMES = { python: "Python / Automation", sql: "SQL / Database", data: "Data analysis", dsa: "DSA", ml: "Machine learning" };
+const spSlug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+S.spBusy = false; S.spAsk = null;
+const spTodos = () => S.todos.filter(t => t.plan === "sp16");
+const spTotal = () => STUDY_PLAN.days.reduce((a, d) => a + d[1].length, 0);
+function spCourseId(c){ const ex = S.courses.find(x => (x.name || "").trim().toLowerCase() === c.name.toLowerCase()); return ex ? ex.id : "sp-" + c.id; }
+async function importStudyPlan(){
+  if (!db) { toast("Sign in first to add the study plan"); return; }
+  S.spBusy = true; renderStudyPlanBox();
+  try {
+    let catsChanged = false;
+    for (const c of STUDY_PLAN.courses) if (!S.cats.find(k => k.tag === c.skill)) { S.cats.push({ name: SP_CAT_NAMES[c.skill], tag: c.skill }); catsChanged = true; }
+    if (catsChanged) saveCats();
+    const cOps = [], cid = {}, mid = {};
+    for (const c of STUDY_PLAN.courses) {
+      const id = spCourseId(c), ex = S.courses.find(x => x.id === id), mods = ((ex && ex.modules) || []).map(m => ({ ...m }));
+      cid[c.id] = id; mid[c.id] = {};
+      c.modules.forEach(title => { let m = mods.find(x => (x.title || "").trim().toLowerCase() === title.toLowerCase()); if (!m) { m = { id: "m-" + spSlug(title), title, done: false }; mods.push(m); } mid[c.id][title] = m.id; });
+      cOps.push(["set", id, { ...(ex ? strip(ex) : { createdAt: nowISO() }), name: ex ? ex.name : c.name, target: c.target, modules: mods, skills: [...new Set([...((ex && ex.skills) || []), c.skill])] }]);
+    }
+    await batchColl("courses", cOps);
+    const have = new Set(spTodos().map(t => t.id)), tOps = [];
+    STUDY_PLAN.days.forEach(([date, its]) => its.forEach(([c, mod, task, mins, fin], i) => {
+      const id = "sp" + date.replace(/-/g, "") + "x" + i; if (have.has(id)) return;
+      const course = STUDY_PLAN.courses.find(x => x.id === c);
+      tOps.push(["set", id, { title: `${mod}: ${task} (${fmtMins(mins)})`, date, done: false, doneAt: "", createdAt: nowISO(), kind: "self", cat: course ? course.skill : "", course: c ? cid[c] : "", plan: "sp16", mins, ...(c ? { mod: mid[c][mod], finMod: !!fin } : {}) }]);
+    }));
+    await batchColl("todos", tOps);
+    toast(`Study plan added: ${tOps.length} sessions across ${STUDY_PLAN.courses.length} courses`);
+  } catch (e) { console.error(e); toast("Couldn't add the plan. Check your connection and try again."); }
+  S.spBusy = false; renderStudyPlanBox();
+}
+async function removeStudyPlan(){
+  const left = spTodos().filter(t => !t.done);
+  S.spBusy = true; renderStudyPlanBox();
+  try { await batchColl("todos", left.map(t => ["delete", t.id])); toast(`Removed ${left.length} unfinished sessions. Courses and finished sessions stay.`); }
+  catch (e) { console.error(e); toast("Couldn't remove the plan. Check your connection and try again."); }
+  S.spBusy = false; S.spAsk = null; renderStudyPlanBox();
+}
+// ticking a plan session logs its planned time to the course, and ticks the module when it is the session that finishes it
+function spTicked(t, on){
+  const tid = "sp-" + t.id, has = S.time.some(x => x.id === tid);
+  if (on && t.mins && !has) { const end = new Date(), start = new Date(end.getTime() - t.mins * 60000);
+    saveTimeRec(tid, { start: start.toISOString(), end: end.toISOString(), mins: t.mins, date: todayKey(), type: t.course ? "course" : "self", ref: t.course || t.id, label: t.title, via: "manual", ...(t.mod ? { mod: t.mod } : {}) }); }
+  else if (!on && has) delTimeRec(tid);
+  if (on && t.finMod && t.course && t.mod) { const c = S.courses.find(x => x.id === t.course), m = c && (c.modules || []).find(x => x.id === t.mod);
+    if (m && !m.done) { saveCourse({ ...c, modules: c.modules.map(x => x.id === t.mod ? { ...x, done: true, doneAt: nowISO() } : x) }); toast("Module done: " + m.title); } }
+}
+function renderStudyPlanBox(){
+  const box = $("#sp-box"); if (!box) return;
+  const all = spTodos(), dn = all.filter(t => t.done), tk = todayKey(), behind = all.filter(t => !t.done && t.date < tk).length, total = spTotal();
+  if (!all.length) { box.innerHTML = `<div class="sp-txt"><b>16-week study plan</b><span class="small muted">Adds Python, SQL, pandas, DSA and ML as courses, plus a self-study to-do for each day from 9 Nov to 26 Feb (${total} sessions). Each day's session shows on Today and in the calendar.</span></div><span class="sp-act"><button class="btn sm primary" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>${S.spBusy ? "Adding…" : "Add study plan"}</button></span>`; return; }
+  const next = all.filter(t => !t.done).sort((a, b) => a.date.localeCompare(b.date))[0];
+  box.innerHTML = `<div class="sp-txt"><b>16-week study plan</b><span class="small muted">${dn.length} of ${all.length} sessions done · ${behind ? `<span class="warn-t">${behind} overdue</span>` : `<span class="ok-t">on track</span>`}${next ? ` · next: ${esc(fmtDate(next.date))}` : ""}</span><span class="bar"><i style="width:${Math.round(dn.length / all.length * 100)}%"></i></span></div>
+    <span class="sp-act">${S.spAsk === "rm" ? `<span class="small">Remove ${all.length - dn.length} unfinished sessions?</span><button class="btn sm solid-danger" type="button" data-sp="rm-yes" ${S.spBusy ? "disabled" : ""}>Remove</button><button class="btn sm" type="button" data-sp="cancel">Cancel</button>`
+      : `${all.length < total ? `<button class="btn sm" type="button" data-sp="add" ${S.spBusy ? "disabled" : ""}>Add missing sessions</button>` : ""}<button class="btn sm ghost danger" type="button" data-sp="rm">Remove plan</button>`}</span>`;
+}
+document.addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-sp]"); if (!b) return; const a = b.dataset.sp;
+  if (a === "add") importStudyPlan(); else if (a === "rm") { S.spAsk = "rm"; renderStudyPlanBox(); } else if (a === "cancel") { S.spAsk = null; renderStudyPlanBox(); } else if (a === "rm-yes") removeStudyPlan(); });
 function renderCourses(){
+  renderStudyPlanBox();
   const sums = S.courses.map(courseStats), tw = sums.reduce((a, x) => a + x.week, 0), md = sums.reduce((a, x) => a + x.done, 0), mt = sums.reduce((a, x) => a + x.mods.length, 0);
   $("#co-sum").innerHTML = S.courses.length ? `<span><b>${S.courses.length}</b> course${S.courses.length === 1 ? "" : "s"}</span><span><b>${md}/${mt}</b> modules done</span><span><b>${fmtMins(tw)}</b> this week</span><span><b>${fmtMins(sums.reduce((a, x) => a + x.mins, 0))}</b> total</span>` : "";
   $("#courses").innerHTML = S.courses.length ? S.courses.slice().sort((a, b) => (a.createdAt || "").localeCompare(b.createdAt || "")).map(c => { const st = courseStats(c);
@@ -3016,7 +3078,7 @@ document.addEventListener("change", e=>{
     if(ck.checked) cur[ck.dataset.check]= k<todayKey() && r ? r.time : fmtTime(nowISO()); else delete cur[ck.dataset.check];
     saveDay(k, {...dd, done:cur}); }
   const td=e.target.closest("[data-todo]");
-  if(td){ const t=S.todos.find(x=>x.id===td.dataset.todo); if(t){ put("todos", t.id, {...strip(t), done:td.checked, doneAt: td.checked?nowISO():""}); } }
+  if(td){ const t=S.todos.find(x=>x.id===td.dataset.todo); if(t){ put("todos", t.id, {...strip(t), done:td.checked, doneAt: td.checked?nowISO():""}); if(t.plan==="sp16") spTicked(t, td.checked); } }
 });
 setInterval(()=>{ if(S.view==="today" && !document.querySelector("dialog[open]")) renderToday(); }, 60000);
 
