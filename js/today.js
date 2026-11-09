@@ -499,15 +499,16 @@ function renderToday() {
     const st = S.todos
         .filter((t) => t.kind === "self" && !t.done)
         .sort((a, b) => (a.date || "").localeCompare(b.date || "")),
-      now = st.filter((t) => !t.date || t.date <= hub.addDays(tk, 1)),
+      now = st.filter((t) => !t.date || t.date <= tk),
+      nextDate = (st.find((t) => t.date > tk) || {}).date,
       lat = st.length - now.length,
       cs = S.courses.filter((c) => hub.courseStats(c).pct < 100);
     $("#today-self-wrap").hidden = !st.length && !S.courses.length;
     $("#today-self").innerHTML =
       (now.length
         ? `<ul class="rows st-todos">${now.map(row).join("")}</ul>`
-        : `<p class="small muted" style="margin:0">${st.length ? "" : "Nothing planned. Add one with the box above: choose <b>Self-study / skills</b>."}</p>`) +
-      (lat ? `<p class="small muted" style="margin:4px 0 0">${lat} more planned later</p>` : "") +
+        : `<p class="small muted" style="margin:0">${st.length ? "Nothing planned for today." : "Nothing planned. Add one with the box above: choose <b>Self-study / skills</b>."}</p>`) +
+      (lat ? `<p class="small muted" style="margin:4px 0 0">${lat} more planned${nextDate ? ` · next on ${esc(fmtDate(nextDate))}` : ""} · <a href="#study-plan">see plan</a></p>` : "") +
       (cs.length
         ? `<ul class="co-mini">${cs
             .slice(0, 3)

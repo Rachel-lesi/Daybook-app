@@ -522,3 +522,32 @@ dialog:focus{outline:none}
   .sc-dues .sd-t{display:none}
   .sc-ev .ev-t{font-size:.66rem}
 }
+
+/* ===== Today layout: greeting + focus timer on top, routine and done on the left, lists on the right ===== */
+.t-top{display:grid;gap:22px;min-width:0}
+.t-top > *{min-width:0}
+.t-focus{display:grid;gap:0;align-content:start}
+.t-focus .focusbox{height:100%;box-sizing:border-box;align-content:center}
+.rt-head{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap;margin-bottom:10px}
+.rt-head .sechead{margin:0;gap:10px;justify-content:flex-start}
+.rt-head .pager{margin:0;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px}
+.rt-head .pager .btn{border:0;background:transparent;box-shadow:none;min-width:30px}
+.rt-head .pager .mid{display:flex;align-items:baseline;gap:6px;padding:0 4px;font-size:.92rem}
+.rt-head .pager .mid small{display:inline;font-size:.8rem}
+.t-self .co-mini{margin-top:6px}
+@media (min-width:1000px){
+  #v-today{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);column-gap:28px;row-gap:24px;align-items:start}
+  #v-today > .t-top{grid-column:1 / -1;grid-template-columns:minmax(0,1.6fr) minmax(320px,1fr);align-items:stretch}
+  .t-focus .sechead{display:none}
+  .t-focus .focusbox{border-radius:18px}
+}
+@media (max-width:999px){
+  /* phone and tablet: greeting, to-do, routine, then the rest */
+  #v-today{display:flex;flex-direction:column;gap:22px}
+  #v-today .t-top,#v-today .t-main,#v-today .t-side{display:contents}
+  .t-top > .now{order:1} .t-todo{order:2} .t-routine{order:3} .t-work{order:4} .t-study{order:5} .t-self{order:6} .t-focus{order:7} .t-done{order:8}
+}
+.t-focus{display:flex;flex-direction:column}
+.t-focus .focusbox{flex:1}
+.t-self .small a,.t-study .small a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+@media (max-width:560px){.fx-set > label.f{flex:1 1 100% !important} .fx-set #fx-len{flex:1} .fx-set #fx-len button{flex:1}}
