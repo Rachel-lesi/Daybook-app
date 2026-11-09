@@ -56,6 +56,7 @@ import * as CFG from "../firebase-config.js";
 const firebaseConfig = CFG.firebaseConfig;
 import { SEED } from "../seed.js";
 import { STUDY_PLAN } from "../study-plan.js";
+import { sceneSVG } from "./scenes.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) =>
@@ -679,9 +680,19 @@ function renderPalettes() {
       `<button type="button" class="pal" data-pal="${id}" aria-pressed="${S.palette === id}"><span class="pal-sw">${sw.map((c) => `<i style="background:${c}"></i>`).join("")}</span>${esc(name)}</button>`,
   ).join("");
 }
+// the header banner scene follows the theme; Nature uses the foggy mountains already in index.html
+const NATURE_SCENE = document.querySelector("#hbanner .scene")?.outerHTML || "";
+function applyScene(p) {
+  const old = document.querySelector("#hbanner .scene");
+  if (!old || old.classList.contains("scene-" + p) || (p === "nature" && !old.className.baseVal.includes("scene-"))) return;
+  const html = sceneSVG(p, PAL[p][2]) || NATURE_SCENE;
+  old.insertAdjacentHTML("beforebegin", html);
+  old.remove();
+}
 function applyPalette(p) {
   p = PAL[p] ? p : "nature";
   S.palette = p;
+  applyScene(p);
   if (p === "nature") delete document.documentElement.dataset.palette;
   else document.documentElement.dataset.palette = p;
   try {

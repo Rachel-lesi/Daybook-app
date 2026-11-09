@@ -108,3 +108,10 @@ ol.timeline li.next{background:var(--pink-soft)}
 mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 .sp-bar i{background:linear-gradient(90deg,var(--accent),var(--pink))}
 .wk-doc h2{color:var(--accent)}
+/* themed banner scenes: soft shade on the left keeps the name readable, darker at night */
+.scene-shade{fill:transparent}
+.hbanner .scene:not(.scene-nature) .scene-shade{fill:rgba(0,0,0,.18)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .hbanner .scene .scene-shade{fill:rgba(0,0,0,.42)}}
+:root[data-theme="dark"] .hbanner .scene .scene-shade{fill:rgba(0,0,0,.42)}
+.hbanner::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(0,0,0,.28),transparent 38%)}
+.hb-in{z-index:1}
