@@ -1313,7 +1313,7 @@ function reportHTML(forFile){
   const body = reportSections(W).map(([h, items]) => `<h2>${esc(h)}</h2>${items.length ? `<ul>${items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="none">None</p>`}`).join("");
   const head = `<h1>${esc(reportTitle(W))}</h1>${S.name || S.org ? `<p class="who">${esc([S.name, S.org].filter(Boolean).join(" · "))}</p>` : ""}`;
   if (!forFile) return head + body;
-  return `<html><head><meta charset="utf-8"><title>${esc(reportTitle(W))}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#465c47;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
+  return `<html><head><meta charset="utf-8"><title>${esc(reportTitle(W))}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#6b2717;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
 }
 // ---------- saved weekly reports: kept, organised by year, month and week
 S.reports = {}; S.wkMode = "live"; S.repMonth = null; S.repDel = null; S.repAutoDone = false;
@@ -1332,7 +1332,7 @@ function repHTMLFrom(R, forFile){
   const body = R.sections.map(([h, items]) => `<h2>${esc(h)}</h2>${items.length ? `<ul>${items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="none">None</p>`}`).join("") + ((R.note || "").trim() ? `<h2>Notes</h2><p>${esc(R.note.trim()).replace(/\n/g, "<br>")}</p>` : "");
   const head = `<h1>${esc(R.title)}</h1>${R.name || R.org ? `<p class="who">${esc([R.name, R.org].filter(Boolean).join(" · "))}</p>` : ""}`;
   if (!forFile) return head + body;
-  return `<html><head><meta charset="utf-8"><title>${esc(R.title)}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#465c47;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
+  return `<html><head><meta charset="utf-8"><title>${esc(R.title)}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#6b2717;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
 }
 function repTextFrom(R){ const L = [R.title]; if (R.name) L.push(R.name); if (R.org) L.push(R.org); for (const [h, items] of R.sections) { L.push("", h.toUpperCase()); L.push(...(items.length ? items.map(x => "- " + x) : ["- None"])); } if ((R.note || "").trim()) L.push("", "NOTES", R.note.trim()); return L.join("\n"); }
 function renderSavedReports(){
@@ -1607,7 +1607,7 @@ function exportHTML(a, b, layout){
   if (!D.length) body = `<p class="none">Nothing recorded in this range.</p>`;
   return { title: `${title} ${a}${a === b ? "" : " to " + b}`, html: head + body };
 }
-const EXPORT_CSS = `body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.45;color:#1e2a1f}h1{font-size:20pt;margin:0 0 2pt;color:#465c47}.who{color:#555;margin:0 0 10pt}h2.xw{font-size:12pt;color:#465c47;border-bottom:1.5px solid #facbc6;padding-bottom:2pt;margin:16pt 0 6pt}h3{font-size:11.5pt;margin:10pt 0 3pt}.xm{font-weight:normal;color:#8c4a43;font-size:9.5pt}.xf{margin:2pt 0}ul{margin:2pt 0 4pt;padding-left:16pt}li{margin:1pt 0}.none{color:#888}.xd{page-break-inside:avoid}`;
+const EXPORT_CSS = `body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.45;color:#2e1d12}h1{font-size:20pt;margin:0 0 2pt;color:#6b2717}.who{color:#555;margin:0 0 10pt}h2.xw{font-size:12pt;color:#6b2717;border-bottom:1.5px solid #cc9e4c;padding-bottom:2pt;margin:16pt 0 6pt}h3{font-size:11.5pt;margin:10pt 0 3pt}.xm{font-weight:normal;color:#8a6a2a;font-size:9.5pt}.xf{margin:2pt 0}ul{margin:2pt 0 4pt;padding-left:16pt}li{margin:1pt 0}.none{color:#888}.xd{page-break-inside:avoid}`;
 $("#x-kind").addEventListener("change", () => { const k = $("#x-kind").value; if (k !== "custom") { const [a, b] = exportRange(k, $("#x-from").value || rDate); $("#x-from").value = a; $("#x-to").value = b; } updateExportCount(); });
 ["#x-from", "#x-to", "#x-layout"].forEach(s => $(s).addEventListener("change", () => { if (s !== "#x-layout") $("#x-kind").value = "custom"; updateExportCount(); }));
 $("#x-cancel").addEventListener("click", () => $("#xdlg").close());
@@ -1791,7 +1791,7 @@ const MOODS = [[1,"Awful"],[2,"Low"],[3,"Okay"],[4,"Good"],[5,"Great"]];
 const FEELS = ["Happy","Calm","Grateful","Proud","Motivated","Excited","Tired","Stressed","Anxious","Overwhelmed","Sad","Lonely","Frustrated","Angry","Bored","Unmotivated"];
 const WHYS = ["Work","Study","Family","Friends","Relationship","Health","Sleep","Money","Food","Exercise","Weather","Social media","Me-time"];
 S.moodDraft = { m: 0, feel: [], why: [], stress: 0 };
-const moodColor = m => ["", "var(--crit)", "#e0857b", "var(--med)", "var(--c1)", "var(--ok)"][Math.round(m)] || "var(--line)";
+const moodColor = m => ["", "var(--crit)", "var(--warm)", "var(--med)", "var(--c1)", "var(--ok)"][Math.round(m)] || "var(--line)";
 function moodFace(m){ // simple drawn faces, no emoji
   const mouth = { 1: "M8 16.5c2.2-2.4 5.8-2.4 8 0", 2: "M8.5 16c2-1.3 5-1.3 7 0", 3: "M8.5 15.5h7", 4: "M8.5 14.5c2 1.6 5 1.6 7 0", 5: "M8 14c2.2 2.8 5.8 2.8 8 0" }[m];
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/><path d="${mouth}"/></svg>`;
@@ -2610,7 +2610,7 @@ function evListHtml(cat, evs, week){
   return `<b>${esc(cat)}</b><ul>${evs.map(e => `<li><span>${esc(e.label)}</span><span class="muted">${fmt12(hm(e.a))}–${fmt12(hm(e.b % 1440))} · ${fmtHM(e.b - e.a)}</span></li>`).join("")}</ul>`;
 }
 function timeOfDay(k){ const seg = {}; dayTimeline(k).forEach(c => { if (c) seg[c] = (seg[c] || 0) + 1; }); return seg; }
-const TV_FIXED = { "Sleep": "#4a6fa5", "Work": "#465c47", "Study & courses": "#86659f", "Classes": "#3f8789", "Meals": "#d08a3e", "Exercise & health": "#c0646f", "Travel": "#8a8f5a", "Chores & errands": "#a07a5a", "Leisure & screen time": "#e0a1b0", "Breaks & rest": "#9bb3a0", "Getting ready": "#b7a8d6", "Focus sessions": "#c9a227", "Personal to-dos": "#7c9cbf", "Not tracked": "var(--line)" };
+const TV_FIXED = { "Sleep": "#7f96a0", "Work": "#6b2717", "Study & courses": "#c9963f", "Classes": "#3f8789", "Meals": "#d08a3e", "Exercise & health": "#c0646f", "Travel": "#8a8f5a", "Chores & errands": "#a07a5a", "Leisure & screen time": "#e0a1b0", "Breaks & rest": "#9bb3a0", "Getting ready": "#b7a8d6", "Focus sessions": "#8a6a2a", "Personal to-dos": "#7c9cbf", "Not tracked": "var(--line)" };
 const TV_EXTRA = ["#6f8fb8", "#b88b6f", "#7a9e7e", "#a678a0", "#c7a35b", "#5f9ea0"];
 function tvColor(n){ if (TV_FIXED[n]) return TV_FIXED[n]; let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return TV_EXTRA[h % TV_EXTRA.length]; }
 function pieSvg(items, center, sub, workNames){
