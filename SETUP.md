@@ -31,7 +31,7 @@ Open `firebase-config.js` in Notepad. Replace the six `PASTE…` values with the
 
 ## 5. Put the app online with GitHub Pages
 1. Go to https://github.com/new. Repository name: `daybook`. Choose **Public**. Click **Create repository**.
-2. Click **uploading an existing file**. Drag in **all the files from this folder** (not the folder itself). Click **Commit changes**.
+2. Click **uploading an existing file**. Drag in **all the files and the `css` and `js` folders from this folder** (not the outer folder itself). Click **Commit changes**.
 3. Go to **Settings → Pages**. Under "Branch", choose **main** and **/(root)**, then **Save**.
 4. After about a minute, your app is at `https://YOUR-GITHUB-NAME.github.io/daybook/`.
 
