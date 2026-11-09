@@ -138,7 +138,7 @@ const strip = o => { const c={...o}; delete c.id; return c; };
 
 // ---------- categories
 const DEFAULT_CATS = [{name:"SQL / Database",tag:"sql"},{name:"Excel / Reporting",tag:"excel"},{name:"Python / Automation",tag:"python"},{name:"Admin / Documentation",tag:"admin"}];
-function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false, cur:S.cur||"RM", budget:S.budget||0, shopHist:S.shopHist||[], semStart:S.semStart||"", semWeeks:S.semWeeks||14, prevCgpa:S.prevCgpa||"", prevCredits:S.prevCredits||"", curSem:S.curSem||"", semBreaks:S.semBreaks||[], palette:S.palette||"autumn"})); }
+function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false, cur:S.cur||"RM", budget:S.budget||0, shopHist:S.shopHist||[], semStart:S.semStart||"", semWeeks:S.semWeeks||14, prevCgpa:S.prevCgpa||"", prevCredits:S.prevCredits||"", curSem:S.curSem||"", semBreaks:S.semBreaks||[]})); }
 
 // ---------- look & feel helpers
 const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -206,14 +206,6 @@ const THEMES = ["auto","light","dark"];
 function applyTheme(t){ if(t==="auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme=t;
   const b=$("#theme"); if(b){ b.innerHTML=SVG(ICON[t==="auto"?"auto":t==="light"?"sun":"moon"]); b.setAttribute("aria-label","Theme: "+(t==="auto"?"match device":t)); b.title="Theme: "+(t==="auto"?"match device":t); } }
 let THEME="auto"; try{ THEME=localStorage.getItem("daybook-theme")||"auto"; }catch{}
-const PAL_META = { autumn: ["#f6efe4", "#221811"], meadow: ["#f3f5ea", "#162019"] };
-function applyPalette(p){ p = PAL_META[p] ? p : "autumn"; S.palette = p; if (p === "autumn") delete document.documentElement.dataset.palette; else document.documentElement.dataset.palette = p;
-  try{ localStorage.setItem("daybook-palette", p); }catch{}
-  document.querySelectorAll('meta[name="theme-color"]').forEach((m, i) => m.setAttribute("content", PAL_META[p][i] || PAL_META[p][0]));
-  document.querySelectorAll('img[src*="icon-"]').forEach(im => { const s = im.getAttribute("src"), n = p === "meadow" ? s.replace(/icon-(meadow-)?/, "icon-meadow-") : s.replace("icon-meadow-", "icon-"); if (n !== s) im.setAttribute("src", n); });
-  document.querySelectorAll("[data-pal]").forEach(b => b.setAttribute("aria-pressed", b.dataset.pal === p)); }
-try{ applyPalette(localStorage.getItem("daybook-palette") || "autumn"); }catch{ applyPalette("autumn"); }
-document.addEventListener("click", e => { const b = e.target.closest("[data-pal]"); if (!b) return; applyPalette(b.dataset.pal); saveCats(); toast(b.dataset.pal === "meadow" ? "Theme: Spring meadow" : "Theme: Autumn"); });
 applyTheme(THEME);
 $("#theme").addEventListener("click", ()=>{ THEME=THEMES[(THEMES.indexOf(THEME)+1)%3]; try{ localStorage.setItem("daybook-theme",THEME); }catch{} applyTheme(THEME); toast(THEME==="auto"?"Theme: matches your device":THEME==="light"?"Theme: light":"Theme: dark"); });
 function catByTag(t){ t=t.toLowerCase(); return S.cats.find(c=>c.tag===t) || S.cats.find(c=>c.tag.startsWith(t)) || S.cats.find(c=>c.name.toLowerCase().includes(t)); }
@@ -1321,7 +1313,7 @@ function reportHTML(forFile){
   const body = reportSections(W).map(([h, items]) => `<h2>${esc(h)}</h2>${items.length ? `<ul>${items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="none">None</p>`}`).join("");
   const head = `<h1>${esc(reportTitle(W))}</h1>${S.name || S.org ? `<p class="who">${esc([S.name, S.org].filter(Boolean).join(" · "))}</p>` : ""}`;
   if (!forFile) return head + body;
-  return `<html><head><meta charset="utf-8"><title>${esc(reportTitle(W))}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#6b2717;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
+  return `<html><head><meta charset="utf-8"><title>${esc(reportTitle(W))}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#243c2c;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
 }
 // ---------- saved weekly reports: kept, organised by year, month and week
 S.reports = {}; S.wkMode = "live"; S.repMonth = null; S.repDel = null; S.repAutoDone = false;
@@ -1340,7 +1332,7 @@ function repHTMLFrom(R, forFile){
   const body = R.sections.map(([h, items]) => `<h2>${esc(h)}</h2>${items.length ? `<ul>${items.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<p class="none">None</p>`}`).join("") + ((R.note || "").trim() ? `<h2>Notes</h2><p>${esc(R.note.trim()).replace(/\n/g, "<br>")}</p>` : "");
   const head = `<h1>${esc(R.title)}</h1>${R.name || R.org ? `<p class="who">${esc([R.name, R.org].filter(Boolean).join(" · "))}</p>` : ""}`;
   if (!forFile) return head + body;
-  return `<html><head><meta charset="utf-8"><title>${esc(R.title)}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#6b2717;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
+  return `<html><head><meta charset="utf-8"><title>${esc(R.title)}</title><style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;color:#111}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt;color:#243c2c;border-bottom:1px solid #ccd;padding-bottom:2pt}.who{color:#555;margin:0 0 8pt}ul{margin:0;padding-left:18pt}li{margin:2pt 0}.none{color:#888;margin:0}</style></head><body>${head}${body}</body></html>`;
 }
 function repTextFrom(R){ const L = [R.title]; if (R.name) L.push(R.name); if (R.org) L.push(R.org); for (const [h, items] of R.sections) { L.push("", h.toUpperCase()); L.push(...(items.length ? items.map(x => "- " + x) : ["- None"])); } if ((R.note || "").trim()) L.push("", "NOTES", R.note.trim()); return L.join("\n"); }
 function renderSavedReports(){
@@ -1615,7 +1607,7 @@ function exportHTML(a, b, layout){
   if (!D.length) body = `<p class="none">Nothing recorded in this range.</p>`;
   return { title: `${title} ${a}${a === b ? "" : " to " + b}`, html: head + body };
 }
-const EXPORT_CSS = `body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.45;color:#2e1d12}h1{font-size:20pt;margin:0 0 2pt;color:#6b2717}.who{color:#555;margin:0 0 10pt}h2.xw{font-size:12pt;color:#6b2717;border-bottom:1.5px solid #cc9e4c;padding-bottom:2pt;margin:16pt 0 6pt}h3{font-size:11.5pt;margin:10pt 0 3pt}.xm{font-weight:normal;color:#8a6a2a;font-size:9.5pt}.xf{margin:2pt 0}ul{margin:2pt 0 4pt;padding-left:16pt}li{margin:1pt 0}.none{color:#888}.xd{page-break-inside:avoid}`;
+const EXPORT_CSS = `body{font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.45;color:#1b2a20}h1{font-size:20pt;margin:0 0 2pt;color:#243c2c}.who{color:#555;margin:0 0 10pt}h2.xw{font-size:12pt;color:#243c2c;border-bottom:1.5px solid #7a9445;padding-bottom:2pt;margin:16pt 0 6pt}h3{font-size:11.5pt;margin:10pt 0 3pt}.xm{font-weight:normal;color:#59789f;font-size:9.5pt}.xf{margin:2pt 0}ul{margin:2pt 0 4pt;padding-left:16pt}li{margin:1pt 0}.none{color:#888}.xd{page-break-inside:avoid}`;
 $("#x-kind").addEventListener("change", () => { const k = $("#x-kind").value; if (k !== "custom") { const [a, b] = exportRange(k, $("#x-from").value || rDate); $("#x-from").value = a; $("#x-to").value = b; } updateExportCount(); });
 ["#x-from", "#x-to", "#x-layout"].forEach(s => $(s).addEventListener("change", () => { if (s !== "#x-layout") $("#x-kind").value = "custom"; updateExportCount(); }));
 $("#x-cancel").addEventListener("click", () => $("#xdlg").close());
@@ -2619,7 +2611,7 @@ function evListHtml(cat, evs, week){
   return `<b>${esc(cat)}</b><ul>${evs.map(e => `<li><span>${esc(e.label)}</span><span class="muted">${fmt12(hm(e.a))}–${fmt12(hm(e.b % 1440))} · ${fmtHM(e.b - e.a)}</span></li>`).join("")}</ul>`;
 }
 function timeOfDay(k){ const seg = {}; dayTimeline(k).forEach(c => { if (c) seg[c] = (seg[c] || 0) + 1; }); return seg; }
-const TV_FIXED = { "Sleep": "#7f96a0", "Work": "#6b2717", "Study & courses": "#c9963f", "Classes": "#3f8789", "Meals": "#d08a3e", "Exercise & health": "#c0646f", "Travel": "#8a8f5a", "Chores & errands": "#a07a5a", "Leisure & screen time": "#e0a1b0", "Breaks & rest": "#9bb3a0", "Getting ready": "#b7a8d6", "Focus sessions": "#8a6a2a", "Personal to-dos": "#7c9cbf", "Not tracked": "var(--line)" };
+const TV_FIXED = { "Sleep": "#59789f", "Work": "#243c2c", "Study & courses": "#7a9445", "Classes": "#3f8789", "Meals": "#d08a3e", "Exercise & health": "#c0646f", "Travel": "#8a8f5a", "Chores & errands": "#a07a5a", "Leisure & screen time": "#e0a1b0", "Breaks & rest": "#9bb3a0", "Getting ready": "#b7a8d6", "Focus sessions": "#c9b84a", "Personal to-dos": "#7c9cbf", "Not tracked": "var(--line)" };
 const TV_EXTRA = ["#6f8fb8", "#b88b6f", "#7a9e7e", "#a678a0", "#c7a35b", "#5f9ea0"];
 function tvColor(n){ if (TV_FIXED[n]) return TV_FIXED[n]; let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return TV_EXTRA[h % TV_EXTRA.length]; }
 function pieSvg(items, center, sub, workNames){
@@ -3221,7 +3213,7 @@ function startData(){
   db.collection("courses").onSnapshot(s => { S.courses = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("time").orderBy("start", "desc").limit(1500).onSnapshot(s => { S.time = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.doc("settings/timer").onSnapshot(s => { const t = s.exists ? s.data() : null; const changed = JSON.stringify(t) !== JSON.stringify(S.timer); S.timer = t && t.start ? t : null; if (changed) render(); }, fail);
-  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (s.exists) { const sd = s.data(); if (sd.cur) S.cur = sd.cur; if (sd.budget) S.budget = sd.budget; if (Array.isArray(sd.shopHist)) S.shopHist = sd.shopHist; if (sd.semStart !== undefined) S.semStart = sd.semStart || ""; if (sd.semWeeks) S.semWeeks = sd.semWeeks; if (sd.prevCgpa !== undefined) S.prevCgpa = sd.prevCgpa; if (sd.prevCredits !== undefined) S.prevCredits = sd.prevCredits; if (sd.curSem !== undefined) S.curSem = sd.curSem || ""; if (Array.isArray(sd.semBreaks)) S.semBreaks = sd.semBreaks; if (sd.palette && sd.palette !== S.palette) applyPalette(sd.palette); } if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
+  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (s.exists) { const sd = s.data(); if (sd.cur) S.cur = sd.cur; if (sd.budget) S.budget = sd.budget; if (Array.isArray(sd.shopHist)) S.shopHist = sd.shopHist; if (sd.semStart !== undefined) S.semStart = sd.semStart || ""; if (sd.semWeeks) S.semWeeks = sd.semWeeks; if (sd.prevCgpa !== undefined) S.prevCgpa = sd.prevCgpa; if (sd.prevCredits !== undefined) S.prevCredits = sd.prevCredits; if (sd.curSem !== undefined) S.curSem = sd.curSem || ""; if (Array.isArray(sd.semBreaks)) S.semBreaks = sd.semBreaks; } if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(1000).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
   watchChecks = () => { const k = viewKey(); if (k === watchedDay) return; watchedDay = k; if (unsubCheck) unsubCheck(); unsubCheck = db.doc("checks/" + k).onSnapshot(s => { const d = s.exists ? s.data() : {}; S.day[k] = { done: d.done || {}, skip: d.skip || {}, extra: d.extra || [] }; render(); }, fail); };
