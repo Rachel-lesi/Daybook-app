@@ -371,7 +371,7 @@ function parseRoute(){
 }
 const subHref = (m, i, sub) => "#" + (i === 0 ? m : m + "-" + sub);
 function buildNav(){
-  const tab = (m, cls) => `<a href="#${m}" data-m="${m}" class="${cls}">${cls === "bn" ? SVG(ICON[NAV[m].icon]) : ""}<span>${NAV[m].label}</span>${m === "work" ? `<span class="count" data-cwork>0</span>` : ""}</a>`;
+  const tab = (m, cls) => `<a href="#${m}" data-m="${m}" class="${cls}">${SVG(ICON[NAV[m].icon])}<span>${NAV[m].label}</span>${m === "work" ? `<span class="count" data-cwork>0</span>` : ""}</a>`;
   $("#tabs").innerHTML = MAIN_TABS.map(m => tab(m, "")).join("");
   $("#bottomnav").innerHTML = MAIN_TABS.map(m => tab(m, "bn")).join("");
   $("#settings-btn").innerHTML = SVG(ICON.gear);
@@ -638,7 +638,7 @@ function drawTask(){
     <label class="f">Task<input id="t-title" value="${esc(t.title)}" required></label>
     <label class="f">Description<textarea id="t-desc" placeholder="What exactly was asked, expected output, where the data is">${esc(t.desc)}</textarea></label>
     <div class="f" style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Steps ${subs.length?`<span class="muted">· ${subs.filter(s=>s.done).length}/${subs.length} done · progress updates automatically</span>`:""}</span>
-      ${subs.length?`<ul class="subs">${subs.map((s,i)=>`<li class="${s.done?"done":""}"><input type="checkbox" data-subtog="${i}" ${s.done?"checked":""} aria-label="Step done: ${esc(s.text)}"><span>${esc(s.text)}</span><button type="button" class="x" data-subdel="${i}" aria-label="Remove step">✕</button></li>`).join("")}</ul>`:""}
+      ${subs.length?`<ul class="subs">${subs.map((s,i)=>`<li class="${s.done?"done":""}"><input type="checkbox" data-subtog="${i}" ${s.done?"checked":""} aria-label="Step done: ${esc(s.text)}"><input class="sub-in" data-subtext="${i}" value="${esc(s.text)}" aria-label="Step ${i + 1}"><button type="button" class="x" data-subdel="${i}" aria-label="Remove step">✕</button></li>`).join("")}</ul>`:""}
       <div class="qrow"><input id="t-subnew" placeholder="Add a step, e.g. Get read access to the database" class="inp"><button class="btn sm" type="button" id="t-subadd">Add step</button></div></div>
     <div class="grid2">
       <label class="f">Category<select id="t-cat"><option value="">Uncategorised</option>${S.cats.map(c=>`<option value="${esc(c.tag)}" ${c.tag===t.category?"selected":""}>${esc(c.name)}</option>`).join("")}</select></label>
@@ -654,7 +654,7 @@ function drawTask(){
     <label class="f">Result / impact <span class="muted" style="font-weight:400">· shows on your resume bullets</span><input id="t-impact" value="${esc(t.impact||"")}" placeholder="e.g. Cut report time from 2 hours to 20 minutes"></label>
     <label class="f">Notes <span class="muted" style="font-weight:400">· SQL queries, file paths, meeting notes</span><textarea id="t-notes" class="mono" placeholder="SELECT batch_id, COUNT(*) FROM production GROUP BY batch_id HAVING COUNT(*) > 1;">${esc(t.notes||"")}</textarea></label>
     <div class="f" style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Links</span>
-      ${t.links.length?`<ul class="links">${t.links.map((l,i)=>`<li>${SVG(ICON.link)}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)}</a><button type="button" class="x" data-linkdel="${i}" aria-label="Remove link">✕</button></li>`).join("")}</ul>`:""}
+      ${t.links.length?`<ul class="links">${t.links.map((l,i)=>`<li>${SVG(ICON.link)}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label||l.url)}</a><button type="button" class="x tl-ed" data-linkedit="${i}" aria-label="Edit link" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-linkdel="${i}" aria-label="Remove link">✕</button></li>`).join("")}</ul>`:""}
       <div class="qrow rwrap"><input id="t-linkurl" type="url" placeholder="Paste a link (shared drive, sheet, ticket)" class="inp"><input id="t-linklabel" placeholder="Name (optional)" class="inp" style="max-width:180px"><button class="btn sm" type="button" id="t-linkadd">Add link</button></div></div>
     <div style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Progress log</span>
       <div class="qrow"><input id="t-note" placeholder="Add an update, e.g. Finished joining the sales tables" class="inp"><button class="btn sm" type="button" id="t-addnote">Log</button></div>
@@ -664,7 +664,7 @@ function drawTask(){
       <div style="display:flex;gap:8px"><button class="btn" type="button" id="t-cancel">Cancel</button><button class="btn primary" type="button" id="t-save">Save</button></div>
     </div>`;
 }
-function readTaskForm(){ const t=editing; t.title=$("#t-title").value.trim()||t.title; t.desc=$("#t-desc").value; t.category=$("#t-cat").value; t.due=$("#t-due").value; t.assignedBy=$("#t-by").value.trim(); if(!(t.subtasks||[]).length) t.progress=+$("#t-prog").value; t.bottleneck=$("#t-block").value.trim(); t.repeat=$("#t-repeat").value; t.impact=$("#t-impact").value.trim(); t.notes=$("#t-notes").value; }
+function readTaskForm(){ const t=editing; document.querySelectorAll("#tf [data-subtext]").forEach(el=>{ const s=(t.subtasks||[])[+el.dataset.subtext]; if(s && el.value.trim()) s.text=el.value.trim(); }); t.title=$("#t-title").value.trim()||t.title; t.desc=$("#t-desc").value; t.category=$("#t-cat").value; t.due=$("#t-due").value; t.assignedBy=$("#t-by").value.trim(); if(!(t.subtasks||[]).length) t.progress=+$("#t-prog").value; t.bottleneck=$("#t-block").value.trim(); t.repeat=$("#t-repeat").value; t.impact=$("#t-impact").value.trim(); t.notes=$("#t-notes").value; }
 function redrawKeep(focusId){ const sc=$("#dlg").scrollTop; drawTask(); $("#dlg").scrollTop=sc; if(focusId) $("#"+focusId)?.focus(); }
 $("#tf").addEventListener("input", e=>{ if(e.target.id==="t-prog") $("#t-pv").textContent=e.target.value+"%"; });
 $("#tf").addEventListener("change", e=>{ const i=e.target.dataset.subtog; if(i===undefined) return; readTaskForm(); const s=editing.subtasks[+i]; s.done=e.target.checked; s.doneAt=s.done?nowISO():""; autoProgress(); redrawKeep(); });
@@ -676,6 +676,7 @@ $("#tf").addEventListener("click", e=>{
   else if(b.id==="t-subadd"){ readTaskForm(); const n=$("#t-subnew").value.trim(); if(n){ editing.subtasks.push({id:newSubId(),text:n,done:false}); autoProgress(); redrawKeep("t-subnew"); } }
   else if(b.dataset.subdel!==undefined){ readTaskForm(); editing.subtasks.splice(+b.dataset.subdel,1); autoProgress(); redrawKeep(); }
   else if(b.id==="t-linkadd"){ readTaskForm(); let u=$("#t-linkurl").value.trim(); if(!u) return; if(!/^https?:\/\//i.test(u)) u="https://"+u; editing.links.push({url:u,label:$("#t-linklabel").value.trim()}); redrawKeep("t-linkurl"); }
+  else if(b.dataset.linkedit!==undefined){ readTaskForm(); const i=+b.dataset.linkedit, l=editing.links[i]; if(l) editDlg("Edit link", [{ k:"label", label:"Name", value:l.label||"" }, { k:"url", label:"Link", type:"url", value:l.url }], v => { if(!v.url) return; editing.links[i]={ ...l, label:v.label, url:/^https?:\/\//i.test(v.url)?v.url:"https://"+v.url }; redrawKeep(); }); }
   else if(b.dataset.linkdel!==undefined){ readTaskForm(); editing.links.splice(+b.dataset.linkdel,1); redrawKeep(); }
   else if(b.id==="t-cancel"){ $("#dlg").close(); }
   else if(b.id==="t-del"){ if(!confirmDel){ readTaskForm(); confirmDel=true; redrawKeep(); } else { if(S.timer&&S.timer.ref===editing.id) stopTimer(false); del("tasks",editing.id); $("#dlg").close(); toast("Task deleted"); } }
@@ -1121,11 +1122,12 @@ function renderCourses(){
         : nx ? `<div class="co-next"><span class="small muted">${nextS ? "Next session " + esc(fmtDate(nextS.date).replace(/^\w+, /, "")) : "Next up"}</span><b title="${esc(nx.title)}">${esc(nx.title)}</b><span class="co-next-b"><button type="button" class="iconbtn sm" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(nx.id)}" title="Log time" aria-label="Log time">${SVG(ICON.timer)}</button><button type="button" class="btn sm" data-cmod-done="${st.mods.indexOf(nx)}">✓ Done</button></span></div>` : ""}
       <div class="co-folds">
       <details class="co-mods" data-cid="${esc(c.id)}" ${S.modOpen[c.id] ? "open" : ""}><summary class="small">Modules <span class="muted">${st.done}/${st.mods.length}</span></summary>
-        ${st.mods.length ? `<ul class="subs">${st.mods.map((m, i) => `<li class="${m.done ? "done" : ""}"><input type="checkbox" data-cmod="${i}" ${m.done ? "checked" : ""} aria-label="Module done: ${esc(m.title)}"><span class="grow">${esc(m.title)}${(() => { const mm = S.time.filter(x => x.type === "course" && x.ref === c.id && x.mod === m.id).reduce((a, x) => a + (+x.mins || 0), 0); return mm ? ` <span class="small muted">· ${fmtMins(mm)}</span>` : ""; })()}</span><button type="button" class="x tl-ed" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(m.id)}" aria-label="Log time for ${esc(m.title)}" title="Log time for this module">${SVG(ICON.timer)}</button><button type="button" class="x" data-cmoddel="${i}" aria-label="Remove module">✕</button></li>`).join("")}</ul>` : `<p class="small muted">No modules yet. Add them under Edit.</p>`}
+        ${st.mods.length ? `<ul class="subs">${st.mods.map((m, i) => `<li class="${m.done ? "done" : ""}"><input type="checkbox" data-cmod="${i}" ${m.done ? "checked" : ""} aria-label="Module done: ${esc(m.title)}"><span class="grow">${esc(m.title)}${(() => { const mm = S.time.filter(x => x.type === "course" && x.ref === c.id && x.mod === m.id).reduce((a, x) => a + (+x.mins || 0), 0); return mm ? ` <span class="small muted">· ${fmtMins(mm)}</span>` : ""; })()}</span><button type="button" class="x tl-ed" data-logtime="course|${esc(c.id)}|${esc(c.name)}" data-logmod="${esc(m.id)}" aria-label="Log time for ${esc(m.title)}" title="Log time for this module">${SVG(ICON.timer)}</button><button type="button" class="x tl-ed" data-ge="mod:${esc(c.id)}:${i}" aria-label="Edit" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-cmoddel="${i}" aria-label="Remove module">✕</button></li>`).join("")}</ul>` : `<p class="small muted">No modules yet. Add them under Edit.</p>`}
       </details>
       <details class="co-more" data-cmore="${esc(c.id)}" ${S.coMore === c.id || !st.mods.length ? "open" : ""}><summary class="small">Edit</summary>
         <div class="co-skills"><span class="small muted">Skills:</span>${S.cskEdit === c.id ? `${S.cats.map((k, i) => `<button type="button" class="qc ci-${i % 6}" data-csk="${esc(k.tag)}" aria-pressed="${(c.skills || []).includes(k.tag)}">${esc(k.name.split(/\s*\/\s*/)[0])}</button>`).join("")}<span class="qc-new"><input data-csknew placeholder="New skill" aria-label="New skill"><button type="button" class="qc" data-csknewadd>Add</button></span><button type="button" class="btn sm" data-cskdone>Done</button>`
           : `${(c.skills || []).map(t => catTag(t)).join("")}<button type="button" class="linkbtn small" data-cskedit>${(c.skills || []).length ? "Change" : "+ Link skills"}</button>`}</div>
+        <label class="f co-name">Course name<input class="inp" data-cname value="${esc(c.name)}"></label>
         <textarea class="inp" data-cmodnew rows="3" placeholder="Add modules: paste names, one per line"></textarea>
         <div class="co-foot"><button class="btn sm primary" type="button" data-cmodadd>Add modules</button><label class="small muted co-tgt">Target <input type="date" data-ctarget value="${esc(c.target || "")}"></label><button class="btn sm ghost danger" type="button" data-cdel>${courseDel === c.id ? "Tap again to delete" : "Delete course"}</button></div>
       </details></div></div>`; }).join("")
@@ -1695,7 +1697,7 @@ function renderHealth(){
     <label class="small muted hw-goal">Daily goal <select id="h-goal">${[6,7,8,9,10,12].map(n => `<option value="${n}" ${n === goal ? "selected" : ""}>${n} cups</option>`).join("")}</select></label>`;
   // meals
   const meals = (d.meals || []).slice().sort((a, b) => a.time.localeCompare(b.time));
-  $("#h-meals").innerHTML = `${meals.length ? `<ul class="hlist">${meals.map(m => `<li><span class="hl-t">${esc(m.time)}</span><span class="hl-tag m-${esc(m.type)}">${esc((MEALS.find(x => x[0] === m.type) || ["", m.type])[1])}</span><span class="hl-b">${esc(m.text)}</span><span class="hl-act"><button type="button" class="m-src" data-msrc="${esc(m.id)}" title="${esc((MEAL_SRC.find(x => x[0] === m.src) || ["", "Where from? Tap to set"])[1])}: tap to change">${(MEAL_SRC.find(x => x[0] === m.src) || ["", "", "＋"])[2]}</button><button type="button" class="x" data-hdel="meals:${esc(m.id)}" aria-label="Remove">✕</button></span></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Nothing logged${isT ? " yet today" : ""}.</p>`}
+  $("#h-meals").innerHTML = `${meals.length ? `<ul class="hlist">${meals.map(m => `<li><span class="hl-t">${esc(m.time)}</span><span class="hl-tag m-${esc(m.type)}">${esc((MEALS.find(x => x[0] === m.type) || ["", m.type])[1])}</span><span class="hl-b">${esc(m.text)}</span><span class="hl-act"><button type="button" class="m-src" data-msrc="${esc(m.id)}" title="${esc((MEAL_SRC.find(x => x[0] === m.src) || ["", "Where from? Tap to set"])[1])}: tap to change">${(MEAL_SRC.find(x => x[0] === m.src) || ["", "", "＋"])[2]}</button><button type="button" class="x tl-ed" data-ge="meal:${esc(m.id)}" aria-label="Edit" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-hdel="meals:${esc(m.id)}" aria-label="Remove">✕</button></span></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">Nothing logged${isT ? " yet today" : ""}.</p>`}
     <div class="qa-chips cwrap">${MEALS.map(([v, l]) => `<button type="button" class="qc" data-meal="${v}" aria-pressed="${S.mealType === v}">${l}</button>`).join("")}</div>
     <div class="qa-chips cwrap m-srcs">${MEAL_SRC.map(([v, l, i]) => `<button type="button" class="qc" data-mealsrc="${v}" aria-pressed="${S.mealSrc === v}">${i} ${l}</button>`).join("")}</div>
     <form class="qrow" id="h-meal-form" autocomplete="off"><input id="h-meal" class="inp" placeholder="What did you eat? e.g. Nasi lemak, teh o"><input type="time" id="h-meal-t" class="inp" value="${isT ? nowHMs() : "12:00"}" style="max-width:110px"><button class="btn sm" type="submit">Add</button></form>
@@ -1703,7 +1705,7 @@ function renderHealth(){
   // bowel
   const bw = (d.bowel || []).slice().sort((a, b) => a.time.localeCompare(b.time));
   const wkB = rangeKeys(7).reduce((a, x) => a + bowelReal(x).length, 0), wkNone = rangeKeys(7).filter(x => (hDoc(x).bowel || []).length && !bowelReal(x).length).length;
-  $("#h-bowel").innerHTML = `${bw.length ? `<ul class="hlist">${bw.map(b => `<li><span class="hl-t">${esc(b.time)}</span><span class="hl-tag b-${esc(b.type)}">${esc((BOWEL.find(x => x[0] === b.type) || ["", b.type])[1])}</span><span class="hl-b">${esc(b.note || "")}</span><button type="button" class="x" data-hdel="bowel:${esc(b.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">No entries${isT ? " today" : ""}.</p>`}
+  $("#h-bowel").innerHTML = `${bw.length ? `<ul class="hlist">${bw.map(b => `<li><span class="hl-t">${esc(b.time)}</span><span class="hl-tag b-${esc(b.type)}">${esc((BOWEL.find(x => x[0] === b.type) || ["", b.type])[1])}</span><span class="hl-b">${esc(b.note || "")}</span><button type="button" class="x tl-ed" data-ge="bowel:${esc(b.id)}" aria-label="Edit" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-hdel="bowel:${esc(b.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">No entries${isT ? " today" : ""}.</p>`}
     <div class="qa-chips cwrap">${BOWEL.map(([v, l]) => `<button type="button" class="qc" data-bowel="${v}" aria-pressed="${S.bowelType === v}">${l}</button>`).join("")}</div>
     <form class="qrow" id="h-bowel-form" autocomplete="off"><input id="h-bowel-note" class="inp" placeholder="Note (optional), e.g. stomach ache, after spicy food"><button class="btn sm primary" type="submit">Log</button></form>
     <p class="small muted" style="margin:0">Last 7 days: <b>${wkB}</b> time${wkB === 1 ? "" : "s"}${wkNone ? ` · <b>${wkNone}</b> day${wkNone === 1 ? "" : "s"} with none` : ""}</p>`;
@@ -1717,13 +1719,13 @@ function renderHealth(){
       <div><span class="small muted">BMI</span><b>${bi ? bi.b : "–"}</b>${bi ? `<span class="small muted">${bi.cat}</span>` : ""}</div></div>
     ${sparkline(ws)}
     <form class="hb-form" id="h-body-form" autocomplete="off"><label class="f">Date<input type="date" id="hb-date" value="${tk}"></label><label class="f">Height (cm)<input type="number" step="0.1" min="50" max="250" id="hb-h" placeholder="${lastH ? esc(lastH.height) : "160"}" inputmode="decimal"></label><label class="f">Weight (kg)<input type="number" step="0.1" min="20" max="300" id="hb-w" placeholder="${lastW ? esc(lastW.weight) : "55"}" inputmode="decimal"></label><button class="btn sm primary" type="submit">Save</button></form>
-    ${recs.length ? `<details class="hb-hist"><summary class="small">All records (${recs.length})</summary><ul class="hlist">${recs.slice().reverse().map(r => `<li><span class="hl-t">${esc(fmtDate(r.date))}</span><span class="hl-b">${r.height ? esc(r.height) + " cm" : ""}${r.height && r.weight ? " · " : ""}${r.weight ? esc(r.weight) + " kg" : ""}</span><button type="button" class="x" data-bdel="${esc(r.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul></details>` : ""}
+    ${recs.length ? `<details class="hb-hist"><summary class="small">All records (${recs.length})</summary><ul class="hlist">${recs.slice().reverse().map(r => `<li><span class="hl-t">${esc(fmtDate(r.date))}</span><span class="hl-b">${r.height ? esc(r.height) + " cm" : ""}${r.height && r.weight ? " · " : ""}${r.weight ? esc(r.weight) + " kg" : ""}</span><button type="button" class="x tl-ed" data-ge="body:${esc(r.id)}" aria-label="Edit" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-bdel="${esc(r.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul></details>` : ""}
     <p class="small muted" style="margin:0">BMI is a rough guide only, not a diagnosis.</p>`;
   // conditions
   const ongoing = S.conds.filter(c => c.status !== "resolved").sort((a, b) => b.start.localeCompare(a.start)), past = S.conds.filter(c => c.status === "resolved").sort((a, b) => b.start.localeCompare(a.start));
   const condRow = c => `<li class="cond sev-${esc(c.severity)}"><div class="cd-top"><b>${esc(c.title)}</b><span class="hl-tag">${esc((COND_KIND.find(x => x[0] === c.kind) || ["", c.kind])[1])}</span><span class="sev">${esc((SEV.find(x => x[0] === c.severity) || ["", ""])[1])}</span></div>
       <div class="small muted">${esc(fmtDate(c.start))}${c.status === "resolved" && c.end ? ` → ${esc(fmtDate(c.end))}` : " · ongoing"}</div>${c.notes ? `<div class="small">${esc(c.notes)}</div>` : ""}
-      <div class="cd-act">${c.status !== "resolved" ? `<button type="button" class="btn sm" data-cres="${esc(c.id)}">Mark recovered</button>` : ""}<button type="button" class="btn sm ghost danger" data-cdelx="${esc(c.id)}">${S.condDel === c.id ? "Tap again to delete" : "Delete"}</button></div></li>`;
+      <div class="cd-act">${c.status !== "resolved" ? `<button type="button" class="btn sm" data-cres="${esc(c.id)}">Mark recovered</button>` : ""}<button type="button" class="btn sm" data-ge="cond:${esc(c.id)}">${SVG(ICON.edit)}Edit</button><button type="button" class="btn sm ghost danger" data-cdelx="${esc(c.id)}">${S.condDel === c.id ? "Tap again to delete" : "Delete"}</button></div></li>`;
   $("#h-cond").innerHTML = `${S.condForm ? `<form class="cond-form" id="h-cond-form" autocomplete="off">
       <label class="f">What's wrong?<input id="hc-title" class="inp" placeholder="e.g. Sore throat, fever, gastric, took panadol" required></label>
       <div class="qa-chips cwrap">${COND_KIND.map(([v, l]) => `<button type="button" class="qc" data-ckind="${v}" aria-pressed="${S.condKind === v}">${l}</button>`).join("")}</div>
@@ -1836,10 +1838,10 @@ function renderMood(){
       <div class="small muted">Stress level</div>
       <div class="seg stress">${[1,2,3,4,5].map(n => `<button type="button" data-mood-s="${n}" aria-pressed="${D.stress === n}">${n}</button>`).join("")}<span class="small muted">1 relaxed · 5 very stressed</span></div>
       <textarea id="mood-note" class="inp" rows="2" placeholder="What's on your mind? (optional, only you can see this in the app)">${esc(D.note || "")}</textarea>
-      <div class="row"><button class="btn sm primary" type="button" data-mood-save>Save check-in</button><button class="btn sm" type="button" data-mood-cancel>Cancel</button></div>` : ""}
+      <div class="row"><button class="btn sm primary" type="button" data-mood-save>${S.moodEdit ? "Save changes" : "Save check-in"}</button><button class="btn sm" type="button" data-mood-cancel>Cancel</button></div>` : ""}
     ${entries.length ? `<ul class="mood-list">${entries.map(e => `<li><span class="mood-dot" style="--mc:${moodColor(e.m)}">${moodFace(e.m)}</span><div><div><b>${esc(MOODS[e.m - 1][1])}</b> <span class="small muted">${esc(e.time)}${e.stress ? ` · stress ${e.stress}/5` : ""}</span></div>
         ${(e.feel || []).length ? `<div class="small">${e.feel.map(esc).join(", ")}</div>` : ""}${(e.why || []).length ? `<div class="small muted">Because of: ${e.why.map(esc).join(", ")}</div>` : ""}${e.note ? `<div class="small mood-note">${esc(e.note)}</div>` : ""}</div>
-        <button type="button" class="x" data-mood-del="${esc(e.id)}" aria-label="Delete check-in">✕</button></li>`).join("")}</ul>` : ""}
+        <span class="mood-acts"><button type="button" class="x tl-ed" data-mood-edit="${esc(e.id)}" aria-label="Edit check-in" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-mood-del="${esc(e.id)}" aria-label="Delete check-in">✕</button></span></li>`).join("")}</ul>` : ""}
     <div class="mood-trend"><div class="small muted">Last 14 days${a14 !== null ? ` · average <b style="color:${moodColor(a14)}">${MOODS[Math.round(a14) - 1][1].toLowerCase()}</b>` : ""}</div>
       <div class="mt-row">${days.map((x, i) => { const v = vals[i]; return `<span class="mt-d ${x === k ? "sel" : ""}" title="${esc(fmtDate(x))}${v !== null ? " · " + MOODS[Math.round(v) - 1][1] : " · no check-in"}"><i style="height:${v === null ? 4 : 8 + v * 8}px;background:${v === null ? "var(--line)" : moodColor(v)}"></i><em>${esc(DAYS[keyDow(x)].slice(0, 1))}</em></span>`; }).join("")}</div></div>
     ${topFeel.length ? `<div class="small muted">Most felt this month: ${topFeel.map(([f, n]) => `<span class="feel-pill">${esc(f)} <b>${n}</b></span>`).join(" ")}</div>` : ""}`;
@@ -1852,10 +1854,14 @@ document.addEventListener("click", e => {
   else if (t.dataset.moodF) { const f = t.dataset.moodF; D.feel = D.feel.includes(f) ? D.feel.filter(x => x !== f) : [...D.feel, f]; renderMood(); }
   else if (t.dataset.moodW) { const f = t.dataset.moodW; D.why = D.why.includes(f) ? D.why.filter(x => x !== f) : [...D.why, f]; renderMood(); }
   else if (t.dataset.moodS) { D.stress = D.stress === +t.dataset.moodS ? 0 : +t.dataset.moodS; renderMood(); }
-  else if (t.dataset.moodCancel !== undefined) { S.moodDraft = { m: 0, feel: [], why: [], stress: 0 }; renderMood(); }
+  else if (t.dataset.moodCancel !== undefined) { S.moodDraft = { m: 0, feel: [], why: [], stress: 0 }; S.moodEdit = null; renderMood(); }
+  else if (t.dataset.moodEdit) { const e0 = (hDoc(hk()).moods || []).find(x => x.id === t.dataset.moodEdit); if (e0) { S.moodEdit = e0.id; S.moodDraft = { m: e0.m, feel: [...(e0.feel || [])], why: [...(e0.why || [])], stress: e0.stress || 0, note: e0.note || "" }; renderMood(); $("#h-mood").scrollIntoView({ block: "start", behavior: "smooth" }); } }
   else if (t.dataset.moodSave !== undefined) {
     const k = hk(), d = hDoc(k);
-    d.moods = [...(d.moods || []), { id: hid(), time: k === todayKey() ? nowHMs() : "20:00", m: D.m, feel: D.feel, why: D.why, stress: D.stress, note: (D.note || "").trim() }];
+    const ed = S.moodEdit && (d.moods || []).find(x => x.id === S.moodEdit);
+    if (ed) d.moods = d.moods.map(x => x.id === ed.id ? { ...x, m: D.m, feel: D.feel, why: D.why, stress: D.stress, note: (D.note || "").trim() } : x);
+    else d.moods = [...(d.moods || []), { id: hid(), time: k === todayKey() ? nowHMs() : "20:00", m: D.m, feel: D.feel, why: D.why, stress: D.stress, note: (D.note || "").trim() }];
+    S.moodEdit = null;
     S.moodDraft = { m: 0, feel: [], why: [], stress: 0 }; saveHealth(k, d);
     toast(D.m >= 4 ? "Check-in saved. Glad you're doing well." : D.m === 3 ? "Check-in saved." : "Check-in saved. Be gentle with yourself today.");
   }
@@ -1887,7 +1893,7 @@ function renderMoney(){
     </form>
     <div class="qa-chips cwrap">${EXP_CATS.map(([v, l, ci]) => `<button type="button" class="qc ci-${ci}" data-ecat="${v}" aria-pressed="${S.expCat === v}">${l}</button>`).join("")}</div>
     <div class="qa-chips cwrap">${PAY.map(([v, l]) => `<button type="button" class="qc" data-epay="${v}" aria-pressed="${S.expPay === v}">${l}</button>`).join("")}</div>
-    ${dayExp.length ? `<ul class="hlist m-list">${dayExp.map(e => { const c = expCat(e.cat); return `<li><span class="hl-tag cat-${c[2]}">${esc(c[1])}</span><span class="hl-b">${esc(e.note || c[1])}<span class="small muted"> · ${esc((PAY.find(p => p[0] === e.pay) || ["", ""])[1])}</span></span><b class="m-amtv">${money(e.amount)}</b><button type="button" class="x" data-edel="${esc(e.id)}" aria-label="Delete">✕</button></li>`; }).join("")}</ul>` : `<p class="small muted" style="margin:0">No spending logged${isT ? " today" : ""}.</p>`}`;
+    ${dayExp.length ? `<ul class="hlist m-list">${dayExp.map(e => { const c = expCat(e.cat); return `<li><span class="hl-tag cat-${c[2]}">${esc(c[1])}</span><span class="hl-b">${esc(e.note || c[1])}<span class="small muted"> · ${esc((PAY.find(p => p[0] === e.pay) || ["", ""])[1])}</span></span><b class="m-amtv">${money(e.amount)}</b><button type="button" class="x tl-ed" data-ge="exp:${esc(e.id)}" aria-label="Edit" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-edel="${esc(e.id)}" aria-label="Delete">✕</button></li>`; }).join("")}</ul>` : `<p class="small muted" style="margin:0">No spending logged${isT ? " today" : ""}.</p>`}`;
   // ---- month summary
   const mk = em(), [y, m] = mk.split("-").map(Number), nDays = new Date(y, m, 0).getDate();
   const mExp = S.exp.filter(e => (e.date || "").startsWith(mk)), mTot = mExp.reduce((s, e) => s + (+e.amount || 0), 0);
@@ -1916,7 +1922,7 @@ function renderMoney(){
   $("#m-shop").innerHTML = `<form id="m-shop-form" class="m-form" autocomplete="off"><input id="m-item" class="inp" placeholder="Add item, e.g. Eggs" aria-label="Item"><input id="m-qty" class="inp" placeholder="Qty" aria-label="Quantity" style="max-width:80px"><button class="btn primary" type="submit">Add</button></form>
     <div class="qa-chips cwrap">${SHOP_CATS.map(([v, l]) => `<button type="button" class="qc" data-scat="${v}" aria-pressed="${S.shopCat === v}">${l}</button>`).join("")}</div>
     ${sugg.length ? `<div class="m-sugg"><span class="small muted">Buy again:</span>${sugg.map(n => `<button type="button" class="qc ghost" data-sagain="${esc(n)}">+ ${esc(n)}</button>`).join("")}</div>` : ""}
-    ${groups.length ? groups.map(([v, l, items]) => `<div class="m-grp"><div class="m-grp-h">${esc(l)} <span class="muted">${items.length}</span></div><ul class="m-items">${items.map(i => `<li><input type="checkbox" data-sdone="${esc(i.id)}" aria-label="Bought ${esc(i.name)}"><span class="m-iname">${esc(i.name)}</span>${i.qty ? `<span class="m-qty">${esc(i.qty)}</span>` : ""}<button type="button" class="x" data-sdel="${esc(i.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul></div>`).join("") : `<p class="small muted" style="margin:0">Your list is empty. Add what you need above.</p>`}
+    ${groups.length ? groups.map(([v, l, items]) => `<div class="m-grp"><div class="m-grp-h">${esc(l)} <span class="muted">${items.length}</span></div><ul class="m-items">${items.map(i => `<li><input type="checkbox" data-sdone="${esc(i.id)}" aria-label="Bought ${esc(i.name)}"><span class="m-iname">${esc(i.name)}</span>${i.qty ? `<span class="m-qty">${esc(i.qty)}</span>` : ""}<button type="button" class="x tl-ed" data-ge="shop:${esc(i.id)}" aria-label="Edit" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-sdel="${esc(i.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul></div>`).join("") : `<p class="small muted" style="margin:0">Your list is empty. Add what you need above.</p>`}
     ${got.length ? `<div class="m-grp got"><div class="m-grp-h">In the basket <span class="muted">${got.length}</span><button type="button" class="btn sm ghost" data-sclear>Clear bought</button></div><ul class="m-items">${got.map(i => `<li class="done"><input type="checkbox" checked data-sdone="${esc(i.id)}" aria-label="Not bought ${esc(i.name)}"><span class="m-iname">${esc(i.name)}</span>${i.qty ? `<span class="m-qty">${esc(i.qty)}</span>` : ""}</li>`).join("")}</ul>
       ${S.groceryLog ? `<form id="m-groc-form" class="m-form" autocomplete="off"><div class="m-amt"><span>${esc(S.cur)}</span><input id="m-groc" inputmode="decimal" placeholder="Total paid"></div><button class="btn sm primary" type="submit">Save expense</button><button class="btn sm" type="button" data-sgroc="0">Cancel</button></form>`
         : `<button type="button" class="btn sm" data-sgroc="1">Log grocery bill as an expense</button>`}</div>` : ""}`;
@@ -3067,7 +3073,7 @@ function renderRoutine(){
       <select data-f="before" aria-label="When to alert" id="rt-b-${esc(r.id)}" ${r.alarm?"":"disabled"}>${[[0,"At the time"],[5,"5 min before"],[10,"10 min before"],[15,"15 min before"],[30,"30 min before"],[60,"1 hour before"]].map(([v,l])=>`<option value="${v}" ${(+r.before||0)===v?"selected":""}>${l}</option>`).join("")}</select></div>
     <div class="presets"><span class="small muted" style="padding:2px 4px">${esc(daysLabel(r.days)||"Custom days")} ·</span>${[["all","Every day"],["wd","Weekdays"],["we","Weekend"]].filter(([,l])=>l!==daysLabel(r.days)).map(([k,l])=>`<button type="button" data-preset="${k}">${l}</button>`).join("")}</div>
   </div>`).join(""):`<div class="empty">${S.ready?"No routine items here yet.":"Loading…"}</div>`;
-  $("#cat-edit").innerHTML = S.cats.map(c=>`<span class="chip">${esc(c.name)} <span class="muted" style="font-family:var(--f-mono)">#${esc(c.tag)}</span> <button class="x" type="button" data-delcat="${esc(c.tag)}" aria-label="Remove ${esc(c.name)}">✕</button></span>`).join("");
+  $("#cat-edit").innerHTML = S.cats.map(c=>`<span class="chip">${esc(c.name)} <span class="muted" style="font-family:var(--f-mono)">#${esc(c.tag)}</span> <button class="x" type="button" data-ge="cat:${esc(c.tag)}" aria-label="Rename ${esc(c.name)}" title="Rename">${SVG(ICON.edit)}</button><button class="x" type="button" data-delcat="${esc(c.tag)}" aria-label="Remove ${esc(c.name)}">✕</button></span>`).join("");
 }
 // When an alarm should fire, in UTC, so the server can find due alarms with one small query.
 function fireFields(r){
@@ -3301,7 +3307,67 @@ addEventListener("online", setOnline); addEventListener("offline", setOnline); s
 // keep sticky side panels below the header
 const setHdr = () => { const h=document.querySelector("header.top"); if(h) document.documentElement.style.setProperty("--hdr", h.offsetHeight+"px"); };
 addEventListener("resize", setHdr); setHdr(); setTimeout(setHdr, 500);
+// glass behind the dock once the misty banner has scrolled away
+const stuckHdr = () => { const b = $("#hbanner"), h = document.querySelector("header.top"); if (b && h) h.classList.toggle("stuck", b.getBoundingClientRect().bottom <= 2); };
+addEventListener("scroll", stuckHdr, { passive: true }); stuckHdr();
 
+
+// ---------- edit anything that was added: one small dialog for list items
+function editDlg(title, fields, onSave, onDelete){
+  let d = $("#gedlg"); if (!d) { d = document.createElement("dialog"); d.id = "gedlg"; d.className = "xdlg"; d.innerHTML = '<form class="dlg" id="ge-form" autocomplete="off"></form>'; document.body.appendChild(d); }
+  const f = d.querySelector("form");
+  const fld = (x, i) => { const v = x.value ?? "", nm = `name="g${i}"`;
+    if (x.type === "select") return `<label class="f">${esc(x.label)}<select ${nm}>${x.options.map(([o, l]) => `<option value="${esc(o)}" ${String(o) === String(v) ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
+    if (x.type === "textarea") return `<label class="f">${esc(x.label)}<textarea ${nm} rows="3">${esc(v)}</textarea></label>`;
+    return `<label class="f">${esc(x.label)}<input ${nm} type="${x.type || "text"}" value="${esc(v)}" ${x.type === "number" ? 'step="any" inputmode="decimal"' : ""} ${x.req ? "required" : ""}></label>`; };
+  f.innerHTML = `<div class="dlg-top"><h3>${esc(title)}</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close">✕</button></div>
+    <div class="ge-fields">${fields.map(fld).join("")}</div>
+    <div class="dlgfoot"><span>${onDelete ? '<button class="btn sm ghost danger" type="button" data-ge-del>Delete</button>' : ""}</span><span style="display:flex;gap:8px"><button class="btn" type="button" data-dlg-x>Cancel</button><button class="btn primary" type="submit">Save</button></span></div>`;
+  f.onsubmit = e => { e.preventDefault(); const out = {}; fields.forEach((x, i) => { const el = f.querySelector(`[name="g${i}"]`); out[x.k] = typeof el.value === "string" ? el.value.trim() : el.value; }); d.close(); onSave(out); };
+  const dx = f.querySelector("[data-ge-del]"); if (dx) dx.onclick = () => { d.close(); onDelete(); };
+  if (!d.open) d.showModal();
+  if (!matchMedia("(hover: none)").matches) setTimeout(() => { const el = f.querySelector(".ge-fields input,.ge-fields textarea"); if (el) el.focus(); }, 30);
+}
+const opts = L => L.map(x => [x[0], x[1]]);
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-ge]"); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const [kind, id, extra] = b.dataset.ge.split(":");
+  if (kind === "meal" || kind === "bowel") {
+    const k = hk(), d = hDoc(k), f = kind === "meal" ? "meals" : "bowel", it = (d[f] || []).find(x => x.id === id); if (!it) return;
+    const F = kind === "meal"
+      ? [{ k: "text", label: "What you ate", value: it.text, req: 1 }, { k: "type", label: "Meal", type: "select", options: opts(MEALS), value: it.type }, { k: "src", label: "Where from", type: "select", options: [["", "Not set"], ...opts(MEAL_SRC)], value: it.src || "" }, { k: "time", label: "Time", type: "time", value: it.time }]
+      : [{ k: "type", label: "Type", type: "select", options: opts(BOWEL), value: it.type }, { k: "note", label: "Note", value: it.note || "" }, { k: "time", label: "Time", type: "time", value: it.time }];
+    editDlg(kind === "meal" ? "Edit meal" : "Edit entry", F, v => { const d2 = hDoc(k); d2[f] = (d2[f] || []).map(x => x.id === id ? { ...x, ...v } : x); saveHealth(k, d2); toast("Saved"); },
+      () => { const d2 = hDoc(k); d2[f] = (d2[f] || []).filter(x => x.id !== id); saveHealth(k, d2); });
+  }
+  else if (kind === "body") { const r = S.body.find(x => x.id === id); if (!r) return;
+    editDlg("Edit record", [{ k: "date", label: "Date", type: "date", value: r.date }, { k: "height", label: "Height (cm)", type: "number", value: r.height || "" }, { k: "weight", label: "Weight (kg)", type: "number", value: r.weight || "" }],
+      v => { put("body", id, { ...strip(r), date: v.date || r.date, height: v.height, weight: v.weight }); toast("Saved"); }, () => del("body", id)); }
+  else if (kind === "cond") { const c = S.conds.find(x => x.id === id); if (!c) return;
+    const F = [{ k: "title", label: "What's wrong?", value: c.title, req: 1 }, { k: "kind", label: "Type", type: "select", options: opts(COND_KIND), value: c.kind }, { k: "severity", label: "How bad", type: "select", options: opts(SEV), value: c.severity }, { k: "start", label: "Started", type: "date", value: c.start }];
+    if (c.status === "resolved") F.push({ k: "end", label: "Recovered", type: "date", value: c.end || "" });
+    F.push({ k: "notes", label: "Notes", type: "textarea", value: c.notes || "" });
+    editDlg("Edit health log", F, v => { put("conditions", id, { ...strip(c), ...v }); toast("Saved"); }, () => del("conditions", id)); }
+  else if (kind === "exp") { const x0 = S.exp.find(x => x.id === id); if (!x0) return;
+    editDlg("Edit expense", [{ k: "amount", label: `Amount (${S.cur})`, type: "number", value: x0.amount, req: 1 }, { k: "note", label: "What was it", value: x0.note || "" }, { k: "cat", label: "Category", type: "select", options: opts(EXP_CATS), value: x0.cat }, { k: "pay", label: "Paid by", type: "select", options: opts(PAY), value: x0.pay }, { k: "date", label: "Date", type: "date", value: x0.date }],
+      v => { const amt = parseFloat(String(v.amount).replace(/[^\d.]/g, "")); if (!(amt > 0)) { toast("Enter an amount"); return; } put("expenses", id, { ...strip(x0), ...v, amount: Math.round(amt * 100) / 100, date: v.date || x0.date }); toast("Saved"); }, () => del("expenses", id)); }
+  else if (kind === "shop") { const i0 = S.shop.find(x => x.id === id); if (!i0) return;
+    editDlg("Edit item", [{ k: "name", label: "Item", value: i0.name, req: 1 }, { k: "qty", label: "Quantity", value: i0.qty || "" }, { k: "cat", label: "Aisle", type: "select", options: SHOP_CATS, value: i0.cat || "other" }],
+      v => { if (!v.name) return; put("shop", id, { ...strip(i0), ...v }); toast("Saved"); }, () => del("shop", id)); }
+  else if (kind === "mod") { const c = S.courses.find(x => x.id === id), i = +extra, m = c && (c.modules || [])[i]; if (!m) return;
+    editDlg("Edit module", [{ k: "title", label: "Module", value: m.title, req: 1 }],
+      v => { if (!v.title) return; const mods = c.modules.map((x, j) => j === i ? { ...x, title: v.title } : x); saveCourse({ ...c, modules: mods }); toast("Saved"); },
+      () => { const mods = [...c.modules]; mods.splice(i, 1); saveCourse({ ...c, modules: mods }); }); }
+  else if (kind === "cat") { const c = S.cats.find(x => x.tag === id); if (!c) return;
+    editDlg("Rename category", [{ k: "name", label: "Name", value: c.name, req: 1 }],
+      v => { if (!v.name) return; S.cats = S.cats.map(x => x.tag === id ? { ...x, name: v.name } : x); saveCats(); renderRoutine && renderRoutine(); toast("Renamed"); }); }
+}, true);
+document.addEventListener("change", e => {
+  const t = e.target; if (!t.matches || !t.matches("[data-cname]")) return;
+  const card = t.closest("[data-course]"), c = card && S.courses.find(x => x.id === card.dataset.course); const n = t.value.trim();
+  if (c && n && n !== c.name) { saveCourse({ ...c, name: n }); toast("Renamed"); }
+});
 // ---------- opening screen
 // the card sets window.__splashMin from its length; tapping "Another one" holds the screen until you tap
 let splashReady = false, splashGone = false;
