@@ -1,7 +1,7 @@
 // Keeps Daybook opening instantly and working offline.
 // Bump VERSION whenever you upload changed files so devices pick them up.
-const VERSION = "daybook-v67";
-const SHELL = ["./", "./index.html", "./app.js", "./firebase-config.js", "./seed.js", "./study-plan.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
+const VERSION = "daybook-v69";
+const SHELL = ["./", "./index.html", "./app.js", "./firebase-config.js", "./seed.js", "./study-plan.js", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./icon-meadow-192.png", "./icon-meadow-512.png", "./apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

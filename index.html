@@ -6,7 +6,7 @@
 <title>Daybook</title>
 <meta name="description" content="Daily routine, to-dos, internship work tasks and daily reflections.">
 <link rel="manifest" href="manifest.webmanifest">
-<script>try{var t=localStorage.getItem("daybook-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;}catch(e){}</script>
+<script>try{var t=localStorage.getItem("daybook-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t;var p=localStorage.getItem("daybook-palette");if(p&&p!=="autumn")document.documentElement.dataset.palette=p;}catch(e){}</script>
 <meta name="theme-color" content="#f6efe4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#221811" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
@@ -831,15 +831,59 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 .rt-confirm .row{display:flex;flex-wrap:wrap;gap:8px}
 .btn.solid-danger{background:var(--crit);border-color:var(--crit);color:#fff}
 
-/* ===== Opening quotes: Chinese and book picks ===== */
-.sp-kind{justify-self:center;font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--pink-ink);background:var(--pink-soft);border-radius:99px;padding:3px 10px}
-.sp-tr{margin:0;font-family:"Instrument Serif",Georgia,serif;font-style:italic;font-size:1.05rem;color:var(--muted);text-wrap:balance}
-.sp-quote.k-zh blockquote{font-family:"Noto Serif SC","Songti SC","STSong","SimSun",serif;font-style:normal;font-weight:600;font-size:clamp(1.4rem,5.2vw,1.9rem);letter-spacing:.04em}
-.sp-quote.k-book blockquote{font-family:var(--f-display);font-style:normal;font-weight:700;font-size:clamp(1.35rem,5vw,1.75rem)}
-.sp-quote.k-book .sp-tr{font-family:var(--f-body);font-style:normal;font-size:.92rem;max-width:26rem;justify-self:center}
-.sp-quote.k-book .sp-kind{order:-2}
-.sp-quote.k-book figcaption{order:1;margin-top:-4px}
-.sp-quote.k-book .sp-tr{order:2}
+/* ===== Meadow palette: glaucous #59789F, powder blue #A9B6C4, vanilla #ECE69D, moss #7A9445, dark green #243C2C ===== */
+:root[data-palette="meadow"]{
+  --bg:#f3f5ea; --surface:#fcfdf6; --sunk:#e9eedd; --line:#d9e0c9; --ink:#1b2a20; --muted:#5d6b5e;
+  --accent:#243c2c; --accent-2:#3e5d45; --accent-ink:#ffffff; --accent-soft:#e1e9da;
+  --pink:#ece69d; --pink-soft:#f6f3d3; --pink-ink:#5a561a;
+  --hero-a:#e6edd8; --hero-b:#e1e7ef; --glass:rgba(252,253,246,.86);
+  --sp-base:#f3f5ea; --sp1:#c8d6a3; --sp2:#ece69d; --sp3:#c5d0dd; --sp-glow:rgba(36,60,44,.25);
+  --c0:#59789f; --c0s:#e3e9f1; --c1:#243c2c; --c1s:#e1e9da; --c2:#6b8439; --c2s:#ecf1dc;
+  --c3:#b07a35; --c3s:#f5ead8; --c4:#a5545a; --c4s:#f6e3e3; --c5:#467b82; --c5s:#dfedee;
+  --crit:#b3261e; --high:#c4621c; --med:#9a8a1c; --low:#7a8c99;
+  --ok:#5d7f3a; --warm:#b8743f;
+  --k-meal:#b07a35; --k-supplement:#8a7f22; --k-break:#467b82; --k-work:#59789f; --k-study:#243c2c; --k-class:#a5545a; --k-health:#c0453a; --k-other:#687565;
+}
+@media (prefers-color-scheme: dark){:root[data-palette="meadow"]:not([data-theme="light"]){
+  --bg:#0e1511; --surface:#162019; --sunk:#1d2921; --line:#2b3a30; --ink:#e9eee1; --muted:#a2b09f;
+  --accent:#ece69d; --accent-2:#f4efc4; --accent-ink:#1c2a12; --accent-soft:#33361f;
+  --pink:#a9b6c4; --pink-soft:#222b37; --pink-ink:#cad5e2;
+  --hero-a:#1b2a1f; --hero-b:#1a2230; --glass:rgba(22,32,25,.86);
+  --sp-base:#0b110d; --sp1:#243c2c; --sp2:#2c3d58; --sp3:#46562a; --sp-glow:rgba(236,230,157,.2);
+  --c0:#9fb6d6; --c0s:#1f2a38; --c1:#a9c49a; --c1s:#1f3022; --c2:#c4d68a; --c2s:#2a331a; --c3:#e3b274; --c3s:#382a17; --c4:#ec9a96; --c4s:#3b2226; --c5:#8cc6c8; --c5s:#183334;
+  --k-meal:#e3b274; --k-supplement:#dcd27a; --k-break:#8cc6c8; --k-work:#9fb6d6; --k-study:#a9c49a; --k-class:#ec9a96; --k-health:#f08a7e; --k-other:#a2b09f;
+  --ok:#a9c27f; --warm:#e3a774; color-scheme:dark}}
+:root[data-palette="meadow"][data-theme="dark"]{
+  --bg:#0e1511; --surface:#162019; --sunk:#1d2921; --line:#2b3a30; --ink:#e9eee1; --muted:#a2b09f;
+  --accent:#ece69d; --accent-2:#f4efc4; --accent-ink:#1c2a12; --accent-soft:#33361f;
+  --pink:#a9b6c4; --pink-soft:#222b37; --pink-ink:#cad5e2;
+  --hero-a:#1b2a1f; --hero-b:#1a2230; --glass:rgba(22,32,25,.86);
+  --sp-base:#0b110d; --sp1:#243c2c; --sp2:#2c3d58; --sp3:#46562a; --sp-glow:rgba(236,230,157,.2);
+  --c0:#9fb6d6; --c0s:#1f2a38; --c1:#a9c49a; --c1s:#1f3022; --c2:#c4d68a; --c2s:#2a331a; --c3:#e3b274; --c3s:#382a17; --c4:#ec9a96; --c4s:#3b2226; --c5:#8cc6c8; --c5s:#183334;
+  --k-meal:#e3b274; --k-supplement:#dcd27a; --k-break:#8cc6c8; --k-work:#9fb6d6; --k-study:#a9c49a; --k-class:#ec9a96; --k-health:#f08a7e; --k-other:#a2b09f;
+  --ok:#a9c27f; --warm:#e3a774; color-scheme:dark}
+.pal-row{display:flex;flex-wrap:wrap;gap:10px}
+.pal{display:grid;gap:8px;justify-items:start;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-weight:600;font-size:.9rem;cursor:pointer;min-width:150px}
+.pal[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.pal-sw{display:flex;border-radius:7px;overflow:hidden;height:22px;width:100%}
+.pal-sw i{flex:1}
+
+/* ===== Opening cards: facts, jokes, books, songs, words, idioms, challenges ===== */
+.sp-quote{width:min(30rem,100%);padding:22px 22px 20px;border-radius:20px;background:var(--glass);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid color-mix(in srgb,var(--line) 70%,transparent);box-shadow:0 14px 40px color-mix(in srgb,var(--ink) 8%,transparent);justify-items:center;gap:10px}
+.sp-kind{justify-self:center;font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--pink-ink);background:var(--pink-soft);border-radius:99px;padding:4px 11px}
+.sp-quote blockquote{font-family:var(--f-display);font-style:normal;font-weight:700;font-size:clamp(1.15rem,4.4vw,1.45rem);line-height:1.35;letter-spacing:-.01em}
+.sp-quote figcaption{font-size:.86rem;color:var(--muted);margin-top:-4px}
+.sp-tr{margin:0;font-size:.95rem;line-height:1.45;color:var(--muted);text-wrap:balance;max-width:26rem}
+.sp-quote.k-fact blockquote,.sp-quote.k-dare blockquote{font-weight:600;font-size:clamp(1.05rem,4vw,1.3rem)}
+.sp-quote.k-joke .sp-tr{font-family:var(--f-display);font-weight:700;font-size:clamp(1.1rem,4.2vw,1.35rem);color:var(--accent);opacity:0;transform:translateY(6px);transition:opacity .5s,transform .5s}
+.sp-quote.k-joke .sp-tr.reveal{opacity:1;transform:none}
+.sp-quote.k-idiom blockquote{font-family:"Noto Serif SC","Songti SC","STSong","SimSun",serif;font-size:clamp(1.8rem,7vw,2.3rem);letter-spacing:.12em;font-weight:700}
+.sp-quote.k-idiom figcaption{font-style:italic;letter-spacing:.04em}
+.sp-quote.k-word blockquote{font-family:"Instrument Serif",Georgia,serif;font-weight:400;font-style:italic;font-size:clamp(1.8rem,7vw,2.3rem)}
+.sp-link{font-size:.85rem;font-weight:600;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:99px;padding:5px 12px;background:var(--surface)}
+.sp-next{margin-top:12px;font:inherit;font-size:.82rem;color:var(--muted);background:none;border:0;padding:6px 10px;border-radius:99px;cursor:pointer;animation:fadeup .9s .6s both}
+.sp-next:hover{color:var(--ink);background:color-mix(in srgb,var(--ink) 6%,transparent)}
+@media (prefers-reduced-motion:reduce){.sp-quote.k-joke .sp-tr{transition:none}.sp-next{animation:none}}
 
 /* ===== Health tab ===== */
 #v-health{align-items:start}
@@ -863,7 +907,7 @@ mark{background:color-mix(in srgb,var(--pink) 70%,transparent)}
 .hl-t{font-family:var(--f-mono);font-size:.76rem;color:var(--muted)}
 .hl-tag{font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:99px;background:var(--sunk);color:var(--ink);white-space:nowrap}
 .hl-tag.m-breakfast{background:var(--c3s);color:var(--c3)} .hl-tag.m-lunch{background:var(--c1s);color:var(--c1)} .hl-tag.m-dinner{background:var(--c2s);color:var(--c2)} .hl-tag.m-snack{background:var(--c4s);color:var(--c4)} .hl-tag.m-drink{background:var(--c0s);color:var(--c0)}
-.hl-tag.b-normal{background:var(--c1s);color:var(--c1)} .hl-tag.b-hard{background:var(--c3s);color:var(--c3)} .hl-tag.b-soft{background:var(--c5s);color:var(--c5)} .hl-tag.b-watery{background:var(--c4s);color:var(--c4)}
+.hl-tag.b-normal{background:var(--c1s);color:var(--c1)} .hl-tag.b-hard{background:var(--c3s);color:var(--c3)} .hl-tag.b-soft{background:var(--c5s);color:var(--c5)} .hl-tag.b-watery{background:var(--c4s);color:var(--c4)} .hl-tag.b-none{background:var(--sunk);color:var(--muted)}
 .hl-b{min-width:0;overflow-wrap:anywhere}
 .hb-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .hb-stats > div{display:grid;gap:1px;background:var(--bg);border-radius:10px;padding:8px 10px}
@@ -1570,134 +1614,213 @@ label.f:has(.dhint){margin-bottom:18px}
     <img class="sp-icon" src="icon-512.png" alt="" width="92" height="92">
     <div class="sp-name">Daybook</div>
     <div class="sp-date" id="sp-date"></div>
-    <figure class="sp-quote"><span class="sp-kind" id="sp-kind" hidden></span><blockquote id="sp-q"></blockquote><p class="sp-tr" id="sp-tr" hidden></p><figcaption id="sp-a"></figcaption></figure>
+    <figure class="sp-quote"><span class="sp-kind" id="sp-kind" hidden></span><blockquote id="sp-q"></blockquote><figcaption id="sp-a" hidden></figcaption><p class="sp-tr" id="sp-tr" hidden></p><a class="sp-link" id="sp-link" target="_blank" rel="noopener" hidden>Listen on Spotify ↗</a></figure>
+    <button type="button" class="sp-next" id="sp-next">↻ Another one</button>
   </div>
   <div class="sp-foot"><span class="sp-bar"><i></i></span><span id="sp-hint">Getting your day ready…</span></div>
 </div>
 <script>
 (function(){
   window.__splashStart = Date.now();
-  var Q = [
-    ["Well begun is half done.","Aristotle"],
-    ["It does not matter how slowly you go as long as you do not stop.","Confucius"],
-    ["The journey of a thousand miles begins with a single step.","Lao Tzu"],
-    ["Luck is what happens when preparation meets opportunity.","Seneca"],
-    ["Begin at once to live.","Seneca"],
-    ["While we wait for life, life passes.","Seneca"],
-    ["You have power over your mind, not outside events. Realise this, and you will find strength.","Marcus Aurelius"],
-    ["Waste no more time arguing what a good person should be. Be one.","Marcus Aurelius"],
-    ["Lost time is never found again.","Benjamin Franklin"],
-    ["Well done is better than well said.","Benjamin Franklin"],
-    ["An investment in knowledge pays the best interest.","Benjamin Franklin"],
-    ["Energy and persistence conquer all things.","Benjamin Franklin"],
-    ["Knowing is not enough; we must apply. Willing is not enough; we must do.","Goethe"],
-    ["Patience is bitter, but its fruit is sweet.","Jean-Jacques Rousseau"],
-    ["Do what you can, with what you have, where you are.","Theodore Roosevelt"],
-    ["Act as if what you do makes a difference. It does.","William James"],
-    ["Learning never exhausts the mind.","Leonardo da Vinci"],
-    ["Simplicity is the ultimate sophistication.","Leonardo da Vinci"],
-    ["The best time to plant a tree was twenty years ago. The second best time is now.","Chinese proverb"],
-    ["Fall seven times, stand up eight.","Japanese proverb"],
-    ["A smooth sea never made a skilled sailor.","English proverb"],
-    ["Be not afraid of growing slowly; be afraid only of standing still.","Chinese proverb"],
-    ["Drop by drop, the water pot is filled.","Dhammapada"],
-    ["Take rest; a field that has rested gives a bountiful crop.","Ovid"],
-    ["Dripping water hollows out stone, not through force but through persistence.","Ovid"],
-    ["The secret of getting ahead is getting started.","Mark Twain"],
-    ["Quality is not an act, it is a habit.","Aristotle"],
-    ["What we learn with pleasure we never forget.","Alfred Mercier"],
-    ["Rest is not idleness.","John Lubbock"],
-    ["Little strokes fell great oaks.","Benjamin Franklin"],
-    ["No man is free who is not master of himself.","Epictetus"],
-    ["First say to yourself what you would be; and then do what you have to do.","Epictetus"],
-    ["It is not that we have a short time to live, but that we waste a lot of it.","Seneca"],
-    ["Difficulties strengthen the mind, as labour does the body.","Seneca"],
-    ["We suffer more often in imagination than in reality.","Seneca"],
-    ["The happiness of your life depends upon the quality of your thoughts.","Marcus Aurelius"],
-    ["Very little is needed to make a happy life.","Marcus Aurelius"],
-    ["Real knowledge is to know the extent of one's ignorance.","Confucius"],
-    ["Nature does not hurry, yet everything is accomplished.","Lao Tzu"],
-    ["Knowing others is intelligence; knowing yourself is true wisdom.","Lao Tzu"],
-    ["Diligence is the mother of good luck.","Benjamin Franklin"],
-    ["Never leave that till tomorrow which you can do today.","Benjamin Franklin"],
-    ["Great things are done by a series of small things brought together.","Vincent van Gogh"],
-    ["I am always doing that which I cannot do, in order that I may learn how to do it.","Vincent van Gogh"],
-    ["There is no substitute for hard work.","Thomas Edison"],
-    ["The beginning is the most important part of the work.","Plato"],
-    ["Slow and steady wins the race.","Aesop"],
-    ["Hitch your wagon to a star.","Ralph Waldo Emerson"],
-    ["Courage is resistance to fear, mastery of fear, not absence of fear.","Mark Twain"],
-    ["Little by little, a little becomes a lot.","Tanzanian proverb"],
-    ["If you want to go fast, go alone. If you want to go far, go together.","African proverb"],
-    ["Learning is a treasure that will follow its owner everywhere.","Chinese proverb"],
-    ["Where there is a will, there is a way.","English proverb"],
-    ["Sedikit-sedikit, lama-lama jadi bukit. (Little by little, it becomes a hill.)","Malay proverb"],
-    ["Hendak seribu daya, tak hendak seribu dalih. (Want it, and you find a thousand ways; don't, and you find a thousand excuses.)","Malay proverb"],
-    ["Berat sama dipikul, ringan sama dijinjing. (Heavy loads carried together, light ones shared too.)","Malay proverb"]
+  if (document.documentElement.dataset.palette === "meadow") document.querySelector(".sp-icon").src = "icon-meadow-512.png";
+  // Opening card deck: [kind, main, sub, extra]
+  var FACT = [
+    "Octopuses have three hearts and blue blood.",
+    "Botanically, bananas are berries but strawberries are not.",
+    "A day on Venus (243 Earth days) is longer than its year (225 Earth days).",
+    "Wombats produce cube-shaped poop.",
+    "Sharks have been around longer than trees: roughly 450 million years versus about 385 million.",
+    "Cleopatra lived closer in time to the Moon landing than to the building of the Great Pyramid.",
+    "Teaching at Oxford began before the Aztec capital Tenochtitlan was even founded.",
+    "Python is named after Monty Python's Flying Circus, not the snake.",
+    "SQL was created at IBM in the 1970s and was first called SEQUEL.",
+    "A modern Excel sheet has 1,048,576 rows and 16,384 columns (A to XFD).",
+    "In 1947 engineers found a real moth stuck in the Harvard Mark II computer and taped it in the logbook as the first actual “bug”.",
+    "The Pomodoro Technique is named after the tomato-shaped kitchen timer Francesco Cirillo used as a student.",
+    "Your brain is about 2% of your body weight but uses around 20% of its energy.",
+    "Spacing out your revision over several days beats cramming the same hours into one night. It's called the spacing effect.",
+    "Sleep after studying helps your brain lock in what you learned that day.",
+    "A group of flamingos is called a flamboyance.",
+    "Sea otters often hold hands while they sleep so they don't drift apart.",
+    "Sunlight takes about 8 minutes and 20 seconds to reach Earth, so you always see the Sun as it was 8 minutes ago.",
+    "There are more possible games of chess than atoms in the observable universe.",
+    "The word “robot” comes from the Czech “robota” (forced labour), first used in Karel Čapek's 1920 play R.U.R.",
+    "The Petronas Twin Towers were the tallest buildings in the world from 1998 to 2004.",
+    "Durians aren't allowed on Singapore's MRT because of their smell.",
+    "Tardigrades (water bears) have survived exposure to the vacuum of space.",
+    "A bolt of lightning is about five times hotter than the surface of the Sun.",
+    "The Great Wall of China can't be seen with the naked eye from the Moon.",
+    "The QWERTY keyboard layout dates back to typewriters of the 1870s.",
+    "Indian mathematician Brahmagupta wrote rules for calculating with zero in 628 CE.",
+    "Koalas can sleep up to around 20 hours a day.",
+    "The cells lining your stomach are replaced every few days.",
+    "Honey hardly ever spoils: still-edible honey has been found in ancient Egyptian tombs.",
+    "Butterflies taste with their feet.",
+    "Hummingbirds are the only birds that can fly backwards.",
+    "A jiffy is a real unit: in physics it's sometimes used for the time light takes to travel one centimetre.",
+    "The dot over a lowercase i or j is called a tittle.",
+    "Cows have best friends and get stressed when they're separated.",
+    "Venus is the only planet in our solar system that spins clockwise."
   ];
-  // Classical Chinese quotes: [Chinese, English meaning, source]
-  var ZH = [
-    ["千里之行，始于足下。","A journey of a thousand li begins with a single step.","老子《道德经》"],
-    ["合抱之木，生于毫末。","A tree too wide to hug grows from a tiny sprout.","老子《道德经》"],
-    ["学而时习之，不亦说乎？","Isn't it a joy to learn something and keep practising it?","孔子《论语》"],
-    ["知之者不如好之者，好之者不如乐之者。","Knowing is good, loving it is better, enjoying it is best.","孔子《论语》"],
-    ["三人行，必有我师焉。","Among any three people walking together, one can teach me.","孔子《论语》"],
-    ["温故而知新，可以为师矣。","Review the old to discover the new.","孔子《论语》"],
-    ["欲速则不达。","Rushing gets you there more slowly.","孔子《论语》"],
-    ["敏而好学，不耻下问。","Be eager to learn and never ashamed to ask.","孔子《论语》"],
-    ["不积跬步，无以至千里；不积小流，无以成江海。","No small steps, no thousand miles; no little streams, no rivers and seas.","荀子《劝学》"],
-    ["锲而不舍，金石可镂。","Keep carving, and even metal and stone will give way.","荀子《劝学》"],
-    ["业精于勤，荒于嬉。","Skill grows with diligence and fades with idleness.","韩愈《进学解》"],
-    ["天行健，君子以自强不息。","As the heavens keep moving, keep striving to grow stronger.","《周易》"],
-    ["博学之，审问之，慎思之，明辨之，笃行之。","Learn widely, question closely, think carefully, judge clearly, act wholeheartedly.","《中庸》"],
-    ["静以修身，俭以养德。","Stay calm to cultivate yourself; live simply to grow in character.","诸葛亮《诫子书》"],
-    ["宝剑锋从磨砺出，梅花香自苦寒来。","A sharp sword comes from grinding; plum blossoms bloom after bitter cold.","《警世贤文》"],
-    ["一年之计在于春，一日之计在于晨。","Plan the year in spring, and the day in the morning.","《增广贤文》"],
-    ["绳锯木断，水滴石穿。","A rope can saw through wood; drops of water wear through stone.","罗大经《鹤林玉露》"],
-    ["少壮不努力，老大徒伤悲。","Idle in youth, regretful in old age.","汉乐府《长歌行》"],
-    ["路漫漫其修远兮，吾将上下而求索。","The road ahead is long; I will keep searching high and low.","屈原《离骚》"],
-    ["不怕慢，就怕站。","Don't fear going slowly; fear standing still.","中国谚语"]
+  var JOKE = [
+    ["Why do programmers prefer dark mode?","Because light attracts bugs."],
+    ["A SQL query walks into a bar, goes up to two tables and asks…","“Can I join you?”"],
+    ["Why was the maths book sad?","It had too many problems."],
+    ["I'm reading a book about anti-gravity.","It's impossible to put down."],
+    ["Why don't scientists trust atoms?","They make up everything."],
+    ["What do you call a fake noodle?","An impasta."],
+    ["There are 10 types of people in the world.","Those who understand binary and those who don't."],
+    ["Why did the developer go broke?","They used up all their cache."],
+    ["I'd tell you a UDP joke…","but you might not get it."],
+    ["What do you call a bear with no teeth?","A gummy bear."],
+    ["I only know 25 letters of the alphabet.","I don't know y."],
+    ["Why did the scarecrow win an award?","He was outstanding in his field."],
+    ["Why do Java developers wear glasses?","Because they don't C#."],
+    ["I tried to catch fog yesterday.","Mist."],
+    ["Why can't you trust stairs?","They're always up to something."],
+    ["Time flies like an arrow.","Fruit flies like a banana."],
+    ["What did the ocean say to the beach?","Nothing, it just waved."],
+    ["Why did the coffee file a police report?","It got mugged."],
+    ["What's the object-oriented way to become wealthy?","Inheritance."],
+    ["Parallel lines have so much in common.","It's a shame they'll never meet."],
+    ["My to-do list and I have a lot in common.","We both keep getting longer."],
+    ["Debugging is like being the detective in a crime movie…","where you're also the murderer."],
+    ["Why did the student eat his homework?","The teacher said it was a piece of cake."],
+    ["What's a computer's favourite snack?","Microchips."],
+    ["Why did the spreadsheet feel so confident?","It had all its cells in order."],
+    ["What do you call a sleeping dinosaur?","A dino-snore."],
+    ["Why are frogs so happy?","They eat whatever bugs them."],
+    ["How do you comfort a JavaScript bug?","You console it."]
   ];
-  // Book picks: [title, author, why]
-  var BK = [
+  var BOOK = [
     ["Atomic Habits","James Clear","Tiny daily habits compound into big results. Pairs well with your routine and streaks."],
     ["Deep Work","Cal Newport","How to focus without distraction. Try it with the focus timer."],
-    ["Storytelling with Data","Cole Nussbaumer Knaflic","Turn spreadsheets into clear charts people understand. Great for your SQL and Excel work."],
-    ["Mindset","Carol S. Dweck","Why treating skills as learnable helps you grow faster and handle mistakes."],
-    ["The Psychology of Money","Morgan Housel","Short, readable stories about saving, risk and patience. A good first-job read."],
-    ["Thinking, Fast and Slow","Daniel Kahneman","How we make decisions, and where our thinking quietly trips us up."],
-    ["The 7 Habits of Highly Effective People","Stephen R. Covey","A classic on priorities, responsibility and working well with others."],
-    ["Make Time","Jake Knapp & John Zeratsky","Simple everyday tactics for making time for what matters to you."],
-    ["Grit","Angela Duckworth","Why passion plus persistence often beats talent alone."],
-    ["Show Your Work!","Austin Kleon","Share what you learn as you go. Handy for building a portfolio during your internship."],
-    ["Peak (《刻意练习》)","Anders Ericsson & Robert Pool","How deliberate practice, not hours alone, builds real skill."],
+    ["Four Thousand Weeks","Oliver Burkeman","A refreshingly honest take on time management: you can't do everything, so choose well."],
+    ["Storytelling with Data","Cole Nussbaumer Knaflic","Turn spreadsheets into clear charts people understand."],
+    ["Naked Statistics","Charles Wheelan","Statistics explained with humour and real examples, no heavy maths needed."],
+    ["Ultralearning","Scott H. Young","How to teach yourself hard skills fast. Great for self-study courses."],
+    ["The Pragmatic Programmer","David Thomas & Andrew Hunt","Practical habits that make you a better developer, whatever language you use."],
+    ["Range","David Epstein","Why being curious about many things can beat specialising too early."],
+    ["The Psychology of Money","Morgan Housel","Short stories about saving, risk and patience. A good first-job read."],
+    ["Project Hail Mary","Andy Weir","A science-packed space adventure that's funny and hard to put down."],
+    ["Klara and the Sun","Kazuo Ishiguro","A gentle, thoughtful novel told by an AI companion."],
+    ["The Midnight Library","Matt Haig","A woman gets to try the lives she didn't choose. Cosy and reflective."],
+    ["Tomorrow, and Tomorrow, and Tomorrow","Gabrielle Zevin","Two friends make video games together over thirty years."],
+    ["Before the Coffee Gets Cold","Toshikazu Kawaguchi","A small Tokyo café where you can travel back in time, briefly."],
+    ["Educated","Tara Westover","A memoir about learning your way into a completely different life."],
+    ["The Little Prince","Antoine de Saint-Exupéry","Short enough for one evening, and it means something new at every age."],
+    ["《三体》 The Three-Body Problem","刘慈欣 Liu Cixin","Mind-bending Chinese science fiction about first contact."],
     ["《被讨厌的勇气》 The Courage to Be Disliked","岸见一郎 · 古贺史健","A conversation about living by your own values instead of others' expectations."],
-    ["《活着》 To Live","余华 Yu Hua","A moving novel about endurance and finding meaning through hardship."],
-    ["《人类简史》 Sapiens","Yuval Noah Harari","A big-picture tour of human history that changes how you see everyday life."]
+    ["《活着》 To Live","余华 Yu Hua","A moving novel about endurance and finding meaning through hardship."]
+  ];
+  var SONG = [
+    ["晴天","周杰伦 Jay Chou","A nostalgic classic for a sunny commute."],
+    ["江南","林俊杰 JJ Lin","Soft and dreamy, good for winding down."],
+    ["光年之外","邓紫棋 G.E.M.","Big, cinematic and full of energy."],
+    ["倎强","五月天 Mayday","For when you need a push to keep going."],
+    ["遇见","孙燕姿 Stefanie Sun","Calm and warm, a perfect slow morning song."],
+    ["稳稳的幸福","陈奕迅 Eason Chan","Gentle and comforting after a long day."],
+    ["爱人错过","告五人 Accusefive","Upbeat indie rock to wake you up."],
+    ["Here Comes the Sun","The Beatles","Instant good mood, guaranteed."],
+    ["Lovely Day","Bill Withers","A feel-good start to any day."],
+    ["Good Days","SZA","Floaty and relaxed, nice for an easy afternoon."],
+    ["Put Your Records On","Corinne Bailey Rae","Breezy and sunny, good for chores."],
+    ["Banana Pancakes","Jack Johnson","The ultimate lazy-weekend-morning song."],
+    ["Riptide","Vance Joy","Light ukulele pop to hum along to."],
+    ["Dreams","Fleetwood Mac","A timeless groove for a calm evening."],
+    ["Electric Feel","MGMT","Funky and fun, good for tidying up."],
+    ["Golden Hour","JVKE","Sweeping and romantic, made for sunsets."],
+    ["Weightless","Marconi Union","Ambient and calm. Try it during a focus session."],
+    ["Clair de Lune","Claude Debussy","Quiet piano for reading or studying."],
+    ["Gymnopédie No. 1","Erik Satie","Slow, gentle piano for a peaceful start."],
+    ["Viva la Vida","Coldplay","Big strings and a big chorus for a motivation boost."],
+    ["As It Was","Harry Styles","Bouncy pop for a walk."],
+    ["Levitating","Dua Lipa","Disco energy for a workout."]
+  ];
+  var WORD = [
+    ["Petrichor","noun","The earthy smell when rain falls on dry ground."],
+    ["Komorebi 木漏れ日","Japanese","Sunlight filtering through the leaves of trees."],
+    ["Tsundoku 積ん読","Japanese","Buying books and letting them pile up unread."],
+    ["Sobremesa","Spanish","Lingering at the table chatting after a meal is finished."],
+    ["Hiraeth","Welsh","A deep longing for home, or for a place you can't return to."],
+    ["Hygge","Danish","A cosy, comfortable feeling of contentment."],
+    ["Lagom","Swedish","Not too much, not too little: just the right amount."],
+    ["Ikigai 生き甲斐","Japanese","Your reason for getting up in the morning."],
+    ["Wabi-sabi","Japanese","Finding beauty in things that are imperfect and impermanent."],
+    ["Kintsugi 金継ぎ","Japanese","Repairing broken pottery with gold, making the cracks part of its story."],
+    ["Shinrin-yoku 森林浴","Japanese","“Forest bathing”: spending calm time among trees."],
+    ["Saudade","Portuguese","A bittersweet longing for something or someone you love."],
+    ["Serendipity","noun","Finding something good by happy accident."],
+    ["Apricity","noun","The warmth of the sun on a cold day."],
+    ["Defenestration","noun","The act of throwing something (or someone) out of a window."],
+    ["Gigil","Filipino","The urge to squeeze something unbearably cute."],
+    ["Mamihlapinatapai","Yaghan","A look shared between two people who both want something but neither wants to start."]
+  ];
+  var IDIOM = [
+    ["画蛇添足","huà shé tiān zú","Drawing legs on a snake: ruining something by overdoing it."],
+    ["守株待兔","shǒu zhū dài tù","Waiting by a tree stump for another rabbit to crash into it: hoping for luck instead of working."],
+    ["对牛弹琴","duì niú tán qín","Playing the zither to a cow: talking to the wrong audience."],
+    ["井底之蛙","jǐng dǐ zhī wā","A frog at the bottom of a well: someone with a narrow view of the world."],
+    ["亡羊补牢","wáng yáng bǔ láo","Mending the pen after losing a sheep: it's never too late to fix things."],
+    ["塞翁失马","sài wēng shī mǎ","The old man lost his horse: a setback may turn out to be a blessing."],
+    ["胸有成竹","xiōng yǒu chéng zhú","Having the bamboo already in mind before painting it: being well prepared."],
+    ["狐假虎威","hú jiǎ hǔ wēi","The fox borrows the tiger's power: bluffing with someone else's authority."],
+    ["叶公好龙","yè gōng hào lóng","Lord Ye loved dragons until a real one showed up: liking something only in theory."],
+    ["水滴石穿","shuǐ dī shí chuān","Dripping water wears through stone: small steady effort wins."]
+  ];
+  var DARE = [
+    "Drink a full glass of water before your first coffee.",
+    "Write down one thing you're looking forward to this week.",
+    "Do the smallest task on your list first, right now.",
+    "Put your phone in another room for one focus session.",
+    "Send a quick message to a friend you haven't talked to in a while.",
+    "Take a 10-minute walk without your earphones.",
+    "Tidy your desk for two minutes before you start.",
+    "Stand up and stretch every time you finish a task today.",
+    "Explain one thing you learned yesterday out loud, as if teaching it.",
+    "Go to bed 20 minutes earlier tonight.",
+    "Eat one extra portion of fruit or vegetables today.",
+    "Say thank you to someone and mention exactly what they did."
   ];
   var pool = [];
-  Q.forEach(function(q){ pool.push({ k: "q", a: q[0], b: q[1] }); });
-  ZH.forEach(function(z){ pool.push({ k: "zh", a: z[0], tr: z[1], b: z[2] }); pool.push({ k: "zh", a: z[0], tr: z[1], b: z[2] }); });
-  BK.forEach(function(x){ pool.push({ k: "book", a: x[0], b: x[1], tr: x[2] }); });
-  var d = new Date(), last = "", pick;
-  try { last = localStorage.getItem("daybook-quote2") || ""; } catch (e) {}
-  for (var n = 0; n < 6; n++) { pick = pool[Math.floor(Math.random() * pool.length)]; if (pick.a !== last) break; }
-  try { localStorage.setItem("daybook-quote2", pick.a); } catch (e) {}
-  var fig = document.querySelector(".sp-quote"); fig.classList.add("k-" + pick.k);
-  var kind = document.getElementById("sp-kind"), tr = document.getElementById("sp-tr");
-  if (pick.k === "book") {
-    kind.hidden = false; kind.textContent = "Book pick";
-    document.getElementById("sp-q").textContent = pick.a;
-    document.getElementById("sp-a").textContent = pick.b;
-    tr.hidden = false; tr.textContent = pick.tr;
-  } else if (pick.k === "zh") {
-    document.getElementById("sp-q").textContent = "“" + pick.a + "”";
-    tr.hidden = false; tr.textContent = pick.tr;
-    document.getElementById("sp-a").textContent = "— " + pick.b;
-  } else {
-    document.getElementById("sp-q").textContent = "“" + pick.a + "”";
-    document.getElementById("sp-a").textContent = "— " + pick.b;
+  FACT.forEach(function(x){ pool.push({ k: "fact", main: x }); });
+  JOKE.forEach(function(x){ pool.push({ k: "joke", main: x[0], sub: x[1] }); });
+  BOOK.forEach(function(x){ pool.push({ k: "book", main: x[0], by: x[1], sub: x[2] }); });
+  SONG.forEach(function(x){ pool.push({ k: "song", main: x[0], by: x[1], sub: x[2] }); });
+  WORD.forEach(function(x){ pool.push({ k: "word", main: x[0], by: x[1], sub: x[2] }); });
+  IDIOM.forEach(function(x){ pool.push({ k: "idiom", main: x[0], by: x[1], sub: x[2] }); });
+  DARE.forEach(function(x){ pool.push({ k: "dare", main: x }); });
+  var LABEL = { fact: "Did you know?", joke: "Joke of the day", book: "Book pick", song: "Song pick", word: "Word to know", idiom: "成语 Idiom", dare: "Tiny challenge" };
+  var KINDS = ["fact","joke","book","song","word","idiom","dare"];
+  var d = new Date(), seen = [], lastK = "";
+  try { seen = JSON.parse(localStorage.getItem("daybook-cards") || "[]"); lastK = localStorage.getItem("daybook-card-kind") || ""; } catch (e) {}
+  function pickCard(){
+    var ks = KINDS.filter(function(k){ return k !== lastK; }), k = ks[Math.floor(Math.random() * ks.length)];
+    var opts = pool.filter(function(c){ return c.k === k && seen.indexOf(c.main) < 0; });
+    if (!opts.length) { seen = seen.filter(function(m){ return !pool.some(function(c){ return c.k === k && c.main === m; }); }); opts = pool.filter(function(c){ return c.k === k; }); }
+    var c = opts[Math.floor(Math.random() * opts.length)];
+    seen.push(c.main); if (seen.length > 120) seen = seen.slice(-120); lastK = k;
+    try { localStorage.setItem("daybook-cards", JSON.stringify(seen)); localStorage.setItem("daybook-card-kind", k); } catch (e) {}
+    return c;
   }
+  var $id = function(i){ return document.getElementById(i); };
+  function show(c){
+    var fig = document.querySelector(".sp-quote"); fig.className = "sp-quote k-" + c.k;
+    var kind = $id("sp-kind"), q = $id("sp-q"), tr = $id("sp-tr"), a = $id("sp-a"), lk = $id("sp-link");
+    kind.hidden = false; kind.textContent = LABEL[c.k];
+    q.textContent = c.main;
+    a.textContent = c.by || ""; a.hidden = !c.by;
+    tr.textContent = c.sub || ""; tr.hidden = !c.sub; tr.classList.remove("reveal");
+    lk.hidden = c.k !== "song";
+    if (c.k === "song") lk.href = "https://open.spotify.com/search/" + encodeURIComponent(c.main + " " + c.by.replace(/[\u4e00-\u9fff]+/g, "").trim());
+    if (c.k === "joke") { clearTimeout(show._t); show._t = setTimeout(function(){ tr.classList.add("reveal"); }, 1400); }
+    var len = (c.main + (c.sub || "")).length;
+    window.__splashMin = Math.min(6000, 2600 + len * 28 + (c.k === "joke" ? 1200 : 0));
+  }
+  show(pickCard());
+  $id("sp-next").addEventListener("click", function(e){ e.stopPropagation(); show(pickCard()); window.__splashStart = Date.now(); window.__splashHold = true; $id("sp-hint").textContent = "Tap anywhere to continue"; });
+  $id("sp-link").addEventListener("click", function(e){ e.stopPropagation(); });
+
   document.getElementById("sp-date").textContent = d.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
 })();
 </script>
@@ -2007,6 +2130,14 @@ label.f:has(.dhint){margin-bottom:18px}
         <form id="cat-form" class="qrow"><input id="cat-new" placeholder="New category, e.g. Power BI / Dashboards" style="flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px"><button class="btn sm" type="submit">Add</button></form>
       </div>
     </div>
+    <div data-part="account" class="panel" style="padding:14px;display:grid;gap:10px">
+      <h2>Colour theme</h2>
+      <div class="pal-row" id="pal-row">
+        <button type="button" class="pal" data-pal="autumn"><span class="pal-sw"><i style="background:#6b2717"></i><i style="background:#cc9e4c"></i><i style="background:#e0d0b6"></i><i style="background:#8b9ea5"></i><i style="background:#442c1b"></i></span>Autumn</button>
+        <button type="button" class="pal" data-pal="meadow"><span class="pal-sw"><i style="background:#59789f"></i><i style="background:#a9b6c4"></i><i style="background:#ece69d"></i><i style="background:#7a9445"></i><i style="background:#243c2c"></i></span>Spring meadow</button>
+      </div>
+      <p class="small muted" style="margin:0">Syncs to your other devices. Light or dark still follows the theme button at the top.</p>
+    </div>
     <div data-part="account" class="panel" style="padding:14px" >
       <h2 style="margin-bottom:6px">Claude reminders</h2>
       <p class="small muted" style="margin:0">Separate from the alarms above, Claude can also send push reminders through the Claude app. Ask Claude to change or turn them off.</p>
@@ -2069,6 +2200,6 @@ label.f:has(.dhint){margin-bottom:18px}
     </form>
   </div>
 </div>
-<script type="module" src="app.js?v=67"></script>
+<script type="module" src="app.js?v=69"></script>
 </body>
 </html>

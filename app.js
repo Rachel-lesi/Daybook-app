@@ -138,7 +138,7 @@ const strip = o => { const c={...o}; delete c.id; return c; };
 
 // ---------- categories
 const DEFAULT_CATS = [{name:"SQL / Database",tag:"sql"},{name:"Excel / Reporting",tag:"excel"},{name:"Python / Automation",tag:"python"},{name:"Admin / Documentation",tag:"admin"}];
-function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false, cur:S.cur||"RM", budget:S.budget||0, shopHist:S.shopHist||[], semStart:S.semStart||"", semWeeks:S.semWeeks||14, prevCgpa:S.prevCgpa||"", prevCredits:S.prevCredits||"", curSem:S.curSem||"", semBreaks:S.semBreaks||[]})); }
+function saveCats(){ if(!db){ render(); return; } write("settings/main", () => db.doc("settings/main").set({categories:S.cats, org:S.org||"", name:S.name||"", calSync:S.calSync||null, waterGoal:S.waterGoal||8, showCycle:S.showCycle!==false, cur:S.cur||"RM", budget:S.budget||0, shopHist:S.shopHist||[], semStart:S.semStart||"", semWeeks:S.semWeeks||14, prevCgpa:S.prevCgpa||"", prevCredits:S.prevCredits||"", curSem:S.curSem||"", semBreaks:S.semBreaks||[], palette:S.palette||"autumn"})); }
 
 // ---------- look & feel helpers
 const SVG = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
@@ -206,6 +206,14 @@ const THEMES = ["auto","light","dark"];
 function applyTheme(t){ if(t==="auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme=t;
   const b=$("#theme"); if(b){ b.innerHTML=SVG(ICON[t==="auto"?"auto":t==="light"?"sun":"moon"]); b.setAttribute("aria-label","Theme: "+(t==="auto"?"match device":t)); b.title="Theme: "+(t==="auto"?"match device":t); } }
 let THEME="auto"; try{ THEME=localStorage.getItem("daybook-theme")||"auto"; }catch{}
+const PAL_META = { autumn: ["#f6efe4", "#221811"], meadow: ["#f3f5ea", "#162019"] };
+function applyPalette(p){ p = PAL_META[p] ? p : "autumn"; S.palette = p; if (p === "autumn") delete document.documentElement.dataset.palette; else document.documentElement.dataset.palette = p;
+  try{ localStorage.setItem("daybook-palette", p); }catch{}
+  document.querySelectorAll('meta[name="theme-color"]').forEach((m, i) => m.setAttribute("content", PAL_META[p][i] || PAL_META[p][0]));
+  document.querySelectorAll('img[src*="icon-"]').forEach(im => { const s = im.getAttribute("src"), n = p === "meadow" ? s.replace(/icon-(meadow-)?/, "icon-meadow-") : s.replace("icon-meadow-", "icon-"); if (n !== s) im.setAttribute("src", n); });
+  document.querySelectorAll("[data-pal]").forEach(b => b.setAttribute("aria-pressed", b.dataset.pal === p)); }
+try{ applyPalette(localStorage.getItem("daybook-palette") || "autumn"); }catch{ applyPalette("autumn"); }
+document.addEventListener("click", e => { const b = e.target.closest("[data-pal]"); if (!b) return; applyPalette(b.dataset.pal); saveCats(); toast(b.dataset.pal === "meadow" ? "Theme: Spring meadow" : "Theme: Autumn"); });
 applyTheme(THEME);
 $("#theme").addEventListener("click", ()=>{ THEME=THEMES[(THEMES.indexOf(THEME)+1)%3]; try{ localStorage.setItem("daybook-theme",THEME); }catch{} applyTheme(THEME); toast(THEME==="auto"?"Theme: matches your device":THEME==="light"?"Theme: light":"Theme: dark"); });
 function catByTag(t){ t=t.toLowerCase(); return S.cats.find(c=>c.tag===t) || S.cats.find(c=>c.tag.startsWith(t)) || S.cats.find(c=>c.name.toLowerCase().includes(t)); }
@@ -800,7 +808,7 @@ function renderOverview(){
   const moodVals = keys.map(k => k < st ? null : dayMood(k)), mv = moodVals.filter(v => v !== null);
   const waterVals = keys.map(k => k < st || k > tk ? null : (hDoc(k).water || 0)), wv = waterVals.filter(v => v !== null);
   const goalDays = wv.filter(v => v >= (S.waterGoal || 8)).length;
-  const bowelN = keys.reduce((a, k) => a + (hDoc(k).bowel || []).length, 0);
+  const bowelN = keys.reduce((a, k) => a + bowelReal(k).length, 0);
   const wrec = S.body.filter(r => r.weight).sort((a, b) => a.date.localeCompare(b.date)), wIn = wrec.filter(r => inR2(r.date)), wBefore = wrec.filter(r => r.date < keys[0]).pop();
   const wNow = wrec[wrec.length - 1], wStart = wBefore || wIn[0];
   const ongoing = S.conds.filter(c => c.status !== "resolved").length;
@@ -1640,7 +1648,8 @@ const MEAL_SRC = [["home","Cooked myself","🍳"],["out","Restaurant","🍽️"]
 const mealSrcCounts = keys => { const c = { home: 0, out: 0, delivery: 0 }; keys.forEach(k => (hDoc(k).meals || []).forEach(m => { if (c[m.src] != null) c[m.src]++; })); return c; };
 const mealSrcLine = c => MEAL_SRC.map(([v, l, i]) => `${i} ${c[v]} ${l.toLowerCase()}`).join(" · ");
 const MEALS = [["breakfast","Breakfast"],["lunch","Lunch"],["dinner","Dinner"],["snack","Snack"],["drink","Drink"]];
-const BOWEL = [["hard","Hard / constipated"],["normal","Normal"],["soft","Soft"],["watery","Watery / diarrhoea"]];
+const BOWEL = [["hard","Hard / constipated"],["normal","Normal"],["soft","Soft"],["watery","Watery / diarrhoea"],["none","None today"]];
+const bowelReal = k => (hDoc(k).bowel || []).filter(b => b.type !== "none");
 const FLOW = [["","None"],["spotting","Spotting"],["light","Light"],["medium","Medium"],["heavy","Heavy"]];
 const SYMS = ["Cramps","Headache","Bloating","Back pain","Tender breasts","Acne","Fatigue","Mood swings","Cravings","Nausea"];
 const COND_KIND = [["symptom","Symptom"],["illness","Illness"],["injury","Injury"],["medication","Medication"],["doctor","Doctor visit"]];
@@ -1691,11 +1700,11 @@ function renderHealth(){
     <p class="small muted" style="margin:0">Last 7 days: ${mealSrcLine(mealSrcCounts(rangeKeys(7)))}</p>`;
   // bowel
   const bw = (d.bowel || []).slice().sort((a, b) => a.time.localeCompare(b.time));
-  const wkB = rangeKeys(7).reduce((a, x) => a + (hDoc(x).bowel || []).length, 0);
+  const wkB = rangeKeys(7).reduce((a, x) => a + bowelReal(x).length, 0), wkNone = rangeKeys(7).filter(x => (hDoc(x).bowel || []).length && !bowelReal(x).length).length;
   $("#h-bowel").innerHTML = `${bw.length ? `<ul class="hlist">${bw.map(b => `<li><span class="hl-t">${esc(b.time)}</span><span class="hl-tag b-${esc(b.type)}">${esc((BOWEL.find(x => x[0] === b.type) || ["", b.type])[1])}</span><span class="hl-b">${esc(b.note || "")}</span><button type="button" class="x" data-hdel="bowel:${esc(b.id)}" aria-label="Remove">✕</button></li>`).join("")}</ul>` : `<p class="small muted" style="margin:0">No entries${isT ? " today" : ""}.</p>`}
     <div class="qa-chips cwrap">${BOWEL.map(([v, l]) => `<button type="button" class="qc" data-bowel="${v}" aria-pressed="${S.bowelType === v}">${l}</button>`).join("")}</div>
     <form class="qrow" id="h-bowel-form" autocomplete="off"><input id="h-bowel-note" class="inp" placeholder="Note (optional), e.g. stomach ache, after spicy food"><button class="btn sm primary" type="submit">Log</button></form>
-    <p class="small muted" style="margin:0">Last 7 days: <b>${wkB}</b> time${wkB === 1 ? "" : "s"}</p>`;
+    <p class="small muted" style="margin:0">Last 7 days: <b>${wkB}</b> time${wkB === 1 ? "" : "s"}${wkNone ? ` · <b>${wkNone}</b> day${wkNone === 1 ? "" : "s"} with none` : ""}</p>`;
   // body
   const recs = S.body.slice().sort((a, b) => a.date.localeCompare(b.date)), lastH = [...recs].reverse().find(r => r.height), lastW = [...recs].reverse().find(r => r.weight);
   const bi = bmiInfo(lastH && +lastH.height, lastW && +lastW.weight), ws = recs.filter(r => r.weight).slice(-20).map(r => +r.weight);
@@ -1772,7 +1781,7 @@ document.addEventListener("submit", e => {
   const f = e.target; if (!f.closest || !f.closest("#v-health")) return;
   e.preventDefault();
   if (f.id === "h-meal-form") { const txt = $("#h-meal").value.trim(); if (!txt) { $("#h-meal").focus(); return; } addHealthItem("meals", { id: hid(), type: S.mealType, src: S.mealSrc, text: txt, time: $("#h-meal-t").value || nowHMs() }); setTimeout(() => $("#h-meal") && $("#h-meal").focus(), 30); }
-  else if (f.id === "h-bowel-form") { addHealthItem("bowel", { id: hid(), type: S.bowelType, note: $("#h-bowel-note").value.trim(), time: hk() === todayKey() ? nowHMs() : "12:00" }); toast("Logged"); }
+  else if (f.id === "h-bowel-form") { if (S.bowelType === "none" && (hDoc(hk()).bowel || []).some(b => b.type === "none")) { toast("Already marked as none"); return; } addHealthItem("bowel", { id: hid(), type: S.bowelType, note: $("#h-bowel-note").value.trim(), time: hk() === todayKey() ? nowHMs() : "12:00" }); if (S.bowelType === "none") S.bowelType = "normal"; toast("Logged"); }
   else if (f.id === "h-body-form") { const hh = parseFloat($("#hb-h").value), ww = parseFloat($("#hb-w").value), dt = $("#hb-date").value || todayKey();
     if (!hh && !ww) { toast("Enter your height, weight or both"); return; }
     const ex = S.body.find(r => r.date === dt); const rec = { date: dt, height: hh ? +hh.toFixed(1) : (ex && ex.height) || "", weight: ww ? +ww.toFixed(1) : (ex && ex.weight) || "", createdAt: nowISO() };
@@ -3212,7 +3221,7 @@ function startData(){
   db.collection("courses").onSnapshot(s => { S.courses = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.collection("time").orderBy("start", "desc").limit(1500).onSnapshot(s => { S.time = s.docs.map(d => ({ ...d.data(), id: d.id })); render(); }, fail);
   db.doc("settings/timer").onSnapshot(s => { const t = s.exists ? s.data() : null; const changed = JSON.stringify(t) !== JSON.stringify(S.timer); S.timer = t && t.start ? t : null; if (changed) render(); }, fail);
-  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (s.exists) { const sd = s.data(); if (sd.cur) S.cur = sd.cur; if (sd.budget) S.budget = sd.budget; if (Array.isArray(sd.shopHist)) S.shopHist = sd.shopHist; if (sd.semStart !== undefined) S.semStart = sd.semStart || ""; if (sd.semWeeks) S.semWeeks = sd.semWeeks; if (sd.prevCgpa !== undefined) S.prevCgpa = sd.prevCgpa; if (sd.prevCredits !== undefined) S.prevCredits = sd.prevCredits; if (sd.curSem !== undefined) S.curSem = sd.curSem || ""; if (Array.isArray(sd.semBreaks)) S.semBreaks = sd.semBreaks; } if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
+  let f1 = true; db.doc("settings/main").onSnapshot(s => { const c = s.exists && s.data().categories; S.cats = c && c.length ? c.map(x => ({ ...x })) : DEFAULT_CATS.slice(); S.org = (s.exists && s.data().org) || ""; S.name = (s.exists && s.data().name) || ""; S.calSync = (s.exists && s.data().calSync) || null; if (s.exists && s.data().waterGoal) S.waterGoal = s.data().waterGoal; if (s.exists && s.data().showCycle === false) S.showCycle = false; if (s.exists) { const sd = s.data(); if (sd.cur) S.cur = sd.cur; if (sd.budget) S.budget = sd.budget; if (Array.isArray(sd.shopHist)) S.shopHist = sd.shopHist; if (sd.semStart !== undefined) S.semStart = sd.semStart || ""; if (sd.semWeeks) S.semWeeks = sd.semWeeks; if (sd.prevCgpa !== undefined) S.prevCgpa = sd.prevCgpa; if (sd.prevCredits !== undefined) S.prevCredits = sd.prevCredits; if (sd.curSem !== undefined) S.curSem = sd.curSem || ""; if (Array.isArray(sd.semBreaks)) S.semBreaks = sd.semBreaks; if (sd.palette && sd.palette !== S.palette) applyPalette(sd.palette); } if (document.activeElement !== $("#org")) $("#org").value = S.org; if (document.activeElement !== $("#uname")) $("#uname").value = S.name; if (f1) { f1 = false; mark(); } else render(); }, fail);
   let f2 = true; db.collection("reflections").orderBy("date", "desc").limit(1000).onSnapshot(s => { const o = {}; s.docs.forEach(d => o[d.id] = d.data()); S.refl = o; if (f2) { f2 = false; mark(); } else render(); }, fail);
   let watchedDay = null, unsubCheck = null;
   watchChecks = () => { const k = viewKey(); if (k === watchedDay) return; watchedDay = k; if (unsubCheck) unsubCheck(); unsubCheck = db.doc("checks/" + k).onSnapshot(s => { const d = s.exists ? s.data() : {}; S.day[k] = { done: d.done || {}, skip: d.skip || {}, extra: d.extra || [] }; render(); }, fail); };
@@ -3292,17 +3301,17 @@ const setHdr = () => { const h=document.querySelector("header.top"); if(h) docum
 addEventListener("resize", setHdr); setHdr(); setTimeout(setHdr, 500);
 
 // ---------- opening screen
-const SPLASH_MIN = 1800;
+// the card sets window.__splashMin from its length; tapping "Another one" holds the screen until you tap
 let splashReady = false, splashGone = false;
 function leaveSplash(now){
   const sp = $("#splash"); if (!sp || splashGone) return;
-  splashReady = true; $("#sp-hint").textContent = "Tap to continue";
-  const wait = now ? 0 : Math.max(0, SPLASH_MIN - (Date.now() - (window.__splashStart || 0)));
+  splashReady = true; if (!window.__splashHold) $("#sp-hint").textContent = "Tap to continue";
+  const wait = now ? 0 : Math.max(0, (window.__splashMin || 2600) - (Date.now() - (window.__splashStart || 0)));
   clearTimeout(leaveSplash._t);
-  leaveSplash._t = setTimeout(() => { if (splashGone) return; splashGone = true; sp.classList.add("out"); setTimeout(() => sp.remove(), 650); }, wait);
+  leaveSplash._t = setTimeout(() => { if (splashGone || (!now && window.__splashHold)) return; splashGone = true; sp.classList.add("out"); setTimeout(() => sp.remove(), 650); }, wait);
 }
-$("#splash")?.addEventListener("click", () => { if (splashReady) leaveSplash(true); });
-setTimeout(() => leaveSplash(), 8000); // never keep the opening screen longer than this
+$("#splash")?.addEventListener("click", () => { if (splashReady || window.__splashHold) { splashReady = true; leaveSplash(true); } });
+setTimeout(() => leaveSplash(), 9000); // never keep the opening screen longer than this unless you asked for another card
 
 const notConfigured = !firebaseConfig || !firebaseConfig.apiKey || /PASTE/i.test(firebaseConfig.apiKey);
 if (notConfigured) { showAuth("setup"); leaveSplash(); }
