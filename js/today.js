@@ -112,7 +112,7 @@ function taskCard(t) {
         ${(t.notes || "").trim() ? `<span class="meta-ic" title="Has notes">${SVG(ICON.note)}</span>` : ""}
         ${t.assignedBy ? `<span>from ${esc(t.assignedBy)}</span>` : ""}</span>
       <span class="line" style="gap:10px"><span class="bar" style="flex:1"><i style="width:${Math.max(0, Math.min(100, +t.progress || 0))}%"></i></span><span style="font-family:var(--f-mono)">${+t.progress || 0}%</span></span>
-      ${t.bottleneck && t.status !== "done" ? `<span class="block"><b>Bottleneck:</b> ${esc(t.bottleneck)}</span>` : ""}
+      ${t.bottleneck && !t.bnSolved && t.status !== "done" ? `<span class="block"><b>Bottleneck:</b> ${esc(t.bottleneck)}</span>` : ""}
       ${t.status === "done" && t.impact ? `<span class="impact">${SVG(ICON.star)}${esc(t.impact)}</span>` : ""}
     </span></div>`;
 }

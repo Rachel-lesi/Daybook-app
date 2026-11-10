@@ -144,7 +144,7 @@ function reportSections(W) {
       "In progress",
       W.active.map(
         (t) =>
-          `[${catName(t.category)}] ${cleanT(t)} — ${STATUS_LABEL[t.status]}, ${+t.progress || 0}%${t.due ? `, due ${fmtDate(t.due)}` : ""}${t.bottleneck ? `. Bottleneck: ${t.bottleneck}` : ""}`,
+          `[${catName(t.category)}] ${cleanT(t)} — ${STATUS_LABEL[t.status]}, ${+t.progress || 0}%${t.due ? `, due ${fmtDate(t.due)}` : ""}${t.bottleneck ? `. Bottleneck: ${t.bottleneck}${t.bnSolved ? ` (solved${t.bnHow ? ": " + t.bnHow : ""})` : ""}` : ""}`,
       ),
     ],
     [

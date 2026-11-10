@@ -366,7 +366,7 @@ $("#r-copy").onclick = async () => {
   ];
   wl.forEach((x) =>
     lines.push(
-      `- [${catName(x.t.category)}] ${x.t.title} — ${STATUS_LABEL[x.t.status]}, ${+x.t.progress || 0}%${x.entries.length ? " (" + x.entries.map((e) => e.note).join("; ") + ")" : ""}${x.t.bottleneck && x.t.status !== "done" ? " | Bottleneck: " + x.t.bottleneck : ""}`,
+      `- [${catName(x.t.category)}] ${x.t.title} — ${STATUS_LABEL[x.t.status]}, ${+x.t.progress || 0}%${x.entries.length ? " (" + x.entries.map((e) => e.note).join("; ") + ")" : ""}${x.t.bottleneck && !x.t.bnSolved && x.t.status !== "done" ? " | Bottleneck: " + x.t.bottleneck : ""}`,
     ),
   );
   if (!wl.length) lines.push("- (no task updates logged)");
