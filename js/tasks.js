@@ -28,7 +28,8 @@ import { fromPlain, rteHTML, rteVal, toPlain } from "./rte.js";
 // ---------- task editor
 let editing = null,
   confirmDel = false,
-  logSt = "";
+  logSt = "",
+  logAt = "";
 const LOG_ST = [
   ["todo", "Not started"],
   ["doing", "In progress"],
@@ -68,7 +69,7 @@ const logKind = (n) =>
   : ["upd", "Update"];
 const stripKind = (n) => n.replace(/^(Bottleneck solved|Bottleneck|Result|Step done):\s*/, "");
 function drawLog(t) {
-  const L = t.log.map((l, i) => ({ l, i })).sort((a, b) => (b.l.at || "").localeCompare(a.l.at || ""));
+  const L = t.log.map((l, i) => ({ l, i })).sort((a, b) => (a.l.at || "").localeCompare(b.l.at || "")); // oldest first
   if (!L.length) return '<p class="small muted plg-empty">No updates yet. Log what you did, what you\'re waiting on, or a decision you made.</p>';
   let day = "",
     h = "";
@@ -102,6 +103,7 @@ function openTask(id) {
   recSel = editing.records.length - 1;
   confirmDel = false;
   logSt = "";
+  logAt = "";
   drawTask();
   const d = $("#dlg");
   if (!d.open) {
@@ -113,7 +115,12 @@ function openTask(id) {
     d.scrollTop = 0;
   }
   growAll();
+  logToEnd();
 }
+const logToEnd = () => {
+  const l = $("#tf .plg-list");
+  if (l) l.scrollTop = l.scrollHeight;
+};
 function autoProgress() {
   const s = editing.subtasks;
   if (!s.length) return;
@@ -126,6 +133,7 @@ function drawTask() {
     mins = taskMins(t.id);
   $("#tf").innerHTML =
     `<div class="dlg-top"><h3>Work task</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close without saving" title="Close">✕</button></div>
+    <div class="tk-grid"><div class="tk-main">
     <label class="f">Task<textarea id="t-title" class="grow1" rows="1" required>${esc(t.title)}</textarea></label>
     <div class="f"><span class="flab">Overview <span class="muted" style="font-weight:400">· the big picture: goal, who it's for, why it matters</span></span>${rteHTML("t-overview", rich(t, "overview"), "e.g. Standardise part numbers across all plants so inventory reports match", "short")}</div>
     <div class="f rec"><span class="flab">Description <span class="muted" style="font-weight:400">· the details, one record per day as the task grows</span></span>
@@ -145,11 +153,11 @@ function drawTask() {
     </div>
     <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Urgency</span><div class="seg" id="t-urg">${URG.map((u) => `<button type="button" data-v="${u}" aria-pressed="${t.urgency === u}">${u[0].toUpperCase() + u.slice(1)}</button>`).join("")}</div></div>
     <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Status</span><div class="seg" id="t-st">${STATUS.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${t.status === k}">${l}</button>`).join("")}</div></div>
-    <fieldset class="bn-wrap"><legend>Bottlenecks ${t.bottlenecks.length ? `<span class="muted" style="font-weight:400">· ${t.bottlenecks.filter((x) => !x.solved).length} open, ${t.bottlenecks.filter((x) => x.solved).length} solved</span>` : ""}</legend>
+    <fieldset class="bn-wrap"><legend>Bottlenecks ${t.bottlenecks.length ? `<span class="muted" style="font-weight:400">· ${t.bottlenecks.filter((x) => x.issue && !x.solved).length} open, ${t.bottlenecks.filter((x) => x.issue && x.solved).length} solved</span>` : ""}</legend>
       ${t.bottlenecks
         .map(
           (x, i) => `<div class="bn-box ${x.solved ? "solved" : ""}">
-        <div class="bn-top"><span class="bn-n">#${i + 1}</span>${x.at ? `<span class="small muted">noted ${esc(whenTxt(x.at))}</span>` : ""}<button type="button" class="x" data-bndel="${i}" aria-label="Remove bottleneck" title="Remove">✕</button></div>
+        <div class="bn-top"><span class="bn-n">#${i + 1}</span><button type="button" class="when-chip" data-bnat="${i}" title="Change when you ran into this">${SVG(ICON.edit)}Ran into it ${esc(whenTxt(x.at) || "· set time")}</button><button type="button" class="x" data-bndel="${i}" aria-label="Remove bottleneck" title="Remove">✕</button></div>
         <label class="f">What's in the way<textarea class="grow1" data-bnissue="${i}" rows="1" placeholder="Waiting for data, access, clarification…">${esc(x.issue)}</textarea></label>
         <div class="f bn-q"><span class="flab">Have I solved it?</span><div class="seg" data-bnsolved="${i}"><button type="button" data-v="0" aria-pressed="${!x.solved}">Not yet</button><button type="button" data-v="1" aria-pressed="${!!x.solved}">Solved</button></div></div>
         ${x.solved ? `<label class="f">How I solved it<textarea class="grow1" data-bnhow="${i}" rows="1" placeholder="e.g. Asked IT for read access, used the backup sheet meanwhile">${esc(x.how || "")}</textarea></label><button type="button" class="when-chip" data-bnwhen="${i}" title="Change when you solved it">${SVG(ICON.edit)}Solved ${esc(whenTxt(x.solvedAt) || "· set time")}</button>` : ""}
@@ -163,13 +171,13 @@ function drawTask() {
     <div class="f" style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Links</span>
       ${t.links.length ? `<ul class="links">${t.links.map((l, i) => `<li>${SVG(ICON.link)}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label || l.url)}</a><button type="button" class="x tl-ed" data-linkedit="${i}" aria-label="Edit link" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-linkdel="${i}" aria-label="Remove link">✕</button></li>`).join("")}</ul>` : ""}
       <div class="qrow rwrap"><input id="t-linkurl" type="url" placeholder="Paste a link (shared drive, sheet, ticket)" class="inp"><input id="t-linklabel" placeholder="Name (optional)" class="inp" style="max-width:180px"><button class="btn sm" type="button" id="t-linkadd">Add link</button></div></div>
-    <section class="plg-wrap"><div class="plg-top"><span class="flab">Progress log</span><span class="small muted">${t.log.length} entr${t.log.length === 1 ? "y" : "ies"}</span></div>
+    </div><aside class="tk-side"><section class="plg-wrap"><div class="plg-top"><span class="flab">Progress log</span><span class="small muted">${t.log.length} entr${t.log.length === 1 ? "y" : "ies"} · oldest first</span></div>
+      <div class="plg-list">${drawLog(t)}</div>
       <div class="plg-add">
         <textarea id="t-note" rows="1" placeholder="Add an update, e.g. Finished joining the sales tables" class="inp grow1" aria-label="Update"></textarea>
         <textarea id="t-memo" rows="2" class="inp" placeholder="Memo or notes (optional)" aria-label="Memo"></textarea>
-        <div class="plg-add-row"><div class="seg sm" id="t-logst" aria-label="Status of this update">${LOG_ST.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${logSt === v}">${l}</button>`).join("")}</div><button class="btn sm primary" type="button" id="t-addnote">Log update</button></div>
-      </div>
-      ${drawLog(t)}</section>
+        <div class="plg-add-row"><div class="seg sm" id="t-logst" aria-label="Status of this update">${LOG_ST.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${logSt === v}">${l}</button>`).join("")}</div><button type="button" class="when-chip" id="t-logwhen" title="When did this happen?">${SVG(ICON.edit)}${logAt ? esc(whenTxt(logAt)) : "Now"}</button><button class="btn sm primary" type="button" id="t-addnote">Log update</button></div>
+      </div></section></aside></div>
     <div class="dlgfoot">
       <button class="btn ghost danger sm" type="button" id="t-del">${confirmDel ? "Tap again to delete" : "Delete"}</button>
       <div style="display:flex;gap:8px"><button class="btn" type="button" id="t-cancel">Cancel</button><button class="btn primary" type="button" id="t-save">Save</button></div>
@@ -220,10 +228,18 @@ function readTaskForm() {
 }
 function redrawKeep(focusId) {
   recDelAsk = false;
-  const sc = $("#dlg").scrollTop;
+  const sc = $("#dlg").scrollTop,
+    lsc = $("#tf .plg-list")?.scrollTop,
+    keep = ["t-note", "t-memo", "t-subnew", "t-linkurl", "t-linklabel"].map((id) => [id, $("#" + id)?.value || ""]);
   drawTask();
+  // half-typed text in the add boxes survives a redraw (adding a step clears only its own box)
+  keep.forEach(([id, v]) => {
+    if (v && id !== focusId && $("#" + id)) $("#" + id).value = v;
+  });
   growAll();
   $("#dlg").scrollTop = sc;
+  if (focusId === "t-note" || lsc === undefined) logToEnd();
+  else $("#tf .plg-list").scrollTop = lsc;
   if (focusId) $("#" + focusId)?.focus();
 }
 const growTA = (el) => {
@@ -306,6 +322,13 @@ $("#tf").addEventListener("click", (e) => {
     readTaskForm();
     editing.bottlenecks.splice(+b.dataset.bndel, 1);
     redrawKeep();
+  } else if (b.dataset.bnat !== undefined) {
+    readTaskForm();
+    const x = editing.bottlenecks[+b.dataset.bnat];
+    editWhen("When did you run into this?", x.at, (iso) => (x.at = iso));
+  } else if (b.id === "t-logwhen") {
+    readTaskForm();
+    editWhen("When did this happen?", logAt, (iso) => (logAt = iso));
   } else if (b.dataset.bnwhen !== undefined) {
     readTaskForm();
     const x = editing.bottlenecks[+b.dataset.bnwhen];
@@ -323,6 +346,8 @@ $("#tf").addEventListener("click", (e) => {
     if (e) {
       editing.log.push(e);
       logSt = "";
+      logAt = "";
+      $("#t-memo").value = "";
       redrawKeep("t-note");
     }
   } else if (b.dataset.logedit !== undefined) {
@@ -375,6 +400,7 @@ $("#tf").addEventListener("click", (e) => {
     if (!u) return;
     if (!/^https?:\/\//i.test(u)) u = "https://" + u;
     editing.links.push({ url: u, label: $("#t-linklabel").value.trim() });
+    $("#t-linklabel").value = "";
     redrawKeep("t-linkurl");
   } else if (b.dataset.linkedit !== undefined) {
     readTaskForm();
@@ -451,7 +477,7 @@ function pendingLog() {
   const n = ($("#t-note")?.value || "").trim(),
     m = ($("#t-memo")?.value || "").trim();
   if (!n && !m) return null;
-  const e = { at: nowISO(), note: n || m.split("\n")[0].slice(0, 80) };
+  const e = { at: logAt || nowISO(), note: n || m.split("\n")[0].slice(0, 80) };
   if (m && n) e.memo = m;
   if (logSt) e.status = logSt;
   return e;
@@ -479,6 +505,7 @@ function saveTask() {
   const pending = pendingLog();
   if (pending) t.log.push(pending);
   logSt = "";
+  logAt = "";
   const oldDone = new Set((old.subtasks || []).filter((s) => s.done).map((s) => s.id));
   t.subtasks
     .filter((s) => s.done && !oldDone.has(s.id))
@@ -504,6 +531,10 @@ function saveTask() {
     if (!o ? !oldIssues.has(x.issue) : o.issue !== x.issue) t.log.push({ at: x.at || nowISO(), note: `Bottleneck: ${x.issue}` });
     if (x.solved && !(o && o.solved))
       t.log.push({ at: x.solvedAt || nowISO(), note: `Bottleneck solved: ${x.issue}`, ...(x.how ? { memo: "How: " + x.how } : {}) });
+    if (o && o.issue === x.issue && x.at && o.at && x.at !== o.at) {
+      const e = t.log.findLast((l) => l.note === `Bottleneck: ${o.issue}`);
+      if (e) e.at = x.at;
+    }
     if (x.solved && o && o.solved && x.solvedAt && x.solvedAt !== o.solvedAt) {
       const e = t.log.findLast((l) => l.note === `Bottleneck solved: ${o.issue}`);
       if (e) e.at = x.solvedAt;

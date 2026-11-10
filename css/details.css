@@ -486,3 +486,16 @@ li.done .when-chip{text-decoration:none}
 .rec-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
 .rec-bar .danger{margin-left:auto;color:var(--crit)}
 .rec .rte{margin-top:6px}
+/* work task window: form on the left, progress log on the right on wide screens */
+.tk-grid{display:grid;gap:14px;min-width:0}
+.tk-main{display:grid;gap:14px;min-width:0;align-content:start}
+.tk-side{min-width:0}
+@media (min-width:1000px){
+  #dlg{width:min(1240px,calc(100vw - 48px))}
+  .tk-grid{grid-template-columns:minmax(0,1fr) minmax(360px,440px);gap:24px;align-items:start}
+  .tk-side{position:sticky;top:76px}
+  .tk-side .plg-wrap{border-top:0;padding:14px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--ink) 2%,var(--surface));display:flex;flex-direction:column;max-height:calc(100dvh - 210px)}
+  .tk-side .plg-list{flex:1 1 auto;overflow-y:auto;min-height:120px;margin:0 -6px;padding:0 6px}
+  .tk-side .plg-add{flex:none}
+}
+.plg-list{display:grid;gap:10px;align-content:start}
