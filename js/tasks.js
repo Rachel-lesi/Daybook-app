@@ -35,6 +35,25 @@ const LOG_ST = [
   ["done", "Completed"],
 ];
 const LOG_ST_LABEL = Object.fromEntries(LOG_ST);
+// description records: one per day, so the write-up can grow as the task goes on
+let recSel = 0,
+  recDelAsk = false;
+const recList = (t) =>
+  t.records ||
+  (t.descHtml || t.desc ? [{ id: newSubId(), day: isoDay(t.createdAt) || todayKey(), html: t.descHtml || fromPlain(t.desc) }] : []);
+const recSort = (L) => L.sort((a, b) => a.day.localeCompare(b.day));
+// bottlenecks: a list of {id, issue, solved, how, at, solvedAt}; older tasks had one text field
+const bnList = (t) =>
+  t.bottlenecks || (t.bottleneck ? [{ id: newSubId(), issue: t.bottleneck, solved: !!t.bnSolved, how: t.bnHow || "", at: t.updatedAt || "" }] : []);
+// keep the plain fields that cards, reports and search read
+function bnSummary(t) {
+  const L = (t.bottlenecks || []).filter((x) => x.issue);
+  const open = L.filter((x) => !x.solved);
+  t.bottleneck = (open.length ? open : L).map((x) => x.issue).join("; ");
+  t.bnSolved = L.length > 0 && !open.length;
+  t.bnHow = L.filter((x) => x.solved && x.how).map((x) => x.how).join("; ");
+}
+const whenTxt = (iso) => (iso ? `${isoDay(iso) === todayKey() ? "Today" : fmtDate(isoDay(iso))} ${fmtTime(iso)}` : "");
 const rich = (t, k) => t[k + "Html"] || fromPlain(t[k] || "");
 // a log entry's kind, from what it says
 const logKind = (n) =>
@@ -77,7 +96,10 @@ function openTask(id) {
     log: [...(t.log || [])],
     subtasks: (t.subtasks || []).map((s) => ({ ...s })),
     links: (t.links || []).map((l) => ({ ...l })),
+    bottlenecks: bnList(t).map((x) => ({ ...x })),
+    records: recList(t).map((x) => ({ ...x })),
   };
+  recSel = editing.records.length - 1;
   confirmDel = false;
   logSt = "";
   drawTask();
@@ -90,6 +112,7 @@ function openTask(id) {
     if (touch) d.focus({ preventScroll: true });
     d.scrollTop = 0;
   }
+  growAll();
 }
 function autoProgress() {
   const s = editing.subtasks;
@@ -103,12 +126,15 @@ function drawTask() {
     mins = taskMins(t.id);
   $("#tf").innerHTML =
     `<div class="dlg-top"><h3>Work task</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close without saving" title="Close">✕</button></div>
-    <label class="f">Task<input id="t-title" value="${esc(t.title)}" required></label>
+    <label class="f">Task<textarea id="t-title" class="grow1" rows="1" required>${esc(t.title)}</textarea></label>
     <div class="f"><span class="flab">Overview <span class="muted" style="font-weight:400">· the big picture: goal, who it's for, why it matters</span></span>${rteHTML("t-overview", rich(t, "overview"), "e.g. Standardise part numbers across all plants so inventory reports match", "short")}</div>
-    <div class="f"><span class="flab">Description <span class="muted" style="font-weight:400">· the details</span></span>${rteHTML("t-desc", rich(t, "desc"), "What exactly was asked, expected output, where the data is")}</div>
+    <div class="f rec"><span class="flab">Description <span class="muted" style="font-weight:400">· the details, one record per day as the task grows</span></span>
+      <div class="rec-tabs" role="tablist">${t.records.map((r, i) => `<button type="button" role="tab" data-recsel="${i}" aria-pressed="${i === recSel}"><b>Day ${i + 1}</b> ${esc(r.day === todayKey() ? "Today" : fmtDate(r.day))}</button>`).join("")}<button type="button" class="rec-add" id="t-recadd">+ ${t.records.length ? "Add today's record" : "Start a record"}</button></div>
+      ${t.records.length ? `<div class="rec-bar"><span class="small muted">Day ${recSel + 1} of ${t.records.length}</span><button type="button" class="when-chip" data-recdate title="Change the date of this record">${SVG(ICON.edit)}${esc(fmtDate(t.records[recSel].day))}</button>${t.records.length > 1 ? `<button type="button" class="linkbtn small danger" data-recdel>Remove this record</button>` : ""}</div>` : ""}
+      ${rteHTML("t-desc", (t.records[recSel] || {}).html || "", t.records.length > 1 ? "What's new today: findings, changes, next steps" : "What exactly was asked, expected output, where the data is")}</div>
     <div class="f" style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Steps ${subs.length ? `<span class="muted">· ${subs.filter((s) => s.done).length}/${subs.length} done · progress updates automatically</span>` : ""}</span>
-      ${subs.length ? `<ul class="subs">${subs.map((s, i) => `<li class="${s.done ? "done" : ""}"><input type="checkbox" data-subtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><input class="sub-in" data-subtext="${i}" value="${esc(s.text)}" aria-label="Step ${i + 1}"><button type="button" class="x" data-subdel="${i}" aria-label="Remove step">✕</button></li>`).join("")}</ul>` : ""}
-      <div class="qrow"><input id="t-subnew" placeholder="Add a step, e.g. Get read access to the database" class="inp"><button class="btn sm" type="button" id="t-subadd">Add step</button></div></div>
+      ${subs.length ? `<ul class="subs">${subs.map((s, i) => `<li class="${s.done ? "done" : ""}"><input type="checkbox" data-subtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><span class="sub-main"><textarea class="sub-in grow1" rows="1" data-subtext="${i}" aria-label="Step ${i + 1}">${esc(s.text)}</textarea>${s.done ? `<button type="button" class="when-chip" data-subwhen="${i}" title="Change when you did this">${SVG(ICON.edit)}Done ${esc(whenTxt(s.doneAt) || "· set time")}</button>` : ""}</span><button type="button" class="x" data-subdel="${i}" aria-label="Remove step">✕</button></li>`).join("")}</ul>` : ""}
+      <div class="qrow"><textarea id="t-subnew" rows="1" placeholder="Add a step, e.g. Get read access to the database" class="inp grow1"></textarea><button class="btn sm" type="button" id="t-subadd">Add step</button></div></div>
     <div class="grid2">
       <label class="f">Category<select id="t-cat"><option value="">Uncategorised</option>${S.cats.map((c) => `<option value="${esc(c.tag)}" ${c.tag === t.category ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
       <label class="f">Due date<input type="date" id="t-due" value="${esc(t.due)}"></label>
@@ -119,10 +145,18 @@ function drawTask() {
     </div>
     <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Urgency</span><div class="seg" id="t-urg">${URG.map((u) => `<button type="button" data-v="${u}" aria-pressed="${t.urgency === u}">${u[0].toUpperCase() + u.slice(1)}</button>`).join("")}</div></div>
     <div class="f" style="display:grid;gap:4px"><span class="small muted" style="font-weight:600">Status</span><div class="seg" id="t-st">${STATUS.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${t.status === k}">${l}</button>`).join("")}</div></div>
-    <fieldset class="bn-box ${t.bnSolved ? "solved" : ""}"><legend>Bottleneck</legend>
-      <label class="f">What's in the way<textarea id="t-block" placeholder="Waiting for data, access, clarification…" rows="2" style="min-height:52px">${esc(t.bottleneck)}</textarea></label>
-      <div class="f bn-q"><span class="flab">Have I solved it?</span><div class="seg" id="t-bnsolved"><button type="button" data-v="0" aria-pressed="${!t.bnSolved}">Not yet</button><button type="button" data-v="1" aria-pressed="${!!t.bnSolved}">Solved</button></div></div>
-      ${t.bnSolved ? `<label class="f">How I solved it<textarea id="t-bnhow" rows="2" style="min-height:52px" placeholder="e.g. Asked IT for read access, used the backup sheet meanwhile">${esc(t.bnHow || "")}</textarea></label>` : ""}
+    <fieldset class="bn-wrap"><legend>Bottlenecks ${t.bottlenecks.length ? `<span class="muted" style="font-weight:400">· ${t.bottlenecks.filter((x) => !x.solved).length} open, ${t.bottlenecks.filter((x) => x.solved).length} solved</span>` : ""}</legend>
+      ${t.bottlenecks
+        .map(
+          (x, i) => `<div class="bn-box ${x.solved ? "solved" : ""}">
+        <div class="bn-top"><span class="bn-n">#${i + 1}</span>${x.at ? `<span class="small muted">noted ${esc(whenTxt(x.at))}</span>` : ""}<button type="button" class="x" data-bndel="${i}" aria-label="Remove bottleneck" title="Remove">✕</button></div>
+        <label class="f">What's in the way<textarea class="grow1" data-bnissue="${i}" rows="1" placeholder="Waiting for data, access, clarification…">${esc(x.issue)}</textarea></label>
+        <div class="f bn-q"><span class="flab">Have I solved it?</span><div class="seg" data-bnsolved="${i}"><button type="button" data-v="0" aria-pressed="${!x.solved}">Not yet</button><button type="button" data-v="1" aria-pressed="${!!x.solved}">Solved</button></div></div>
+        ${x.solved ? `<label class="f">How I solved it<textarea class="grow1" data-bnhow="${i}" rows="1" placeholder="e.g. Asked IT for read access, used the backup sheet meanwhile">${esc(x.how || "")}</textarea></label><button type="button" class="when-chip" data-bnwhen="${i}" title="Change when you solved it">${SVG(ICON.edit)}Solved ${esc(whenTxt(x.solvedAt) || "· set time")}</button>` : ""}
+      </div>`,
+        )
+        .join("")}
+      <button type="button" class="btn sm ghost bn-add" id="t-bnadd">+ Add ${t.bottlenecks.length ? "another " : "a "}bottleneck</button>
     </fieldset>
     <div class="f"><span class="flab">Result / impact <span class="muted" style="font-weight:400">· shows on your resume bullets</span></span>${rteHTML("t-impact", rich(t, "impact"), "e.g. Cut report time from 2 hours to 20 minutes", "short")}</div>
     <div class="f"><span class="flab">Notes <span class="muted" style="font-weight:400">· SQL queries, file paths, meeting notes</span></span>${rteHTML("t-notes", rich(t, "notes"), "SELECT batch_id, COUNT(*) FROM production GROUP BY batch_id HAVING COUNT(*) > 1;", "mono")}</div>
@@ -131,7 +165,7 @@ function drawTask() {
       <div class="qrow rwrap"><input id="t-linkurl" type="url" placeholder="Paste a link (shared drive, sheet, ticket)" class="inp"><input id="t-linklabel" placeholder="Name (optional)" class="inp" style="max-width:180px"><button class="btn sm" type="button" id="t-linkadd">Add link</button></div></div>
     <section class="plg-wrap"><div class="plg-top"><span class="flab">Progress log</span><span class="small muted">${t.log.length} entr${t.log.length === 1 ? "y" : "ies"}</span></div>
       <div class="plg-add">
-        <input id="t-note" placeholder="Add an update, e.g. Finished joining the sales tables" class="inp" aria-label="Update">
+        <textarea id="t-note" rows="1" placeholder="Add an update, e.g. Finished joining the sales tables" class="inp grow1" aria-label="Update"></textarea>
         <textarea id="t-memo" rows="2" class="inp" placeholder="Memo or notes (optional)" aria-label="Memo"></textarea>
         <div class="plg-add-row"><div class="seg sm" id="t-logst" aria-label="Status of this update">${LOG_ST.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${logSt === v}">${l}</button>`).join("")}</div><button class="btn sm primary" type="button" id="t-addnote">Log update</button></div>
       </div>
@@ -145,19 +179,35 @@ function readTaskForm() {
   const t = editing;
   document.querySelectorAll("#tf [data-subtext]").forEach((el) => {
     const s = (t.subtasks || [])[+el.dataset.subtext];
-    if (s && el.value.trim()) s.text = el.value.trim();
+    if (s && el.value.trim()) s.text = el.value.replace(/\s*\n\s*/g, " ").trim();
   });
-  t.title = $("#t-title").value.trim() || t.title;
+  t.title = $("#t-title").value.replace(/\s*\n\s*/g, " ").trim() || t.title;
   t.overviewHtml = rteVal("t-overview");
   t.overview = toPlain(t.overviewHtml);
-  t.descHtml = rteVal("t-desc");
-  t.desc = toPlain(t.descHtml);
+  const h = rteVal("t-desc");
+  if (t.records[recSel]) t.records[recSel].html = h;
+  else if (h) {
+    t.records.push({ id: newSubId(), day: todayKey(), html: h });
+    recSel = t.records.length - 1;
+  }
+  const last = [...t.records].reverse().find((r) => r.html) || {};
+  t.descHtml = last.html || "";
+  t.desc = t.records
+    .filter((r) => r.html)
+    .map((r) => (t.records.length > 1 ? fmtDate(r.day) + ": " : "") + toPlain(r.html))
+    .join("\n");
   t.category = $("#t-cat").value;
   t.due = $("#t-due").value;
   t.assignedBy = $("#t-by").value.trim();
   if (!(t.subtasks || []).length) t.progress = +$("#t-prog").value;
-  t.bottleneck = $("#t-block").value.trim();
-  if ($("#t-bnhow")) t.bnHow = $("#t-bnhow").value.trim();
+  document.querySelectorAll("#tf [data-bnissue]").forEach((el) => {
+    const x = t.bottlenecks[+el.dataset.bnissue];
+    if (x) x.issue = el.value.trim();
+  });
+  document.querySelectorAll("#tf [data-bnhow]").forEach((el) => {
+    const x = t.bottlenecks[+el.dataset.bnhow];
+    if (x) x.how = el.value.trim();
+  });
   t.repeat = $("#t-repeat").value;
   t.impactHtml = rteVal("t-impact");
   t.impact = toPlain(t.impactHtml)
@@ -169,13 +219,21 @@ function readTaskForm() {
   t.notes = toPlain(t.notesHtml);
 }
 function redrawKeep(focusId) {
+  recDelAsk = false;
   const sc = $("#dlg").scrollTop;
   drawTask();
+  growAll();
   $("#dlg").scrollTop = sc;
   if (focusId) $("#" + focusId)?.focus();
 }
+const growTA = (el) => {
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + 2 + "px";
+};
+const growAll = () => document.querySelectorAll("#tf textarea.grow1").forEach(growTA);
 $("#tf").addEventListener("input", (e) => {
   if (e.target.id === "t-prog") $("#t-pv").textContent = e.target.value + "%";
+  if (e.target.classList.contains("grow1")) growTA(e.target);
 });
 $("#tf").addEventListener("change", (e) => {
   const i = e.target.dataset.subtog;
@@ -199,11 +257,63 @@ $("#tf").addEventListener("click", (e) => {
     editing.status = b.dataset.v;
     if (b.dataset.v === "done") editing.progress = 100;
     redrawKeep(b.dataset.v === "done" ? "t-impact" : null);
-  } else if (b.parentElement.id === "t-bnsolved") {
+  } else if (b.parentElement.dataset.bnsolved !== undefined) {
     readTaskForm();
-    editing.bnSolved = b.dataset.v === "1";
-    if (editing.bnSolved && editing.status === "blocked") editing.status = "doing";
-    redrawKeep(editing.bnSolved ? "t-bnhow" : null);
+    const x = editing.bottlenecks[+b.parentElement.dataset.bnsolved],
+      v = b.dataset.v === "1";
+    if (x.solved !== v) x.solvedAt = v ? nowISO() : "";
+    x.solved = v;
+    if (v && editing.status === "blocked" && editing.bottlenecks.every((y) => y.solved || !y.issue)) editing.status = "doing";
+    redrawKeep();
+    if (v) document.querySelector(`#tf [data-bnhow="${b.parentElement.dataset.bnsolved}"]`)?.focus();
+  } else if (b.dataset.recsel !== undefined) {
+    readTaskForm();
+    recSel = +b.dataset.recsel;
+    redrawKeep("t-desc");
+  } else if (b.id === "t-recadd") {
+    readTaskForm();
+    editing.records.push({ id: newSubId(), day: todayKey(), html: "" });
+    recSort(editing.records);
+    recSel = editing.records.findLastIndex((r) => r.day === todayKey() && !r.html);
+    redrawKeep("t-desc");
+  } else if (b.dataset.recdate !== undefined) {
+    readTaskForm();
+    const r = editing.records[recSel];
+    hub.editDlg("Date of this record", [{ k: "day", label: "Date", type: "date", value: r.day }], (v) => {
+      if (v.day) r.day = v.day;
+      recSort(editing.records);
+      recSel = editing.records.indexOf(r);
+      redrawKeep();
+    });
+  } else if (b.dataset.recdel !== undefined) {
+    readTaskForm();
+    const r = editing.records[recSel];
+    if (r.html && !recDelAsk) {
+      recDelAsk = true;
+      b.textContent = "Tap again to remove";
+      return;
+    }
+    recDelAsk = false;
+    editing.records.splice(recSel, 1);
+    recSel = Math.max(0, recSel - 1);
+    redrawKeep();
+  } else if (b.id === "t-bnadd") {
+    readTaskForm();
+    editing.bottlenecks.push({ id: newSubId(), issue: "", solved: false, how: "", at: nowISO() });
+    redrawKeep();
+    document.querySelector(`#tf [data-bnissue="${editing.bottlenecks.length - 1}"]`)?.focus();
+  } else if (b.dataset.bndel !== undefined) {
+    readTaskForm();
+    editing.bottlenecks.splice(+b.dataset.bndel, 1);
+    redrawKeep();
+  } else if (b.dataset.bnwhen !== undefined) {
+    readTaskForm();
+    const x = editing.bottlenecks[+b.dataset.bnwhen];
+    editWhen("When did you solve it?", x.solvedAt, (iso) => (x.solvedAt = iso));
+  } else if (b.dataset.subwhen !== undefined) {
+    readTaskForm();
+    const x = editing.subtasks[+b.dataset.subwhen];
+    editWhen("When did you do this step?", x.doneAt, (iso) => (x.doneAt = iso));
   } else if (b.parentElement.id === "t-logst") {
     logSt = logSt === b.dataset.v ? "" : b.dataset.v;
     b.parentElement.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === logSt));
@@ -248,7 +358,7 @@ $("#tf").addEventListener("click", (e) => {
     );
   } else if (b.id === "t-subadd") {
     readTaskForm();
-    const n = $("#t-subnew").value.trim();
+    const n = $("#t-subnew").value.replace(/\s*\n\s*/g, " ").trim();
     if (n) {
       editing.subtasks.push({ id: newSubId(), text: n, done: false });
       autoProgress();
@@ -307,6 +417,13 @@ $("#tf").addEventListener("click", (e) => {
 });
 $("#tf").addEventListener("keydown", (e) => {
   if (e.key !== "Enter") return;
+  if (e.target.matches && e.target.matches("textarea.grow1") && !e.shiftKey) {
+    const m = { "t-note": 1, "t-subnew": 1 };
+    if (!m[e.target.id]) {
+      e.preventDefault();
+      return;
+    }
+  }
   const map = { "t-note": "t-addnote", "t-subnew": "t-subadd", "t-linkurl": "t-linkadd", "t-linklabel": "t-linkadd" };
   if (map[e.target.id]) {
     e.preventDefault();
@@ -314,6 +431,22 @@ $("#tf").addEventListener("keydown", (e) => {
   }
 });
 const pad2 = (n) => String(n).padStart(2, "0");
+// pick a date and time for something already done (steps and bottlenecks added late)
+function editWhen(title, iso, set) {
+  const d = iso ? new Date(iso) : new Date();
+  hub.editDlg(
+    title,
+    [
+      { k: "date", label: "Date", type: "date", value: dkey(d) },
+      { k: "time", label: "Time", type: "time", value: pad2(d.getHours()) + ":" + pad2(d.getMinutes()) },
+    ],
+    (v) => {
+      const at = new Date(`${v.date || dkey(d)}T${v.time || "12:00"}`);
+      if (!isNaN(at)) set(at.toISOString());
+      redrawKeep();
+    },
+  );
+}
 function pendingLog() {
   const n = ($("#t-note")?.value || "").trim(),
     m = ($("#t-memo")?.value || "").trim();
@@ -349,19 +482,35 @@ function saveTask() {
   const oldDone = new Set((old.subtasks || []).filter((s) => s.done).map((s) => s.id));
   t.subtasks
     .filter((s) => s.done && !oldDone.has(s.id))
-    .forEach((s) => t.log.push({ at: nowISO(), note: `Step done: ${s.text}` }));
+    .forEach((s) => t.log.push({ at: s.doneAt || nowISO(), note: `Step done: ${s.text}` }));
+  // a step's done time changed later: move its log entry too
+  (old.subtasks || []).forEach((o) => {
+    const s = t.subtasks.find((x) => x.id === o.id);
+    if (!s || !s.done || !o.done || !s.doneAt || s.doneAt === o.doneAt) return;
+    const e = t.log.findLast((l) => l.note === `Step done: ${o.text}`);
+    if (e) e.at = s.doneAt;
+  });
   if (old.status !== t.status)
     t.log.push({ at: nowISO(), note: `Status: ${STATUS_LABEL[old.status] || "—"} → ${STATUS_LABEL[t.status]}` });
   if ((+old.progress || 0) !== t.progress)
     t.log.push({ at: nowISO(), note: `Progress ${+old.progress || 0}% → ${t.progress}%` });
-  if (t.bottleneck && t.bottleneck !== old.bottleneck)
-    t.log.push({ at: nowISO(), note: `Bottleneck: ${t.bottleneck}` });
-  if (t.bottleneck && t.bnSolved && !old.bnSolved)
-    t.log.push({ at: nowISO(), note: `Bottleneck solved: ${t.bottleneck}`, ...(t.bnHow ? { memo: "How: " + t.bnHow } : {}) });
-  if (!t.bottleneck) {
-    t.bnSolved = false;
-    t.bnHow = "";
-  }
+  t.bottlenecks = t.bottlenecks.filter((x) => x.issue);
+  t.records = t.records.filter((r) => r.html);
+  const oldL = bnList(old),
+    oldBn = new Map(oldL.map((x) => [x.id, x])),
+    oldIssues = new Set(oldL.map((x) => x.issue));
+  t.bottlenecks.forEach((x) => {
+    const o = oldBn.get(x.id) || oldL.find((y) => y.issue === x.issue);
+    if (!o ? !oldIssues.has(x.issue) : o.issue !== x.issue) t.log.push({ at: x.at || nowISO(), note: `Bottleneck: ${x.issue}` });
+    if (x.solved && !(o && o.solved))
+      t.log.push({ at: x.solvedAt || nowISO(), note: `Bottleneck solved: ${x.issue}`, ...(x.how ? { memo: "How: " + x.how } : {}) });
+    if (x.solved && o && o.solved && x.solvedAt && x.solvedAt !== o.solvedAt) {
+      const e = t.log.findLast((l) => l.note === `Bottleneck solved: ${o.issue}`);
+      if (e) e.at = x.solvedAt;
+    }
+  });
+  bnSummary(t);
+  t.log.sort((a, b) => (a.at || "").localeCompare(b.at || ""));
   if (t.impact && t.impact !== old.impact) t.log.push({ at: nowISO(), note: `Result: ${t.impact}` });
   const justDone = t.status === "done" && old.status !== "done";
   if (justDone) t.doneAt = nowISO();
@@ -380,11 +529,13 @@ function saveTask() {
       overviewHtml: t.overviewHtml || "",
       desc: t.desc || "",
       descHtml: t.descHtml || "",
+      records: t.descHtml ? [{ id: newSubId(), day: due, html: t.descHtml }] : [],
       category: t.category || "",
       urgency: t.urgency,
       status: "todo",
       progress: 0,
       bottleneck: "",
+      bottlenecks: [],
       assignedBy: t.assignedBy || "",
       due,
       repeat: t.repeat,
