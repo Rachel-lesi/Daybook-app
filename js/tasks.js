@@ -104,7 +104,8 @@ function drawTask() {
   $("#tf").innerHTML =
     `<div class="dlg-top"><h3>Work task</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close without saving" title="Close">✕</button></div>
     <label class="f">Task<input id="t-title" value="${esc(t.title)}" required></label>
-    <div class="f"><span class="flab">Description</span>${rteHTML("t-desc", rich(t, "desc"), "What exactly was asked, expected output, where the data is")}</div>
+    <div class="f"><span class="flab">Overview <span class="muted" style="font-weight:400">· the big picture: goal, who it's for, why it matters</span></span>${rteHTML("t-overview", rich(t, "overview"), "e.g. Standardise part numbers across all plants so inventory reports match", "short")}</div>
+    <div class="f"><span class="flab">Description <span class="muted" style="font-weight:400">· the details</span></span>${rteHTML("t-desc", rich(t, "desc"), "What exactly was asked, expected output, where the data is")}</div>
     <div class="f" style="display:grid;gap:6px"><span class="small muted" style="font-weight:600">Steps ${subs.length ? `<span class="muted">· ${subs.filter((s) => s.done).length}/${subs.length} done · progress updates automatically</span>` : ""}</span>
       ${subs.length ? `<ul class="subs">${subs.map((s, i) => `<li class="${s.done ? "done" : ""}"><input type="checkbox" data-subtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><input class="sub-in" data-subtext="${i}" value="${esc(s.text)}" aria-label="Step ${i + 1}"><button type="button" class="x" data-subdel="${i}" aria-label="Remove step">✕</button></li>`).join("")}</ul>` : ""}
       <div class="qrow"><input id="t-subnew" placeholder="Add a step, e.g. Get read access to the database" class="inp"><button class="btn sm" type="button" id="t-subadd">Add step</button></div></div>
@@ -147,6 +148,8 @@ function readTaskForm() {
     if (s && el.value.trim()) s.text = el.value.trim();
   });
   t.title = $("#t-title").value.trim() || t.title;
+  t.overviewHtml = rteVal("t-overview");
+  t.overview = toPlain(t.overviewHtml);
   t.descHtml = rteVal("t-desc");
   t.desc = toPlain(t.descHtml);
   t.category = $("#t-cat").value;
@@ -373,6 +376,8 @@ function saveTask() {
       id = newId();
     put("tasks", id, {
       title: t.title,
+      overview: t.overview || "",
+      overviewHtml: t.overviewHtml || "",
       desc: t.desc || "",
       descHtml: t.descHtml || "",
       category: t.category || "",

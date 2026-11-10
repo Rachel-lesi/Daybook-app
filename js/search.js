@@ -45,6 +45,7 @@ function runSearch() {
   for (const t of S.tasks) {
     const hay = [
       t.title,
+      t.overview,
       t.desc,
       t.notes,
       t.bottleneck,
