@@ -100,32 +100,39 @@ const logKind = (n) =>
   : /^Task added|^Follow-up/.test(n) ? ["new", "Added"]
   : ["upd", "Update"];
 const stripKind = (n) => n.replace(/^(Bottleneck solved|Bottleneck|Result|Step done):\s*/, "");
+// noise (status, progress, timer) is hidden unless "Everything" is picked
+let logF = "key";
+const NOISE = new Set(["prog", "stat", "time"]);
 function drawLog(t, editable) {
-  const L = t.log.map((l, i) => ({ l, i })).sort((a, b) => (a.l.at || "").localeCompare(b.l.at || "")); // oldest first
-  if (!L.length) return '<p class="small muted plg-empty">No updates yet. Log what you did, what you\'re waiting on, or a decision you made.</p>';
-  let day = "",
-    h = "";
-  L.forEach(({ l, i }) => {
-    const d = isoDay(l.at);
-    if (d !== day) {
-      if (day) h += "</ol>";
-      h += `<div class="plg-day ${d === daySel ? "sel" : ""}" data-logday="${d}">${esc(dayLbl(d))}</div><ol class="plog ${d === daySel ? "sel" : ""}">`;
-      day = d;
-    }
-    const [k, kl] = logKind(l.note || "");
-    h += `<li class="plg-${k}"><span class="plg-dot" aria-hidden="true"></span><div class="plg-body">
-      <div class="plg-head"><time>${fmtTime(l.at)}</time><span class="plg-kind">${kl}</span>${l.status ? `<span class="plg-st st-${esc(l.status)}">${esc(LOG_ST_LABEL[l.status] || l.status)}</span>` : ""}${editable ? `<button type="button" class="x tl-ed" data-logedit="${i}" aria-label="Edit this update" title="Edit time or text">${SVG(ICON.edit)}</button>` : ""}</div>
-      <div class="plg-note">${["upd", "new", "time", "prog", "stat", "due"].includes(k) ? esc(l.note) : esc(stripKind(l.note))}</div>
-      ${l.memo ? `<div class="plg-memo">${esc(l.memo)}</div>` : ""}</div></li>`;
-  });
-  return h + "</ol>";
+  const all = t.log.map((l, i) => ({ l, i, k: logKind(l.note || "") })).sort((a, b) => (a.l.at || "").localeCompare(b.l.at || "")); // oldest first
+  if (!all.length) return '<p class="small muted plg-empty">No updates yet. Log what you did, what you\'re waiting on, or a decision you made.</p>';
+  const L = logF === "all" ? all : all.filter((x) => !NOISE.has(x.k[0]));
+  const days = [...new Set(L.map((x) => isoDay(x.l.at)))],
+    lastDay = days.at(-1);
+  const head = `<div class="plg-f" role="group" aria-label="Show"><button type="button" data-logf="key" aria-pressed="${logF === "key"}">Key updates</button><button type="button" data-logf="all" aria-pressed="${logF === "all"}">Everything · ${all.length}</button></div>`;
+  return (
+    head +
+    days
+      .map((d) => {
+        const items = L.filter((x) => isoDay(x.l.at) === d);
+        const open = editable || d === daySel || d === lastDay;
+        return `<details class="plg-g ${d === daySel ? "sel" : ""}" data-logday="${d}" ${open ? "open" : ""}><summary><span>${esc(dayLbl(d))}</span><small>${items.length}</small></summary><ol class="plog">${items
+          .map(({ l, i, k: [k, kl] }) => {
+            const txt = ["upd", "new", "time", "prog", "stat", "due"].includes(k) ? l.note : stripKind(l.note);
+            return `<li class="plg-${k}"><span class="plg-dot" aria-hidden="true"></span><div class="plg-row"><div class="plg-head"><time>${fmtTime(l.at)}</time><span class="plg-kind">${kl}</span>${l.status ? `<span class="plg-st st-${esc(l.status)}">${esc(LOG_ST_LABEL[l.status] || l.status)}</span>` : ""}${editable ? `<button type="button" class="x tl-ed" data-logedit="${i}" aria-label="Edit this update" title="Edit time or text">${SVG(ICON.edit)}</button>` : ""}</div>
+            <div class="plg-note clamp c3">${esc(txt)}</div>${l.memo ? `<div class="plg-memo clamp c2">${esc(l.memo)}</div>` : ""}</div></li>`;
+          })
+          .join("")}</ol></details>`;
+      })
+      .join("")
+  );
 }
 // show the selected day's part of the log
 const logToDay = () => {
   const l = $("#tf .plg-list");
   if (!l) return;
   const d = l.querySelector(`[data-logday="${daySel}"]`);
-  l.scrollTop = d ? d.offsetTop - l.offsetTop - 4 : l.scrollHeight;
+  l.scrollTop = d ? d.offsetTop - l.offsetTop - 40 : l.scrollHeight;
 };
 
 // ---------- open
@@ -167,7 +174,16 @@ function openTask(id, opts = {}) {
 function afterDraw() {
   growAll();
   logToDay();
+  clampMore();
 }
+// long text shows 2–3 lines with a "more" link
+function clampMore() {
+  document.querySelectorAll("#tf .clamp:not(.open)").forEach((el) => {
+    const has = el.nextElementSibling && el.nextElementSibling.classList.contains("more");
+    if (!has && el.offsetParent && el.scrollHeight > el.clientHeight + 2) el.insertAdjacentHTML("afterend", '<button type="button" class="more">more</button>');
+  });
+}
+$("#tf").addEventListener("toggle", clampMore, true);
 function autoProgress() {
   const s = editing.subtasks;
   if (!s.length) return;
@@ -244,11 +260,17 @@ function drawView() {
     carrySteps = isLast ? subs.map((s, i) => [s, i]).filter(([s]) => !s.done && s.day < pg.day) : [],
     carryBn = isLast ? t.bottlenecks.filter((x) => x.issue && !x.solved && x.day < pg.day) : [];
   const vstep = ([s, i], carry) =>
-    `<li class="${s.done ? "done" : ""}"><label><input type="checkbox" data-vtog="${i}" ${s.done ? "checked" : ""}><span>${esc(s.text)}</span></label>${s.done && s.doneAt ? `<small>${esc(whenTxt(s.doneAt))}</small>` : carry ? `<small>from ${esc(dayLbl(s.day))}</small>` : ""}</li>`;
+    `<li class="vst ${s.done ? "done" : ""}"><input type="checkbox" data-vtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><div class="vst-b"><div class="vst-t clamp c2">${esc(s.text)}</div>${s.note ? `<div class="vst-n clamp c2">${esc(s.note)}</div>` : ""}${s.done && s.doneAt ? `<small>Done ${esc(whenTxt(s.doneAt))}</small>` : carry ? `<small>from ${esc(dayLbl(s.day))}</small>` : ""}</div></li>`;
+  // open steps first; done ones fold away
+  const stepList = (L, carry) => {
+    const open = L.filter(([s]) => !s.done),
+      done = L.filter(([s]) => s.done);
+    return `${open.length ? `<ol class="vsteps">${open.map((x) => vstep(x, carry)).join("")}</ol>` : '<p class="small muted" style="margin:0">All steps for this day are done.</p>'}${done.length ? `<details class="vst-done"><summary>Done · ${done.length}</summary><ol class="vsteps">${done.map((x) => vstep(x, carry)).join("")}</ol></details>` : ""}`;
+  };
   const vbn = (x, carry) => `<div class="vbn ${x.solved ? "solved" : ""}">
-      <div class="vbn-top"><b>${esc(x.issue)}</b><span class="pill ${x.solved ? "ok" : "bad"}">${x.solved ? "Solved" : "Open"}</span></div>
-      ${x.solved && x.how ? `<div class="vbn-how"><span>How</span>${esc(x.how)}</div>` : ""}
-      <div class="vbn-meta">${carry ? `<button type="button" class="linkish" data-day="${x.day}">${esc(dayLbl(x.day))} ›</button> · ` : ""}Ran into it ${esc(whenTxt(x.at) || "—")}${x.solved ? ` · solved ${esc(whenTxt(x.solvedAt) || "—")}` : ""}</div></div>`;
+      <div class="vbn-top"><div class="vbn-ti"><b class="clamp c2">${esc(x.issue)}</b></div><span class="pill ${x.solved ? "ok" : "bad"}">${x.solved ? "Solved" : "Open"}</span></div>
+      ${x.solved && x.how ? `<div class="vbn-how clamp c2"><span>How</span>${esc(x.how)}</div>` : ""}
+      <div class="vbn-meta">${carry ? `<button type="button" class="linkish" data-day="${x.day}">${esc(dayLbl(x.day))} ›</button> · ` : ""}${esc(whenTxt(x.at) || "—")}${x.solved ? ` → solved ${esc(whenTxt(x.solvedAt) || "—")}` : ""}</div></div>`;
   const filled = pg.overviewHtml || pg.html || daySteps.length || dayBn.length || dayLinks.length;
   const about = [
     ["Category", t.category ? catName(t.category) : ""],
@@ -276,12 +298,12 @@ function drawView() {
           <button type="button" class="btn sm" data-goedit="day">${SVG(ICON.edit)}Edit this day</button></header>
         ${
           carrySteps.length || carryBn.length ?
-            `<section class="carry"><div class="carry-h">${SVG(ICON.repeat)}Still open from earlier days</div>${carrySteps.length ? `<ul class="vsteps">${carrySteps.map((x) => vstep(x, true)).join("")}</ul>` : ""}${carryBn.map((x) => vbn(x, true)).join("")}</section>`
+            `<section class="carry"><div class="carry-h">${SVG(ICON.repeat)}Still open from earlier days</div>${carrySteps.length ? `<ol class="vsteps">${carrySteps.map((x) => vstep(x, true)).join("")}</ol>` : ""}${carryBn.map((x) => vbn(x, true)).join("")}</section>`
           : ""
         }
         ${pg.overviewHtml ? sec("s-focus", "plan", "Focus of the day", "", html(pg.overviewHtml)) : ""}
         ${pg.html ? sec("s-det", "note", "Details &amp; findings", "", html(pg.html)) : ""}
-        ${daySteps.length ? sec("s-steps", "steps", "Steps", `${daySteps.filter(([s]) => s.done).length}/${daySteps.length} done`, `<ul class="vsteps">${daySteps.map((x) => vstep(x)).join("")}</ul>`) : ""}
+        ${daySteps.length ? sec("s-steps", "steps", "Steps", `<span class="mini-bar"><i style="width:${Math.round((daySteps.filter(([s]) => s.done).length / daySteps.length) * 100)}%"></i></span>${daySteps.filter(([s]) => s.done).length}/${daySteps.length}`, stepList(daySteps)) : ""}
         ${dayBn.length ? sec("s-bn", "flame", "Bottlenecks", `${dayBn.filter(([x]) => !x.solved).length} open · ${dayBn.filter(([x]) => x.solved).length} solved`, dayBn.map(([x]) => vbn(x)).join("")) : ""}
         ${dayLinks.length ? sec("s-links", "link", "Links", "", `<ul class="links">${dayLinks.map((l) => `<li>${SVG(ICON.link)}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label || l.url)}</a></li>`).join("")}</ul>`) : ""}
         ${filled ? "" : `<div class="dpage-empty"><p>Nothing written for this day yet.</p><button type="button" class="btn primary sm" data-goedit="day">Write this day</button></div>`}
@@ -301,7 +323,7 @@ function drawView() {
         ${parent ? `<button type="button" class="rel-row up" data-openrel="${esc(parent.id)}"><small>Continues from</small><b>${esc(parent.title)}</b><span class="st ${esc(parent.status)}">${esc(STATUS_LABEL[parent.status] || "")}</span></button>` : ""}
         ${kids.map((k) => `<button type="button" class="rel-row down" data-openrel="${esc(k.id)}"><small>Follow-up</small><b>${esc(k.title)}</b><span class="st ${esc(k.status)}">${esc(STATUS_LABEL[k.status] || "")}</span></button>`).join("")}
         <button type="button" class="btn sm ghost rel-add" id="t-follow" title="When this task leads to a new one, start a follow-up so they stay linked">+ Follow-up task</button></section>
-      <section class="plg-wrap"><div class="plg-top"><span class="flab">Progress log</span><span class="small muted">${t.log.length} entr${t.log.length === 1 ? "y" : "ies"}</span></div>
+      <section class="plg-wrap"><div class="plg-top"><span class="flab">Progress log</span></div>
         <div class="plg-list">${drawLog(t, false)}</div></section>
     </aside>
   </div>
@@ -333,7 +355,7 @@ function drawEdit() {
   </div>`;
 }
 const stepLi = (s, i) =>
-  `<li class="${s.done ? "done" : ""}"><input type="checkbox" data-subtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><span class="sub-main"><textarea class="sub-in grow1" rows="1" data-subtext="${i}" aria-label="Step">${esc(s.text)}</textarea>${s.done ? `<button type="button" class="when-chip" data-subwhen="${i}" title="Change when you did this">${SVG(ICON.edit)}Done ${esc(whenTxt(s.doneAt) || "· set time")}</button>` : ""}</span><button type="button" class="x" data-subdel="${i}" aria-label="Remove step">✕</button></li>`;
+  `<li class="${s.done ? "done" : ""}"><input type="checkbox" data-subtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><span class="sub-main"><textarea class="sub-in grow1" rows="1" data-subtext="${i}" aria-label="Step">${esc(s.text)}</textarea>${s.note !== undefined ? `<textarea class="sub-note grow1" rows="1" data-subnote="${i}" aria-label="Step details" placeholder="Details (optional): how, where, what to check">${esc(s.note)}</textarea>` : `<button type="button" class="sub-addnote" data-subnoteadd="${i}">+ details</button>`}${s.done ? `<button type="button" class="when-chip" data-subwhen="${i}" title="Change when you did this">${SVG(ICON.edit)}Done ${esc(whenTxt(s.doneAt) || "· set time")}</button>` : ""}</span><button type="button" class="x" data-subdel="${i}" aria-label="Remove step">✕</button></li>`;
 function editDay(t, pg) {
   const pi = t.days.indexOf(pg),
     daySteps = t.subtasks.map((s, i) => [s, i]).filter(([s]) => s.day === pg.day),
@@ -404,6 +426,10 @@ function readTaskForm() {
     const s = t.subtasks[+el.dataset.subtext];
     if (s && el.value.trim()) s.text = el.value.replace(/\s*\n\s*/g, " ").trim();
   });
+  document.querySelectorAll("#tf [data-subnote]").forEach((el) => {
+    const s = t.subtasks[+el.dataset.subnote];
+    if (s) s.note = el.value.trim();
+  });
   document.querySelectorAll("#tf [data-bnissue]").forEach((el) => {
     const x = t.bottlenecks[+el.dataset.bnissue];
     if (x) x.issue = el.value.trim();
@@ -464,6 +490,7 @@ function redrawKeep(focusId) {
   $("#dlg").scrollTop = sc;
   if (focusId === "t-note" && $("#tf .plg-list")) $("#tf .plg-list").scrollTop = 1e6;
   else if (lsc !== undefined && $("#tf .plg-list")) $("#tf .plg-list").scrollTop = lsc;
+  clampMore();
   if (focusId) $("#" + focusId)?.focus();
 }
 function goDay(d) {
@@ -545,7 +572,20 @@ $("#tf").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b || !$("#tf").contains(b)) return;
   const t = editing;
-  if (b.dataset.day) goDay(b.dataset.day);
+  if (b.classList.contains("more")) {
+    b.previousElementSibling.classList.add("open");
+    b.remove();
+  } else if (b.dataset.logf) {
+    logF = b.dataset.logf;
+    const l = $("#tf .plg-list");
+    l.innerHTML = drawLog(t, mode === "edit");
+    clampMore();
+  } else if (b.dataset.subnoteadd !== undefined) {
+    readTaskForm();
+    t.subtasks[+b.dataset.subnoteadd].note = "";
+    redrawKeep();
+    document.querySelector(`#tf [data-subnote="${b.dataset.subnoteadd}"]`)?.focus();
+  } else if (b.dataset.day) goDay(b.dataset.day);
   else if (b.dataset.goedit) goMode("edit", b.dataset.goedit);
   else if (b.dataset.etab) goMode("edit", b.dataset.etab);
   else if (b.id === "t-back") {
@@ -853,7 +893,10 @@ function saveTask(after = "close") {
   delete t.records;
   if (!t.parentId) delete t.parentId;
   t.log.sort((a, b) => (a.at || "").localeCompare(b.at || ""));
-  if (t.impact && t.impact !== old.impact) t.log.push({ at: nowISO(), note: `Result: ${t.impact}` });
+  if (t.impact && t.impact !== old.impact) {
+    const first = toPlain(t.impactHtml || "").split("\n").find((x) => x.trim()) || t.impact;
+    t.log.push({ at: nowISO(), note: `Result: ${first.length > 90 ? first.slice(0, 88) + "…" : first}`, ...(old.impact ? { memo: "Result / impact updated" } : {}) });
+  }
   const justDone = t.status === "done" && old.status !== "done";
   if (justDone) t.doneAt = nowISO();
   if (t.status !== "done") t.doneAt = "";
