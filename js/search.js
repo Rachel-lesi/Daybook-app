@@ -53,6 +53,7 @@ function runSearch() {
       catName(t.category),
       ...(t.subtasks || []).map((s) => s.text),
       ...(t.links || []).map((l) => l.label + " " + l.url),
+      ...[...(t.impactDocs || []), ...(t.notesDocs || [])].map((l) => (l.label || "") + " " + l.url),
       t.bnHow,
       ...(t.log || []).map((l) => [l.note, l.memo].filter(Boolean).join(" ")),
     ].join(" \n ");

@@ -247,6 +247,8 @@ function loadTask(id, opts = {}) {
     log: [...(t.log || [])],
     subtasks: (t.subtasks || []).map((s) => ({ ...s })),
     links: (t.links || []).map((l) => ({ ...l })),
+    impactDocs: (t.impactDocs || []).map((l) => ({ ...l })),
+    notesDocs: (t.notesDocs || []).map((l) => ({ ...l })),
     bottlenecks: bnList(t).map((x) => ({ ...x })),
     days: pageList(t),
   };
@@ -342,6 +344,44 @@ const sec = (cls, icon, title, hint, body, editTab) =>
   `<section class="dsec ${cls}"><div class="dsec-h"><span class="dsec-ic">${SVG(ICON[icon])}</span><span class="dsec-t">${title}</span>${hint ? `<span class="dsec-hint">${hint}</span>` : ""}${editTab ? `<button type="button" class="sec-ed" data-goedit="${editTab}" aria-label="Edit ${title}">${SVG(ICON.edit)}</button>` : ""}</div>${body}</section>`;
 const html = (h) => `<div class="rt-view">${clean(h)}</div>`;
 
+// ---------- smart chips: links to Google Docs, Word, PDF and the like
+const DOC_KIND = [
+  [/docs\.google\.com\/document/, "gdoc", "Google Doc"],
+  [/docs\.google\.com\/spreadsheets/, "gsheet", "Google Sheet"],
+  [/docs\.google\.com\/presentation/, "gslides", "Google Slides"],
+  [/docs\.google\.com\/forms/, "gform", "Google Form"],
+  [/\.pdf(\?|#|$)|\/:b:\//i, "pdf", "PDF"],
+  [/\.docx?(\?|#|$)|\/:w:\/|word/i, "word", "Word"],
+  [/\.xlsx?(\?|#|$)|\.csv(\?|#|$)|\/:x:\//i, "excel", "Excel"],
+  [/\.pptx?(\?|#|$)|\/:p:\//i, "ppt", "PowerPoint"],
+  [/drive\.google\.com|sharepoint\.com|onedrive|1drv\.ms/i, "drive", "File"],
+];
+const docKind = (url) => DOC_KIND.find(([re]) => re.test(url || "")) || [null, "web", "Link"];
+const DOC_IC = {
+  gdoc: "Doc", gsheet: "Sheet", gslides: "Slides", gform: "Form", pdf: "PDF", word: "W", excel: "X", ppt: "P", drive: "File", web: "Link",
+};
+function docName(l) {
+  if (l.label) return l.label;
+  try {
+    const u = new URL(l.url),
+      last = decodeURIComponent(u.pathname.split("/").filter(Boolean).pop() || "");
+    if (/\.[a-z0-9]{2,5}$/i.test(last)) return last;
+    return docKind(l.url)[2] + " · " + u.hostname.replace(/^www\./, "");
+  } catch {
+    return l.url;
+  }
+}
+const chip = (l, edit) => {
+  const [, k, kl] = docKind(l.url);
+  return `<span class="schip k-${k}"><a href="${esc(l.url)}" target="_blank" rel="noopener" title="${esc(l.url)}"><span class="schip-ic">${DOC_IC[k]}</span><span class="schip-t">${esc(docName(l))}</span><span class="schip-k">${kl}</span></a>${edit || ""}</span>`;
+};
+const docAdder = (key) =>
+  `<div class="qrow rwrap doc-add"><input id="t-doc-${key}-url" type="url" placeholder="Paste a Google Docs, Word or PDF link" class="inp"><input id="t-doc-${key}-name" placeholder="Name (optional)" class="inp" style="max-width:170px"><button class="btn sm" type="button" data-docadd="${key}">Add</button></div>`;
+const docList = (t, key, editable) => {
+  const L = t[key + "Docs"] || [];
+  return L.length ? `<div class="schips">${L.map((l, i) => chip(l, editable ? `<button type="button" class="schip-x" data-docdel="${key}:${i}" aria-label="Remove">✕</button>` : "")).join("")}</div>` : "";
+};
+
 function drawTask() {
   const d = $("#tf");
   d.classList.toggle("tk-editing", mode === "edit");
@@ -389,28 +429,35 @@ function drawView() {
     ["Time spent", mins ? fmtMins(mins) : ""],
   ].filter((x) => x[1]);
   // things that are easy to forget, with a jump straight to each field
-  const miss = [];
-  if (!t.overviewHtml && !t.overview) miss.push(["task:t-overview", "Goal of the whole task"]);
-  if (!t.due) miss.push(["task:t-due", "Deadline"]);
-  if (!t.category) miss.push(["task:t-cat", "Category"]);
-  if (!t.assignedBy) miss.push(["task:t-by", "Who assigned it"]);
-  if (t.status !== "done" && !t.days.some((p) => p.day === todayKey())) miss.push(["today:", "Today's page: what you did today"]);
-  else {
-    if (!pg.overviewHtml) miss.push(["day:t-dover", `Focus of ${dayLbl(pg.day).replace("Today", "today")}`]);
-    if (!pg.html) miss.push(["day:t-desc", `Details for ${dayLbl(pg.day).replace("Today", "today")}`]);
-    if (!daySteps.length && !pg.html) miss.push(["day:t-subnew", `Steps for ${dayLbl(pg.day).replace("Today", "today")}`]);
-  }
+  // the day's sections that are still empty; steps, bottlenecks and links can be marked "none today"
+  const miss = [],
+    none = pg.none || [],
+    dl = pg.day === todayKey() ? "today" : fmtDate(pg.day);
+  if (t.status !== "done" && !t.days.some((p) => p.day === todayKey())) miss.push(["today:", "Today's page", ""]);
+  if (!pg.overviewHtml) miss.push(["day:t-dover", "Focus of the day", ""]);
+  if (!pg.html) miss.push(["day:t-desc", "Details & findings", ""]);
+  if (!daySteps.length && !none.includes("steps")) miss.push(["day:t-subnew", "Steps", "steps"]);
+  if (!dayBn.length && !none.includes("bn")) miss.push(["daybn:", "Bottlenecks", "bn"]);
+  if (!dayLinks.length && !none.includes("links")) miss.push(["day:t-linkurl", "Links", "links"]);
   t.bottlenecks.forEach((x, i) => {
-    if (x.issue && x.solved && !x.how) miss.push(["bn:" + i, `How you solved “${x.issue.length > 40 ? x.issue.slice(0, 38) + "…" : x.issue}”`]);
+    if (x.issue && x.solved && !x.how && x.day === pg.day) miss.push(["bn:" + i, `How you solved “${x.issue.length > 34 ? x.issue.slice(0, 32) + "…" : x.issue}”`, ""]);
   });
-  if ((t.status === "done" || prog >= 100) && !t.impactHtml && !t.impact) miss.push(["task:t-impact", "Result / impact"]);
+  if ((t.status === "done" || prog >= 100) && !t.impact && !t.impactHtml && !(t.impactDocs || []).length) miss.push(["task:t-impact-line", "Result / impact", ""]);
   const fillBlock = miss.length
-    ? `<section class="tp-box tk-fill"><div class="tp-box-h"><span class="flab">Still to fill in</span><span class="fill-n">${miss.length}</span></div><ul class="fill-l">${miss.map(([a, l]) => `<li><button type="button" data-fill="${esc(a)}"><span class="fill-dot"></span>${esc(l)}<span class="fill-go">›</span></button></li>`).join("")}</ul></section>`
-    : `<section class="tp-box tk-fill done"><div class="tp-box-h"><span class="flab">All filled in</span><span class="fill-ok">✓</span></div></section>`;
+    ? `<section class="tp-box tk-fill"><div class="tp-box-h"><span class="flab">Still to fill in · ${esc(dl)}</span><span class="fill-n">${miss.length}</span></div><ul class="fill-l">${miss.map(([a, l, nk]) => `<li><button type="button" class="fill-go-b" data-fill="${esc(a)}"><span class="fill-dot"></span>${esc(l)}</button>${nk ? `<button type="button" class="fill-none" data-fillnone="${nk}" title="Nothing for this day">none</button>` : '<span class="fill-go">›</span>'}</li>`).join("")}</ul></section>`
+    : `<section class="tp-box tk-fill done"><div class="tp-box-h"><span class="flab">${esc(dl[0].toUpperCase() + dl.slice(1))} is all filled in</span><span class="fill-ok">✓</span></div></section>`;
   const aboutBlock = `<section class="tp-box tk-about2"><div class="tp-box-h"><span class="flab">About this task</span><button type="button" class="linkbtn small" data-goedit="task">Edit</button></div>
       ${about.length ? `<dl class="kv">${about.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : '<p class="small muted" style="margin:0">Nothing added yet.</p>'}
-      ${t.impactHtml || t.impact ? `<details class="kv-d"><summary>Result / impact</summary>${html(rich(t, "impact"))}</details>` : ""}
-      ${t.notesHtml || t.notes ? `<details class="kv-d"><summary>Notes</summary><div class="rt-view mono">${clean(rich(t, "notes"))}</div></details>` : ""}
+      ${
+        t.impact || t.impactHtml || (t.impactDocs || []).length ?
+          `<div class="kv-b"><span class="kv-l">Result / impact</span>${t.impactLine || (!t.impactHtml && t.impact) ? `<div class="kv-line">${esc(t.impactLine || t.impact)}</div>` : ""}${docList(t, "impact")}${t.impactHtml ? `<details class="kv-d"><summary>Written result</summary>${html(t.impactHtml)}</details>` : ""}</div>`
+        : ""
+      }
+      ${
+        t.notesHtml || t.notes || (t.notesDocs || []).length ?
+          `<div class="kv-b"><span class="kv-l">Notes</span>${docList(t, "notes")}${t.notesHtml || t.notes ? `<details class="kv-d"><summary>Written notes</summary><div class="rt-view mono">${clean(rich(t, "notes"))}</div></details>` : ""}</div>`
+        : ""
+      }
     </section>`;
   const relBlock = `<section class="tp-box tk-rel2"><div class="tp-box-h"><span class="flab">Connected tasks</span></div>
       ${parent ? `<button type="button" class="rel-row up" data-openrel="${esc(parent.id)}"><small>Continues from</small><b>${esc(parent.title)}</b><span class="st ${esc(parent.status)}">${esc(STATUS_LABEL[parent.status] || "")}</span></button>` : ""}
@@ -448,7 +495,7 @@ function drawView() {
         ${pg.html ? sec("s-det", "note", "Details &amp; findings", "", html(pg.html)) : ""}
         ${daySteps.length ? sec("s-steps", "steps", "Steps", `<span class="mini-bar"><i style="width:${Math.round((daySteps.filter(([s]) => s.done).length / daySteps.length) * 100)}%"></i></span>${daySteps.filter(([s]) => s.done).length}/${daySteps.length}`, stepList(daySteps)) : ""}
         ${dayBn.length ? sec("s-bn", "flame", "Bottlenecks", `${dayBn.filter(([x]) => !x.solved).length} open · ${dayBn.filter(([x]) => x.solved).length} solved`, dayBn.map(([x]) => vbn(x)).join("")) : ""}
-        ${dayLinks.length ? sec("s-links", "link", "Links", "", `<ul class="links">${dayLinks.map((l) => `<li>${SVG(ICON.link)}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label || l.url)}</a></li>`).join("")}</ul>`) : ""}
+        ${dayLinks.length ? sec("s-links", "link", "Links & files", "", `<div class="schips">${dayLinks.map((l) => chip(l)).join("")}</div>`) : ""}
         ${filled ? "" : `<div class="dpage-empty"><p>Nothing written for this day yet.</p><button type="button" class="btn primary sm" data-goedit="day">Write this day</button></div>`}
       </article>
     </div>
@@ -504,8 +551,8 @@ function editDay(t, pg) {
       <div class="qrow"><textarea id="t-subnew" rows="1" placeholder="Add a step, then press Enter" class="inp grow1"></textarea><button class="btn sm" type="button" id="t-subadd">Add</button></div></div>
     <div class="ef s-bn"><span class="ef-l">${SVG(ICON.flame)}Bottlenecks</span>
       ${dayBn.map(([x, i]) => bnCard(x, i)).join("")}<button type="button" class="btn sm ghost bn-add" id="t-bnadd">+ Add a bottleneck</button></div>
-    <div class="ef s-links"><span class="ef-l">${SVG(ICON.link)}Links</span>
-      ${dayLinks.length ? `<ul class="links">${dayLinks.map(([l, i]) => `<li>${SVG(ICON.link)}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label || l.url)}</a><button type="button" class="x tl-ed" data-linkedit="${i}" aria-label="Edit link" title="Edit">${SVG(ICON.edit)}</button><button type="button" class="x" data-linkdel="${i}" aria-label="Remove link">✕</button></li>`).join("")}</ul>` : ""}
+    <div class="ef s-links"><span class="ef-l">${SVG(ICON.link)}Links &amp; files</span>
+      ${dayLinks.length ? `<div class="schips">${dayLinks.map(([l, i]) => chip(l, `<button type="button" class="schip-x" data-linkedit="${i}" aria-label="Edit link" title="Rename">${SVG(ICON.edit)}</button><button type="button" class="schip-x" data-linkdel="${i}" aria-label="Remove link">✕</button>`)).join("")}</div>` : ""}
       <div class="qrow rwrap"><input id="t-linkurl" type="url" placeholder="Paste a link (drive, sheet, ticket)" class="inp"><input id="t-linklabel" placeholder="Name (optional)" class="inp" style="max-width:170px"><button class="btn sm" type="button" id="t-linkadd">Add</button></div></div>`;
 }
 function editInfo(t) {
@@ -527,8 +574,13 @@ function editInfo(t) {
       <label class="f">Repeats<select id="t-repeat">${REPEAT.map(([v, l]) => `<option value="${v}" ${(t.repeat || "none") === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       <label class="f">Continues from<select id="t-parent"><option value="">Nothing, it's a new piece of work</option>${others.map((x) => `<option value="${esc(x.id)}" ${x.id === t.parentId ? "selected" : ""}>${esc(x.title)}</option>`).join("")}</select></label>
     </div>
-    <div class="f"><span class="flab">Result / impact <span class="muted">· shows on your resume bullets</span></span>${rteHTML("t-impact", rich(t, "impact"), "e.g. Cut report time from 2 hours to 20 minutes", "short")}</div>
-    <div class="f"><span class="flab">Notes for the whole task <span class="muted">· SQL, file paths, things to remember</span></span>${rteHTML("t-notes", rich(t, "notes"), "SELECT batch_id, COUNT(*) FROM production GROUP BY batch_id HAVING COUNT(*) > 1;", "mono")}</div>
+    <div class="f doc-sec"><span class="flab">Result / impact</span>
+      <input id="t-impact-line" class="inp" value="${esc(t.impactLine ?? (t.impactHtml ? "" : t.impact || ""))}" placeholder="In one line, for your resume, e.g. Found 120 wrong part codes before they reached the ERP">
+      ${docList(t, "impact", true)}${docAdder("impact")}
+      <details class="write-in" ${t.impactHtml ? "open" : ""}><summary>Write it out here instead</summary>${rteHTML("t-impact", t.impactHtml || "", "Why it matters, key findings…", "short")}</details></div>
+    <div class="f doc-sec"><span class="flab">Notes for the whole task</span>
+      ${docList(t, "notes", true)}${docAdder("notes")}
+      <details class="write-in" ${t.notesHtml || t.notes ? "open" : ""}><summary>Write notes here instead</summary>${rteHTML("t-notes", rich(t, "notes"), "SQL, file paths, things to remember", "mono")}</details></div>
     ${isNew ? "" : `<p class="small muted tk-time">${SVG(ICON.timer)} Time spent: ${mins ? fmtMins(mins) : "none yet"} · <button type="button" class="linkbtn small" data-logtime="task|${esc(t.id)}|${esc(t.title || "")}">log or edit time</button></p>`}`;
 }
 function editLog(t) {
@@ -581,11 +633,15 @@ function readTaskForm() {
     t.parentId = val("t-parent");
     if (!t.subtasks.length && $("#t-prog")) t.progress = +val("t-prog");
     t.impactHtml = rteVal("t-impact");
-    t.impact = toPlain(t.impactHtml)
-      .split("\n")
-      .map((x) => x.replace(/^(• |\d+\. )/, "").trim())
-      .filter(Boolean)
-      .join("; ");
+    t.impactLine = (val("t-impact-line") || "").trim();
+    // the one-liner is what resume bullets use; otherwise fall back to the written result
+    t.impact =
+      t.impactLine ||
+      toPlain(t.impactHtml)
+        .split("\n")
+        .map((x) => x.replace(/^(• |\d+\. )/, "").trim())
+        .filter(Boolean)
+        .join("; ");
     t.notesHtml = rteVal("t-notes");
     t.notes = toPlain(t.notesHtml);
   }
@@ -607,7 +663,7 @@ function redrawKeep(focusId) {
   pageDelAsk = false;
   const sc = window.scrollY,
     lsc = $("#tf .plg-list")?.scrollTop,
-    keep = ["t-note", "t-memo", "t-subnew", "t-linkurl", "t-linklabel"].map((id) => [id, $("#" + id)?.value || ""]);
+    keep = ["t-note", "t-memo", "t-subnew", "t-linkurl", "t-linklabel", "t-doc-impact-url", "t-doc-impact-name", "t-doc-notes-url", "t-doc-notes-name"].map((id) => [id, $("#" + id)?.value || ""]);
   drawTask();
   keep.forEach(([id, v]) => {
     if (v && id !== focusId && $("#" + id)) $("#" + id).value = v;
@@ -701,6 +757,26 @@ $("#tf").addEventListener("click", (e) => {
   if (b.classList.contains("more")) {
     b.previousElementSibling.classList.add("open");
     b.remove();
+  } else if (b.dataset.docadd) {
+    readTaskForm();
+    const k = b.dataset.docadd;
+    let u = (val(`t-doc-${k}-url`) || "").trim();
+    if (!u) return $(`#t-doc-${k}-url`).focus();
+    if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+    t[k + "Docs"] = [...(t[k + "Docs"] || []), { url: u, label: (val(`t-doc-${k}-name`) || "").trim() }];
+    $(`#t-doc-${k}-name`).value = "";
+    redrawKeep(`t-doc-${k}-url`);
+  } else if (b.dataset.docdel) {
+    readTaskForm();
+    const [k, i] = b.dataset.docdel.split(":");
+    t[k + "Docs"].splice(+i, 1);
+    redrawKeep();
+  } else if (b.dataset.fillnone) {
+    const pg = curPage();
+    pg.none = [...new Set([...(pg.none || []), b.dataset.fillnone])];
+    saveTask("stay");
+    drawTask();
+    afterDraw();
   } else if (b.dataset.tlscope) {
     tlScope = b.dataset.tlscope;
     $("#tf .plg-list").innerHTML = drawLog(t, mode === "edit");
@@ -714,6 +790,9 @@ $("#tf").addEventListener("click", (e) => {
       daySel = todayKey();
       goMode("edit", "day");
       $("#t-dover")?.focus();
+    } else if (kind === "daybn") {
+      goMode("edit", "day");
+      $("#t-bnadd")?.click();
     } else if (kind === "bn") {
       const x = t.bottlenecks[+arg];
       daySel = x.day;
@@ -977,7 +1056,11 @@ $("#tf").addEventListener("keydown", (e) => {
     }
   }
   const map = { "t-note": "t-addnote", "t-subnew": "t-subadd", "t-linkurl": "t-linkadd", "t-linklabel": "t-linkadd" };
-  if (map[e.target.id]) {
+  const dm = (e.target.id || "").match(/^t-doc-(\w+)-(url|name)$/);
+  if (dm) {
+    e.preventDefault();
+    document.querySelector(`#tf [data-docadd="${dm[1]}"]`).click();
+  } else if (map[e.target.id]) {
     e.preventDefault();
     $("#" + map[e.target.id]).click();
   }
@@ -1051,7 +1134,13 @@ function saveTask(after = "close") {
   bnSummary(t);
   // day pages: drop empty ones, keep plain text for cards, reports and search
   const used = (d) => [...t.subtasks, ...t.bottlenecks, ...t.links].some((x) => x.day === d);
-  t.days = t.days.filter((p) => p.html || p.overviewHtml || used(p.day));
+  t.days.forEach((p) => {
+    if (!p.none) return;
+    const has = { steps: t.subtasks, bn: t.bottlenecks, links: t.links };
+    p.none = p.none.filter((k) => !has[k].some((x) => x.day === p.day));
+    if (!p.none.length) delete p.none;
+  });
+  t.days = t.days.filter((p) => p.html || p.overviewHtml || p.none || used(p.day));
   const many = t.days.length > 1;
   t.desc = t.days
     .filter((p) => p.html || p.overviewHtml)
