@@ -122,74 +122,116 @@ const TL_GROUPS = [
 ];
 const TL_SHOW = 6;
 let tlOpen = {};
-// "day": only what happened on the selected day; "all": the whole task
-let tlScope = "day";
-function drawLog(t, editable) {
+// "day": only the selected day; "all": the whole task. "type": grouped by kind; "date": a diary by day.
+let tlScope = "day",
+  tlView = "type";
+const tlExp = new Set(); // rows opened to show their details
+// short "how long" tag for a bottleneck
+function spanTag(from, to) {
+  const a = new Date(from),
+    b = to ? new Date(to) : new Date();
+  const m = Math.round((b - a) / 6e4);
+  if (to && m < 0) return ["warn", "Check dates"];
+  const days = dayDiff(isoDay(from), to ? isoDay(to) : todayKey());
+  const txt =
+    m < 60 ? `${Math.max(1, m)} min`
+    : days === 0 ? `${m < 600 ? Math.round(m / 6) / 10 : Math.round(m / 60)} h`
+    : days === 1 ? (to ? "next day" : "1 day")
+    : `${days} days`;
+  return to ? ["ok", m < 60 || days === 0 ? `Solved in ${txt}` : days === 1 ? "Solved next day" : `Solved in ${txt}`] : ["bad", `Open ${txt}`];
+}
+// every log entry becomes one row; a bottleneck and its "solved" entry share a row
+function tlRows(t, editable) {
   const all = t.log.map((l, i) => ({ l, i, k: logKind(l.note || "")[0] }));
-  const onDay = tlScope === "day" ? daySel : "";
-  const scope = `<div class="tl-scope" role="group" aria-label="Timeline for"><button type="button" data-tlscope="day" aria-pressed="${tlScope === "day"}">${esc(daySel === todayKey() ? "Today" : fmtDate(daySel))}</button><button type="button" data-tlscope="all" aria-pressed="${tlScope === "all"}">Whole task · ${all.length}</button></div>`;
-  if (!all.length) return scope + '<p class="small muted plg-empty">No updates yet. Log what you did, what you\'re waiting on, or a decision you made.</p>';
-  const inDay = (...isos) => !onDay || isos.some((x) => x && isoDay(x) === onDay);
-  const newest = (a, b) => (b.l.at || "").localeCompare(a.l.at || "");
-  const ed = (i, lbl) => (editable ? `<button type="button" class="x tl-ed" data-logedit="${i}" aria-label="Edit ${lbl}" title="Edit ${lbl}">${SVG(ICON.edit)}${lbl ? `<span>${lbl}</span>` : ""}</button>` : "");
-  const when = (iso) => `${esc(dayLbl(isoDay(iso)))} · ${fmtTime(iso)}`;
-  const item = (k, title, opts = {}) =>
-    `<li class="tl-i k-${k}"><span class="tl-ic">${SVG(TL_IC[k] || TL_IC.other)}</span><div class="tl-b"><div class="tl-h"><div class="tl-tw"><b class="clamp c2">${esc(title)}</b></div>${opts.pill || ""}</div>${opts.memo ? `<div class="tl-memo clamp c2">${opts.memo}</div>` : ""}<div class="tl-meta">${opts.meta || ""}${opts.edit || ""}</div></div></li>`;
-  const body = TL_GROUPS.map(([g, label, kinds]) => {
-    let rows = [];
-    if (g === "block") {
-      // pair each bottleneck with its solved entry
-      const solved = all.filter((x) => x.k === "solved"),
-        usedS = new Set();
-      all
-        .filter((x) => x.k === "block")
-        .sort(newest)
-        .forEach((x) => {
-          const issue = stripKind(x.l.note),
-            s = solved.find((y) => !usedS.has(y.i) && stripKind(y.l.note) === issue);
-          if (s) usedS.add(s.i);
-          if (!inDay(x.l.at, s && s.l.at)) return;
-          rows.push({
-            at: (s || x).l.at,
-            h: item(s ? "solved" : "block", issue, {
-              pill: `<span class="pill ${s ? "ok" : "bad"}">${s ? "Solved" : "Open"}</span>`,
-              memo: s && s.l.memo ? esc(s.l.memo.replace(/^How:\s*/, "")) : x.l.memo ? esc(x.l.memo) : "",
-              meta: `${when(x.l.at)}${s ? ` → solved ${when(s.l.at)}` : ""}`,
-              edit: ed(x.i, editable ? "noted" : "") + (s ? ed(s.i, editable ? "solved" : "") : ""),
-            }),
-          });
-        });
-      solved
-        .filter((y) => !usedS.has(y.i) && inDay(y.l.at))
-        .forEach((y) => rows.push({ at: y.l.at, h: item("solved", stripKind(y.l.note), { pill: '<span class="pill ok">Solved</span>', memo: y.l.memo ? esc(y.l.memo.replace(/^How:\s*/, "")) : "", meta: when(y.l.at), edit: ed(y.i) }) }));
-      rows.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
-    } else {
-      rows = all
-        .filter((x) => kinds.includes(x.k) && inDay(x.l.at))
-        .sort(newest)
-        .map((x) => {
-          const k = x.k === "new" ? "new" : g === "other" ? "other" : g;
-          const title = ["step", "res"].includes(g) ? stripKind(x.l.note) : x.l.note;
-          return {
-            at: x.l.at,
-            h: item(k, title, {
-              pill: x.l.status ? `<span class="plg-st st-${esc(x.l.status)}">${esc(LOG_ST_LABEL[x.l.status] || x.l.status)}</span>` : "",
-              memo: x.l.memo ? esc(x.l.memo) : "",
-              meta: when(x.l.at),
-              edit: ed(x.i),
-            }),
-          };
-        });
+  const rows = [],
+    solved = all.filter((x) => x.k === "solved"),
+    usedS = new Set();
+  const ed = (i, lbl) => (editable ? `<button type="button" class="tl-edb" data-logedit="${i}">${SVG(ICON.edit)}${lbl}</button>` : "");
+  const full = (iso) => `${esc(fullDay(isoDay(iso)))} · ${fmtTime(iso)}`;
+  all.forEach((x) => {
+    if (x.k === "solved") return;
+    if (x.k === "block") {
+      const issue = stripKind(x.l.note),
+        s = solved.find((y) => !usedS.has(y.i) && stripKind(y.l.note) === issue);
+      if (s) usedS.add(s.i);
+      const [tc, tt] = spanTag(x.l.at, s && s.l.at);
+      rows.push({
+        key: "b" + x.i,
+        g: "block",
+        k: s ? "solved" : "block",
+        at: x.l.at,
+        days: [isoDay(x.l.at), s && isoDay(s.l.at)].filter(Boolean),
+        title: issue,
+        tags: `<span class="tl-tag ${tc}">${tt}</span>`,
+        memo: s && s.l.memo ? s.l.memo.replace(/^How:\s*/, "") : x.l.memo || "",
+        memoLbl: s ? "How" : "",
+        detail: `<div>Ran into it: ${full(x.l.at)}</div>${s ? `<div>Solved: ${full(s.l.at)}</div>` : ""}`,
+        edit: ed(x.i, "Change when it started") + (s ? ed(s.i, "Change when solved") : ""),
+      });
+      return;
     }
-    if (!rows.length) return "";
-    const isOpen = tlOpen[g] ?? g !== "other",
-      full = tlOpen[g + "+"];
-    return `<details class="tl-g g-${g}" data-tlg="${g}" ${isOpen ? "open" : ""}><summary><span class="tl-gi">${SVG(TL_IC[g])}</span><span>${label}</span><small>${rows.length}</small></summary><ol class="tl">${rows
-      .slice(0, full ? rows.length : TL_SHOW)
-      .map((r) => r.h)
-      .join("")}</ol>${rows.length > TL_SHOW && !full ? `<button type="button" class="tl-all" data-tlall="${g}">Show all ${rows.length}</button>` : ""}</details>`;
-  }).join("");
-  return scope + (body || `<p class="small muted plg-empty">Nothing logged on ${esc(dayLbl(onDay))} yet.</p>`);
+    const g = TL_GROUPS.find(([, , ks]) => ks.includes(x.k))[0];
+    rows.push({
+      key: "e" + x.i,
+      g,
+      k: x.k === "new" ? "new" : g,
+      at: x.l.at,
+      days: [isoDay(x.l.at)],
+      title: ["step", "res"].includes(g) ? stripKind(x.l.note) : x.l.note,
+      tags: x.l.status ? `<span class="plg-st st-${esc(x.l.status)}">${esc(LOG_ST_LABEL[x.l.status] || x.l.status)}</span>` : "",
+      memo: x.l.memo || "",
+      memoLbl: "",
+      detail: `<div>${full(x.l.at)}</div>`,
+      edit: ed(x.i, "Edit"),
+    });
+  });
+  solved
+    .filter((y) => !usedS.has(y.i))
+    .forEach((y) =>
+      rows.push({ key: "e" + y.i, g: "block", k: "solved", at: y.l.at, days: [isoDay(y.l.at)], title: stripKind(y.l.note), tags: '<span class="tl-tag ok">Solved</span>', memo: (y.l.memo || "").replace(/^How:\s*/, ""), memoLbl: "How", detail: `<div>Solved: ${full(y.l.at)}</div>`, edit: ed(y.i, "Edit") }),
+    );
+  return rows.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
+}
+const tlRow = (r) => {
+  const open = tlExp.has(r.key);
+  return `<li class="tl-i k-${r.k} ${open ? "open" : ""}"><time class="tl-t">${fmtTime(r.at)}</time><span class="tl-ic">${SVG(TL_IC[r.k] || TL_IC.other)}</span><div class="tl-b">
+    <button type="button" class="tl-sum" data-tlx="${r.key}" aria-expanded="${open}"><span class="tlr-title">${esc(r.title)}</span>${r.tags}</button>
+    ${open ? `<div class="tl-more">${r.memo ? `<div class="tl-memo">${r.memoLbl ? `<b>${r.memoLbl}</b> ` : ""}${esc(r.memo)}</div>` : ""}<div class="tl-when">${r.detail}</div>${r.edit ? `<div class="tl-eds">${r.edit}</div>` : ""}</div>` : r.memo ? `<div class="tl-peek">${r.memoLbl ? `<b>${r.memoLbl}</b> ` : ""}${esc(r.memo)}</div>` : ""}
+  </div></li>`;
+};
+// rows with a small date heading whenever the day changes (not needed when only one day is shown)
+const tlList = (rows, withDates) => {
+  let d = "",
+    h = "";
+  rows.forEach((r) => {
+    const rd = isoDay(r.at);
+    if (withDates && rd !== d) {
+      d = rd;
+      h += `<li class="tl-date">${esc(dayLbl(rd))}</li>`;
+    }
+    h += tlRow(r);
+  });
+  return `<ol class="tl">${h}</ol>`;
+};
+function drawLog(t, editable) {
+  const rowsAll = tlRows(t, editable),
+    onDay = tlScope === "day" ? daySel : "",
+    rows = onDay ? rowsAll.filter((r) => r.days.includes(onDay)) : rowsAll;
+  const head = `<div class="tl-ctl"><div class="tl-scope" role="group" aria-label="Timeline for"><button type="button" data-tlscope="day" aria-pressed="${tlScope === "day"}">${esc(dayLbl(daySel))}</button><button type="button" data-tlscope="all" aria-pressed="${tlScope === "all"}">Whole task</button></div><div class="tl-scope sm" role="group" aria-label="Arrange"><button type="button" data-tlview="type" aria-pressed="${tlView === "type"}">By type</button><button type="button" data-tlview="date" aria-pressed="${tlView === "date"}">By date</button></div></div>`;
+  if (!rows.length) return head + `<p class="small muted plg-empty">${t.log.length ? `Nothing logged on ${esc(dayLbl(onDay))} yet.` : "No updates yet. Log what you did, what you're waiting on, or a decision you made."}</p>`;
+  if (tlView === "date") return head + tlList(rows, !onDay);
+  return (
+    head +
+    TL_GROUPS.map(([g, label]) => {
+      const R = rows.filter((r) => r.g === g);
+      if (!R.length) return "";
+      const isOpen = tlOpen[g] ?? g !== "other",
+        showAll = tlOpen[g + "+"],
+        cut = showAll ? R : R.slice(0, TL_SHOW),
+        opn = g === "block" ? R.filter((r) => r.k === "block").length : 0;
+      return `<details class="tl-g g-${g}" data-tlg="${g}" ${isOpen ? "open" : ""}><summary><span class="tl-gi">${SVG(TL_IC[g])}</span><span>${label}</span>${opn ? `<em class="tl-open">${opn} open</em>` : ""}<small>${R.length}</small></summary>${tlList(cut, !onDay)}${R.length > TL_SHOW && !showAll ? `<button type="button" class="tl-all" data-tlall="${g}">Show all ${R.length}</button>` : ""}</details>`;
+    }).join("")
+  );
 }
 // show the selected day's part of the log
 const logToDay = () => {
@@ -500,7 +542,7 @@ function drawView() {
       </article>
     </div>
     <aside class="tp-right">
-      <section class="plg-wrap"><div class="plg-top"><span class="flab">Timeline</span><span class="small muted">newest first</span></div>
+      <section class="plg-wrap"><div class="plg-top"><span class="flab">Timeline</span><span class="small muted">newest first · tap a row for details</span></div>
         <div class="plg-list">${drawLog(t, false)}</div></section>
     </aside>
   </div>`;
@@ -589,7 +631,7 @@ function editLog(t) {
       <textarea id="t-memo" rows="1" class="inp grow1" placeholder="Memo or notes (optional)" aria-label="Memo"></textarea>
       <div class="plg-add-row"><div class="seg sm" id="t-logst" aria-label="Status of this update">${LOG_ST.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${logSt === v}">${l}</button>`).join("")}</div><button type="button" class="when-chip" id="t-logwhen" title="When did this happen?">${SVG(ICON.edit)}${logAt ? esc(whenTxt(logAt)) : daySel === todayKey() ? "Now" : esc(fmtDate(daySel))}</button><button class="btn sm primary" type="button" id="t-addnote">Add to log</button></div>
     </div>
-    <div class="plg-wrap e"><div class="plg-top"><span class="flab">Progress log</span><span class="small muted">tap ✎ to change the time or text</span></div><div class="plg-list">${drawLog(t, true)}</div></div>`;
+    <div class="plg-wrap e"><div class="plg-top"><span class="flab">Progress log</span><span class="small muted">tap a row to change its time or text</span></div><div class="plg-list">${drawLog(t, true)}</div></div>`;
 }
 
 // ---------- reading the form (only the fields on the current edit tab exist)
@@ -777,6 +819,16 @@ $("#tf").addEventListener("click", (e) => {
     saveTask("stay");
     drawTask();
     afterDraw();
+  } else if (b.dataset.tlx) {
+    const k = b.dataset.tlx;
+    tlExp.has(k) ? tlExp.delete(k) : tlExp.add(k);
+    const l = $("#tf .plg-list"),
+      sc = l.scrollTop;
+    l.innerHTML = drawLog(t, mode === "edit");
+    l.scrollTop = sc;
+  } else if (b.dataset.tlview) {
+    tlView = b.dataset.tlview;
+    $("#tf .plg-list").innerHTML = drawLog(t, mode === "edit");
   } else if (b.dataset.tlscope) {
     tlScope = b.dataset.tlscope;
     $("#tf .plg-list").innerHTML = drawLog(t, mode === "edit");
