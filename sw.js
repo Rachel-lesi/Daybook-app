@@ -1,6 +1,6 @@
 // Keeps Daybook opening instantly and working offline.
 // Bump VERSION whenever you upload changed files so devices pick them up.
-const VERSION = "daybook-v98";
+const VERSION = "daybook-v99";
 const SHELL = [
   "./",
   "./index.html",

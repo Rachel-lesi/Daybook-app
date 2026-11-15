@@ -123,7 +123,9 @@ const TL_GROUPS = [
 const TL_SHOW = 6;
 let tlOpen = {};
 // "day": only the selected day; "all": the whole task. "type": grouped by kind; "date": a diary by day.
-const bnOpen = new Set(); // bottlenecks opened for editing
+const bnOpen = new Set(), // bottlenecks opened for editing
+  stOpen = new Set(), // steps opened for editing
+  vstOpen = new Set(); // steps showing their details on the summary
 let tlScope = "day",
   tlView = "type";
 const tlExp = new Set(); // rows opened to show their details
@@ -299,6 +301,7 @@ function loadTask(id, opts = {}) {
   daySel = opts.day && editing.days.some((p) => p.day === opts.day) ? opts.day : editing.days.some((p) => p.day === todayKey()) ? todayKey() : editing.days.at(-1).day;
   confirmDel = pageDelAsk = false;
   bnOpen.clear();
+  stOpen.clear();
   logSt = logAt = "";
   mode = isNew ? "edit" : opts.mode || "view";
   etab = isNew ? "task" : opts.tab || "day";
@@ -453,8 +456,15 @@ function drawView() {
     dayLinks = t.links.filter((l) => l.day === pg.day),
     carrySteps = isLast ? subs.map((s, i) => [s, i]).filter(([s]) => !s.done && s.day < pg.day) : [],
     carryBn = isLast ? t.bottlenecks.filter((x) => x.issue && !x.solved && x.day < pg.day) : [];
-  const vstep = ([s, i], carry) =>
-    `<li class="vst ${s.done ? "done" : ""}"><input type="checkbox" data-vtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><div class="vst-b"><div class="vst-t clamp c2">${esc(s.text)}</div>${s.note ? `<div class="vst-n clamp c2">${esc(s.note)}</div>` : ""}${s.done && s.doneAt ? `<small>Done ${esc(whenTxt(s.doneAt))}</small>` : carry ? `<small>from ${esc(dayLbl(s.day))}</small>` : ""}</div></li>`;
+  const vstep = ([s, i], carry) => {
+    const op = vstOpen.has(s.id),
+      meta = s.done && s.doneAt ? `Done ${shortWhen(s.doneAt)}` : carry ? `from ${dayLbl(s.day)}` : "";
+    return `<li class="vst ${s.done ? "done" : ""} ${op ? "open" : ""}"><input type="checkbox" data-vtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><div class="vst-b">${
+      s.note ?
+        `<button type="button" class="vst-sum" data-vstx="${esc(s.id)}" aria-expanded="${op}"><span class="vst-t">${esc(s.text)}</span>${meta ? `<small>${esc(meta)}</small>` : ""}<span class="bn-chev">›</span></button>${op ? `<div class="vst-n">${esc(s.note)}</div>` : ""}`
+      : `<div class="vst-line"><span class="vst-t">${esc(s.text)}</span>${meta ? `<small>${esc(meta)}</small>` : ""}</div>`
+    }</div></li>`;
+  };
   // open steps first; done ones fold away
   const stepList = (L, carry) => {
     const open = L.filter(([s]) => !s.done),
@@ -571,15 +581,25 @@ function drawEdit() {
     <div style="display:flex;gap:8px"><button class="btn" type="button" id="t-back">${isNew ? "Cancel" : "Discard changes"}</button><button class="btn primary" type="button" id="t-save">Save</button></div>
   </div>`;
 }
-const stepLi = (s, i) =>
-  `<li class="${s.done ? "done" : ""}"><input type="checkbox" data-subtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><span class="sub-main"><textarea class="sub-in grow1" rows="1" data-subtext="${i}" aria-label="Step">${esc(s.text)}</textarea>${s.note !== undefined ? `<textarea class="sub-note grow1" rows="1" data-subnote="${i}" aria-label="Step details" placeholder="Details (optional): how, where, what to check">${esc(s.note)}</textarea>` : `<button type="button" class="sub-addnote" data-subnoteadd="${i}">+ details</button>`}${s.done ? `<button type="button" class="when-chip" data-subwhen="${i}" title="Change when you did this">${SVG(ICON.edit)}Done ${esc(whenTxt(s.doneAt) || "· set time")}</button>` : ""}</span><button type="button" class="x" data-subdel="${i}" aria-label="Remove step">✕</button></li>`;
+const shortWhen = (iso) => (iso ? `${isoDay(iso) === todayKey() ? "Today" : new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${fmtTime(iso)}` : "set time");
+// a step folds to its title with the tick; tap the title to edit it and its details
+const stepLi = (s, i) => {
+  const open = stOpen.has(s.id);
+  return `<li class="st-row ${s.done ? "done" : ""} ${open ? "open" : ""}"><div class="st-head"><input type="checkbox" data-subtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><button type="button" class="st-sum" data-stx="${esc(s.id)}" aria-expanded="${open}"><span class="st-t">${open ? '<span class="muted">Close</span>' : esc(s.text)}</span>${!open && s.note ? '<span class="st-has">details</span>' : ""}${!open && s.done ? `<span class="st-when">${esc(shortWhen(s.doneAt))}</span>` : ""}<span class="bn-chev">›</span></button></div>
+    ${
+      open ?
+        `<div class="st-body"><label class="bn-part"><span class="bn-lbl st">Step</span><textarea class="grow1 line sub-in st-in" rows="1" data-subtext="${i}">${esc(s.text)}</textarea></label>
+      <label class="bn-part"><span class="bn-lbl">Details</span><textarea class="grow1 line sub-note" rows="1" data-subnote="${i}" placeholder="How, where, what to check (optional)">${esc(s.note || "")}</textarea></label>
+      <div class="bn-foot st-foot">${s.done ? `<span class="small muted">Done</span><button type="button" class="when-chip" data-subwhen="${i}" title="Change when you did this">${SVG(ICON.edit)}${esc(shortWhen(s.doneAt))}</button>` : ""}<button type="button" class="linkbtn small danger bn-del" data-subdel="${i}">Remove</button></div></div>`
+      : ""
+    }</li>`;
+};
 function editDay(t, pg) {
   const pi = t.days.indexOf(pg),
     daySteps = t.subtasks.map((s, i) => [s, i]).filter(([s]) => s.day === pg.day),
     dayBn = t.bottlenecks.map((x, i) => [x, i]).filter(([x]) => x.day === pg.day),
     dayLinks = t.links.map((l, i) => [l, i]).filter(([l]) => l.day === pg.day);
   // a saved bottleneck folds to one line; tap to open its form
-  const shortWhen = (iso) => (iso ? `${isoDay(iso) === todayKey() ? "Today" : new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${fmtTime(iso)}` : "set time");
   const bnCard = (x, i) => {
     const odd = x.solved && x.solvedAt && x.at && x.solvedAt < x.at,
       open = bnOpen.has(x.id),
@@ -603,7 +623,7 @@ function editDay(t, pg) {
     <div class="ef s-focus"><span class="ef-l">${SVG(ICON.plan)}Focus of the day</span>${rteHTML("t-dover", pg.overviewHtml || "", "What is today about? e.g. Finish the family-level checks for pipes", "short")}</div>
     <div class="ef s-det"><span class="ef-l">${SVG(ICON.note)}Details &amp; findings</span>${rteHTML("t-desc", pg.html || "", pi ? "Findings, decisions, what changed since last time" : "What exactly was asked, expected output, where the data is")}</div>
     <div class="ef s-steps"><span class="ef-l">${SVG(ICON.steps)}Steps</span>
-      ${daySteps.length ? `<ul class="subs">${daySteps.map(([s, i]) => stepLi(s, i)).join("")}</ul>` : ""}
+      ${daySteps.length ? `<ul class="st-list">${daySteps.map(([s, i]) => stepLi(s, i)).join("")}</ul>` : ""}
       <div class="qrow"><textarea id="t-subnew" rows="1" placeholder="Add a step, then press Enter" class="inp grow1"></textarea><button class="btn sm" type="button" id="t-subadd">Add</button></div></div>
     <div class="ef s-bn"><span class="ef-l">${SVG(ICON.flame)}Bottlenecks</span>
       ${dayBn.map(([x, i]) => bnCard(x, i)).join("")}<button type="button" class="btn sm ghost bn-add" id="t-bnadd">+ Add a bottleneck</button></div>
@@ -980,6 +1000,17 @@ $("#tf").addEventListener("click", (e) => {
     readTaskForm();
     t.urgency = b.dataset.v;
     redrawKeep();
+  } else if (b.dataset.stx) {
+    readTaskForm();
+    const id = b.dataset.stx;
+    stOpen.has(id) ? stOpen.delete(id) : stOpen.add(id);
+    redrawKeep();
+    if (stOpen.has(id)) b.closest("li")?.querySelector("textarea.sub-note");
+  } else if (b.dataset.vstx) {
+    const id = b.dataset.vstx;
+    vstOpen.has(id) ? vstOpen.delete(id) : vstOpen.add(id);
+    drawTask();
+    afterDraw();
   } else if (b.dataset.bnx) {
     readTaskForm();
     const id = b.dataset.bnx;
