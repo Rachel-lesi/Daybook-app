@@ -2,7 +2,7 @@
 import { hub } from "./registry.js";
 import { $, ICON, S, SVG, del, esc, fmtDate, nowISO, put, strip, toast, todayKey, write } from "./core.js";
 import { fmtMins } from "./today.js";
-import { editing, readTaskForm, redrawKeep } from "./tasks.js";
+import { editing, readTaskForm, redrawKeep, taskEditing } from "./tasks.js";
 import { saveCourse } from "./courses.js";
 import { hm, minsOfISO } from "./schedule.js";
 import { nowHMs } from "./health.js";
@@ -184,7 +184,7 @@ function logTime({ type, ref, label }, mins, date, end) {
       });
   }
   hub.render();
-  if (type === "task" && $("#dlg").open && editing && editing.id === ref) {
+  if (type === "task" && taskEditing(ref)) {
     readTaskForm();
     editing.log = [...(editing.log || []), { at: nowISO(), note: `Logged ${fmtMins(mins)} by hand` }];
     redrawKeep();

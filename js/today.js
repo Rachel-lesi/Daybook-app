@@ -45,6 +45,7 @@ function render() {
   renderNav();
   if (S.view === "today") renderToday();
   if (S.view === "work") renderWork();
+  if (S.view === "task") hub.renderTaskPage();
   if (S.view === "calendar") hub.renderCalendar();
   if (S.view === "overview") hub.renderOverview();
   if (S.view === "growth") hub.renderGrowth();

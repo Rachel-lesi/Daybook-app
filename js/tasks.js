@@ -100,47 +100,138 @@ const logKind = (n) =>
   : /^Task added|^Follow-up/.test(n) ? ["new", "Added"]
   : ["upd", "Update"];
 const stripKind = (n) => n.replace(/^(Bottleneck solved|Bottleneck|Result|Step done):\s*/, "");
-// noise (status, progress, timer) is hidden unless "Everything" is picked
-let logF = "key";
-const NOISE = new Set(["prog", "stat", "time"]);
+// The timeline is grouped by type, like a GitHub activity list: each entry has a coloured
+// round icon. A bottleneck and its "solved" entry show as one item. Newest first in each group.
+const TL_IC = {
+  upd: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/>',
+  block: '<path d="M12 4 2.8 20h18.4L12 4z"/><path d="M12 10v4.5M12 17.4v.1"/>',
+  solved: '<path d="M5 12.5 9.5 17 19 7.5"/>',
+  step: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="m8.5 12.3 2.4 2.4 4.6-5.2"/>',
+  res: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5z"/>',
+  due: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  other: '<circle cx="12" cy="12" r="3.2"/>',
+  new: '<path d="M12 5v14M5 12h14"/>',
+};
+const TL_GROUPS = [
+  ["upd", "Updates", ["upd", "new"]],
+  ["block", "Bottlenecks", ["block", "solved"]],
+  ["step", "Steps done", ["step"]],
+  ["res", "Results", ["res"]],
+  ["due", "Deadline changes", ["due"]],
+  ["other", "Status, progress & time", ["prog", "stat", "time"]],
+];
+const TL_SHOW = 6;
+let tlOpen = {};
 function drawLog(t, editable) {
-  const all = t.log.map((l, i) => ({ l, i, k: logKind(l.note || "") })).sort((a, b) => (a.l.at || "").localeCompare(b.l.at || "")); // oldest first
+  const all = t.log.map((l, i) => ({ l, i, k: logKind(l.note || "")[0] }));
   if (!all.length) return '<p class="small muted plg-empty">No updates yet. Log what you did, what you\'re waiting on, or a decision you made.</p>';
-  const L = logF === "all" ? all : all.filter((x) => !NOISE.has(x.k[0]));
-  const days = [...new Set(L.map((x) => isoDay(x.l.at)))],
-    lastDay = days.at(-1);
-  const head = `<div class="plg-f" role="group" aria-label="Show"><button type="button" data-logf="key" aria-pressed="${logF === "key"}">Key updates</button><button type="button" data-logf="all" aria-pressed="${logF === "all"}">Everything · ${all.length}</button></div>`;
-  return (
-    head +
-    days
-      .map((d) => {
-        const items = L.filter((x) => isoDay(x.l.at) === d);
-        const open = editable || d === daySel || d === lastDay;
-        return `<details class="plg-g ${d === daySel ? "sel" : ""}" data-logday="${d}" ${open ? "open" : ""}><summary><span>${esc(dayLbl(d))}</span><small>${items.length}</small></summary><ol class="plog">${items
-          .map(({ l, i, k: [k, kl] }) => {
-            const txt = ["upd", "new", "time", "prog", "stat", "due"].includes(k) ? l.note : stripKind(l.note);
-            return `<li class="plg-${k}"><span class="plg-dot" aria-hidden="true"></span><div class="plg-row"><div class="plg-head"><time>${fmtTime(l.at)}</time><span class="plg-kind">${kl}</span>${l.status ? `<span class="plg-st st-${esc(l.status)}">${esc(LOG_ST_LABEL[l.status] || l.status)}</span>` : ""}${editable ? `<button type="button" class="x tl-ed" data-logedit="${i}" aria-label="Edit this update" title="Edit time or text">${SVG(ICON.edit)}</button>` : ""}</div>
-            <div class="plg-note clamp c3">${esc(txt)}</div>${l.memo ? `<div class="plg-memo clamp c2">${esc(l.memo)}</div>` : ""}</div></li>`;
-          })
-          .join("")}</ol></details>`;
-      })
-      .join("")
-  );
+  const newest = (a, b) => (b.l.at || "").localeCompare(a.l.at || "");
+  const ed = (i, lbl) => (editable ? `<button type="button" class="x tl-ed" data-logedit="${i}" aria-label="Edit ${lbl}" title="Edit ${lbl}">${SVG(ICON.edit)}${lbl ? `<span>${lbl}</span>` : ""}</button>` : "");
+  const when = (iso) => `${esc(dayLbl(isoDay(iso)))} · ${fmtTime(iso)}`;
+  const item = (k, title, opts = {}) =>
+    `<li class="tl-i k-${k}"><span class="tl-ic">${SVG(TL_IC[k] || TL_IC.other)}</span><div class="tl-b"><div class="tl-h"><div class="tl-tw"><b class="clamp c2">${esc(title)}</b></div>${opts.pill || ""}</div>${opts.memo ? `<div class="tl-memo clamp c2">${opts.memo}</div>` : ""}<div class="tl-meta">${opts.meta || ""}${opts.edit || ""}</div></div></li>`;
+  return TL_GROUPS.map(([g, label, kinds]) => {
+    let rows = [];
+    if (g === "block") {
+      // pair each bottleneck with its solved entry
+      const solved = all.filter((x) => x.k === "solved"),
+        usedS = new Set();
+      all
+        .filter((x) => x.k === "block")
+        .sort(newest)
+        .forEach((x) => {
+          const issue = stripKind(x.l.note),
+            s = solved.find((y) => !usedS.has(y.i) && stripKind(y.l.note) === issue);
+          if (s) usedS.add(s.i);
+          rows.push({
+            at: (s || x).l.at,
+            h: item(s ? "solved" : "block", issue, {
+              pill: `<span class="pill ${s ? "ok" : "bad"}">${s ? "Solved" : "Open"}</span>`,
+              memo: s && s.l.memo ? esc(s.l.memo.replace(/^How:\s*/, "")) : x.l.memo ? esc(x.l.memo) : "",
+              meta: `${when(x.l.at)}${s ? ` → solved ${when(s.l.at)}` : ""}`,
+              edit: ed(x.i, editable ? "noted" : "") + (s ? ed(s.i, editable ? "solved" : "") : ""),
+            }),
+          });
+        });
+      solved
+        .filter((y) => !usedS.has(y.i))
+        .forEach((y) => rows.push({ at: y.l.at, h: item("solved", stripKind(y.l.note), { pill: '<span class="pill ok">Solved</span>', memo: y.l.memo ? esc(y.l.memo.replace(/^How:\s*/, "")) : "", meta: when(y.l.at), edit: ed(y.i) }) }));
+      rows.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
+    } else {
+      rows = all
+        .filter((x) => kinds.includes(x.k))
+        .sort(newest)
+        .map((x) => {
+          const k = x.k === "new" ? "new" : g === "other" ? "other" : g;
+          const title = ["step", "res"].includes(g) ? stripKind(x.l.note) : x.l.note;
+          return {
+            at: x.l.at,
+            h: item(k, title, {
+              pill: x.l.status ? `<span class="plg-st st-${esc(x.l.status)}">${esc(LOG_ST_LABEL[x.l.status] || x.l.status)}</span>` : "",
+              memo: x.l.memo ? esc(x.l.memo) : "",
+              meta: when(x.l.at),
+              edit: ed(x.i),
+            }),
+          };
+        });
+    }
+    if (!rows.length) return "";
+    const isOpen = tlOpen[g] ?? g !== "other",
+      full = tlOpen[g + "+"];
+    return `<details class="tl-g g-${g}" data-tlg="${g}" ${isOpen ? "open" : ""}><summary><span class="tl-gi">${SVG(TL_IC[g])}</span><span>${label}</span><small>${rows.length}</small></summary><ol class="tl">${rows
+      .slice(0, full ? rows.length : TL_SHOW)
+      .map((r) => r.h)
+      .join("")}</ol>${rows.length > TL_SHOW && !full ? `<button type="button" class="tl-all" data-tlall="${g}">Show all ${rows.length}</button>` : ""}</details>`;
+  }).join("");
 }
 // show the selected day's part of the log
 const logToDay = () => {
   const l = $("#tf .plg-list");
   if (!l) return;
-  const d = l.querySelector(`[data-logday="${daySel}"]`);
-  l.scrollTop = d ? d.offsetTop - l.offsetTop - 40 : l.scrollHeight;
+  l.scrollTop = 0;
 };
 
 // ---------- open
 // A task opens as a clean summary. Editing happens on a separate page with three tabs:
 // the day page, the task info, and progress updates. Saving goes back to the summary.
 let mode = "view",
-  etab = "day";
-function openTask(id, opts = {}) {
+  etab = "day",
+  pendingNew = null;
+// Each task has its own page at #task/<id>. openTask just goes there.
+function openTask(id) {
+  if (typeof id === "object") {
+    pendingNew = id;
+    if (location.hash === "#task/new") loadTask(id);
+    else location.hash = "#task/new";
+    return;
+  }
+  if (location.hash === "#task/" + id) return loadTask(id);
+  location.hash = "#task/" + id;
+}
+const leave = () => {
+  location.hash = "#work";
+};
+// called from render() whenever the task page is showing
+let shownHash = "";
+function renderTaskPage() {
+  const id = S.taskId,
+    fresh = location.hash !== shownHash;
+  shownHash = location.hash;
+  if (id === "new") {
+    if (pendingNew) loadTask(pendingNew);
+    else if (!(editing && isNew)) leave();
+    return;
+  }
+  if (!fresh && editing && editing.id === id && (mode === "edit" || isNew)) return; // keep what's being typed
+  const t = S.tasks.find((x) => x.id === id);
+  if (!t) {
+    $("#tf").innerHTML = `<div class="tp-bar"><button type="button" class="tp-back" id="t-close">← Tasks</button></div><p class="muted" style="padding:20px 0">${S.tasks.length ? "This task isn't here any more." : "Loading…"}</p>`;
+    return;
+  }
+  const same = !fresh && editing && editing.id === id;
+  loadTask(id, same ? { day: daySel, keepScroll: true } : {});
+}
+function loadTask(id, opts = {}) {
   const t = typeof id === "object" ? id : S.tasks.find((x) => x.id === id);
   if (!t) return;
   isNew = typeof id === "object";
@@ -158,16 +249,9 @@ function openTask(id, opts = {}) {
   logSt = logAt = "";
   mode = isNew ? "edit" : opts.mode || "view";
   etab = isNew ? "task" : opts.tab || "day";
+  if (typeof id === "object") pendingNew = null;
   drawTask();
-  const d = $("#dlg");
-  if (!d.open) {
-    const touch = matchMedia("(hover: none)").matches;
-    d.toggleAttribute("autofocus", touch);
-    if (touch) d.tabIndex = -1;
-    d.showModal();
-    if (touch) d.focus({ preventScroll: true });
-  }
-  d.scrollTop = 0;
+  if (!opts.keepScroll) window.scrollTo(0, 0);
   afterDraw();
   if (isNew) $("#t-title")?.focus();
 }
@@ -184,6 +268,25 @@ function clampMore() {
   });
 }
 $("#tf").addEventListener("toggle", clampMore, true);
+$("#tf").addEventListener(
+  "toggle",
+  (e) => {
+    const g = e.target.dataset && e.target.dataset.tlg;
+    if (g) tlOpen[g] = e.target.open;
+  },
+  true,
+);
+// the task form now lives on its own page instead of a pop-up
+{
+  const f = $("#tf");
+  f.className = "tpage";
+  f.removeAttribute("method");
+  f.addEventListener("submit", (e) => e.preventDefault());
+  $("#v-task").appendChild(f);
+}
+Object.defineProperties(hub, {
+  renderTaskPage: { get: () => renderTaskPage, enumerable: true },
+});
 function autoProgress() {
   const s = editing.subtasks;
   if (!s.length) return;
@@ -233,7 +336,7 @@ const sec = (cls, icon, title, hint, body, editTab) =>
 const html = (h) => `<div class="rt-view">${clean(h)}</div>`;
 
 function drawTask() {
-  const d = $("#dlg");
+  const d = $("#tf");
   d.classList.toggle("tk-editing", mode === "edit");
   d.classList.toggle("tk-viewing", mode === "view");
   $("#tf").innerHTML = mode === "view" ? drawView() : drawEdit();
@@ -278,8 +381,17 @@ function drawView() {
     ["Repeats", t.repeat && t.repeat !== "none" ? REPEAT_SHORT[t.repeat] : ""],
     ["Time spent", mins ? fmtMins(mins) : ""],
   ].filter((x) => x[1]);
-  return `<div class="dlg-top"><h3>Work task</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close" title="Close">✕</button></div>
-  <div class="tk-grid">
+  const aboutBlock = `<section class="tp-box tk-about2"><div class="tp-box-h"><span class="flab">About this task</span><button type="button" class="linkbtn small" data-goedit="task">Edit</button></div>
+      ${about.length ? `<dl class="kv">${about.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : '<p class="small muted" style="margin:0">Nothing added yet.</p>'}
+      ${t.impactHtml || t.impact ? `<details class="kv-d"><summary>Result / impact</summary>${html(rich(t, "impact"))}</details>` : ""}
+      ${t.notesHtml || t.notes ? `<details class="kv-d"><summary>Notes</summary><div class="rt-view mono">${clean(rich(t, "notes"))}</div></details>` : ""}
+    </section>`;
+  const relBlock = `<section class="tp-box tk-rel2"><div class="tp-box-h"><span class="flab">Connected tasks</span></div>
+      ${parent ? `<button type="button" class="rel-row up" data-openrel="${esc(parent.id)}"><small>Continues from</small><b>${esc(parent.title)}</b><span class="st ${esc(parent.status)}">${esc(STATUS_LABEL[parent.status] || "")}</span></button>` : ""}
+      ${kids.map((k) => `<button type="button" class="rel-row down" data-openrel="${esc(k.id)}"><small>Follow-up</small><b>${esc(k.title)}</b><span class="st ${esc(k.status)}">${esc(STATUS_LABEL[k.status] || "")}</span></button>`).join("")}
+      <button type="button" class="btn sm ghost rel-add" id="t-follow" title="When this task leads to a new one, start a follow-up so they stay linked">+ Follow-up task</button></section>`;
+  return `<div class="tp-bar"><button type="button" class="tp-back" id="t-close">← Tasks</button><div class="tp-act"><button class="btn" type="button" data-goedit="log">Log update</button><button class="btn primary" type="button" data-goedit="task">${SVG(ICON.edit)}Edit task</button></div></div>
+  <div class="tp-grid">
     <div class="tk-hero v" data-u="${esc(t.urgency || "medium")}">
       ${parent ? `<button type="button" class="tk-crumb" data-openrel="${esc(parent.id)}">↰ Continues from <b>${esc(parent.title)}</b></button>` : ""}
       <h2 class="tk-h">${esc(t.title)}</h2>
@@ -291,8 +403,12 @@ function drawView() {
       </div>
       ${t.overviewHtml || t.overview ? `<div class="tk-goal-v"><span class="flab">Goal</span>${html(rich(t, "overview"))}</div>` : ""}
     </div>
-    <div class="tk-main">
-      <div class="dnav"><span class="flab">Work days <span class="muted">· ${t.days.length} day${t.days.length === 1 ? "" : "s"}</span></span>${dayStrip(t, true)}</div>
+    <div class="tp-left">
+      <div class="dnav"><span class="flab">Work days <span class="muted">· ${t.days.length}</span></span>${dayStrip(t, true)}</div>
+      ${aboutBlock}
+      ${relBlock}
+    </div>
+    <div class="tp-main">
       <article class="dpage v">
         <header class="dpage-h"><div><span class="dpage-n">Day ${pi + 1} of ${t.days.length}</span><h4>${esc(fullDay(pg.day))}${pg.day === todayKey() ? ' <span class="today-pill">Today</span>' : ""}</h4></div>
           <button type="button" class="btn sm" data-goedit="day">${SVG(ICON.edit)}Edit this day</button></header>
@@ -308,28 +424,11 @@ function drawView() {
         ${dayLinks.length ? sec("s-links", "link", "Links", "", `<ul class="links">${dayLinks.map((l) => `<li>${SVG(ICON.link)}<a href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label || l.url)}</a></li>`).join("")}</ul>`) : ""}
         ${filled ? "" : `<div class="dpage-empty"><p>Nothing written for this day yet.</p><button type="button" class="btn primary sm" data-goedit="day">Write this day</button></div>`}
       </article>
-      ${
-        about.length || t.impactHtml || t.impact || t.notesHtml || t.notes ?
-          `<details class="tk-about" ${aboutOpen ? "open" : ""}><summary><span class="flab">About this task</span><span class="small muted">${about.map((x) => esc(x[1])).join(" · ")}</span></summary>
-        ${about.length ? `<dl class="kv">${about.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : ""}
-        ${t.impactHtml || t.impact ? `<div class="kv-block"><span class="flab">Result / impact</span>${html(rich(t, "impact"))}</div>` : ""}
-        ${t.notesHtml || t.notes ? `<div class="kv-block"><span class="flab">Notes</span><div class="rt-view mono">${clean(rich(t, "notes"))}</div></div>` : ""}
-      </details>`
-        : ""
-      }
     </div>
-    <aside class="tk-side">
-      <section class="tk-rel ${parent || kids.length ? "" : "empty"}"><div class="flab">Connected tasks</div>
-        ${parent ? `<button type="button" class="rel-row up" data-openrel="${esc(parent.id)}"><small>Continues from</small><b>${esc(parent.title)}</b><span class="st ${esc(parent.status)}">${esc(STATUS_LABEL[parent.status] || "")}</span></button>` : ""}
-        ${kids.map((k) => `<button type="button" class="rel-row down" data-openrel="${esc(k.id)}"><small>Follow-up</small><b>${esc(k.title)}</b><span class="st ${esc(k.status)}">${esc(STATUS_LABEL[k.status] || "")}</span></button>`).join("")}
-        <button type="button" class="btn sm ghost rel-add" id="t-follow" title="When this task leads to a new one, start a follow-up so they stay linked">+ Follow-up task</button></section>
-      <section class="plg-wrap"><div class="plg-top"><span class="flab">Progress log</span></div>
+    <aside class="tp-right">
+      <section class="plg-wrap"><div class="plg-top"><span class="flab">Timeline</span><span class="small muted">grouped by type · newest first</span></div>
         <div class="plg-list">${drawLog(t, false)}</div></section>
     </aside>
-  </div>
-  <div class="dlgfoot">
-    <span></span>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end"><button class="btn" type="button" data-goedit="log">Log update</button><button class="btn primary" type="button" data-goedit="task">${SVG(ICON.edit)}Edit task</button></div>
   </div>`;
 }
 
@@ -346,10 +445,10 @@ function drawEdit() {
   if (etab === "day") body = editDay(t, pg);
   else if (etab === "task") body = editInfo(t);
   else body = editLog(t);
-  return `<div class="dlg-top"><h3>${isNew ? "New work task" : "Edit task"}</h3><button type="button" class="iconbtn dlg-x" data-dlg-x aria-label="Close without saving" title="Close">✕</button></div>
+  return `<div class="tp-bar"><button type="button" class="tp-back" id="t-back">← ${isNew ? "Cancel" : "Back to summary"}</button><h3 class="tp-title">${isNew ? "New work task" : "Edit · " + esc(t.title)}</h3></div>
   ${isNew ? "" : `<div class="etabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" data-etab="${k}" aria-pressed="${etab === k}">${esc(l)}</button>`).join("")}</div>`}
   <div class="ebody">${body}</div>
-  <div class="dlgfoot">
+  <div class="dlgfoot tp-foot">
     ${!isNew && etab === "task" ? `<button class="btn ghost danger sm" type="button" id="t-del">${confirmDel ? "Tap again to delete" : "Delete task"}</button>` : "<span></span>"}
     <div style="display:flex;gap:8px"><button class="btn" type="button" id="t-back">${isNew ? "Cancel" : "Discard changes"}</button><button class="btn primary" type="button" id="t-save">Save</button></div>
   </div>`;
@@ -403,7 +502,7 @@ function editInfo(t) {
     </div>
     <div class="f"><span class="flab">Result / impact <span class="muted">· shows on your resume bullets</span></span>${rteHTML("t-impact", rich(t, "impact"), "e.g. Cut report time from 2 hours to 20 minutes", "short")}</div>
     <div class="f"><span class="flab">Notes for the whole task <span class="muted">· SQL, file paths, things to remember</span></span>${rteHTML("t-notes", rich(t, "notes"), "SELECT batch_id, COUNT(*) FROM production GROUP BY batch_id HAVING COUNT(*) > 1;", "mono")}</div>
-    ${isNew ? "" : `<p class="small muted">${SVG(ICON.timer)} Time spent: ${mins ? fmtMins(mins) : "none yet"} · <button type="button" class="linkbtn small" data-logtime="task|${esc(t.id)}|${esc(t.title || "")}">log or edit time</button></p>`}`;
+    ${isNew ? "" : `<p class="small muted tk-time">${SVG(ICON.timer)} Time spent: ${mins ? fmtMins(mins) : "none yet"} · <button type="button" class="linkbtn small" data-logtime="task|${esc(t.id)}|${esc(t.title || "")}">log or edit time</button></p>`}`;
 }
 function editLog(t) {
   return `<div class="plg-add">
@@ -479,7 +578,7 @@ function applyDue(t) {
 }
 function redrawKeep(focusId) {
   pageDelAsk = false;
-  const sc = $("#dlg").scrollTop,
+  const sc = window.scrollY,
     lsc = $("#tf .plg-list")?.scrollTop,
     keep = ["t-note", "t-memo", "t-subnew", "t-linkurl", "t-linklabel"].map((id) => [id, $("#" + id)?.value || ""]);
   drawTask();
@@ -487,8 +586,8 @@ function redrawKeep(focusId) {
     if (v && id !== focusId && $("#" + id)) $("#" + id).value = v;
   });
   growAll();
-  $("#dlg").scrollTop = sc;
-  if (focusId === "t-note" && $("#tf .plg-list")) $("#tf .plg-list").scrollTop = 1e6;
+  window.scrollTo(0, sc);
+  if (focusId === "t-note" && $("#tf .plg-list")) $("#tf .plg-list").scrollTop = 0;
   else if (lsc !== undefined && $("#tf .plg-list")) $("#tf .plg-list").scrollTop = lsc;
   clampMore();
   if (focusId) $("#" + focusId)?.focus();
@@ -506,7 +605,7 @@ function goMode(m, tab) {
   if (tab) etab = tab;
   confirmDel = false;
   drawTask();
-  $("#dlg").scrollTop = 0;
+  window.scrollTo(0, 0);
   afterDraw();
   if (m === "edit" && etab === "log") $("#t-note")?.focus();
 }
@@ -575,8 +674,8 @@ $("#tf").addEventListener("click", (e) => {
   if (b.classList.contains("more")) {
     b.previousElementSibling.classList.add("open");
     b.remove();
-  } else if (b.dataset.logf) {
-    logF = b.dataset.logf;
+  } else if (b.dataset.tlall) {
+    tlOpen[b.dataset.tlall + "+"] = true;
     const l = $("#tf .plg-list");
     l.innerHTML = drawLog(t, mode === "edit");
     clampMore();
@@ -588,9 +687,14 @@ $("#tf").addEventListener("click", (e) => {
   } else if (b.dataset.day) goDay(b.dataset.day);
   else if (b.dataset.goedit) goMode("edit", b.dataset.goedit);
   else if (b.dataset.etab) goMode("edit", b.dataset.etab);
+  else if (b.id === "t-close") leave();
   else if (b.id === "t-back") {
-    if (isNew) return $("#dlg").close();
-    openTask(t.id, { day: daySel });
+    if (isNew) {
+      editing = null;
+      isNew = false;
+      return t.parentId ? openTask(t.parentId) : leave();
+    }
+    loadTask(t.id, { day: daySel });
   } else if (b.id === "t-dayadd") {
     readTaskForm();
     const add = (d) => {
@@ -786,15 +890,21 @@ $("#tf").addEventListener("click", (e) => {
     } else {
       if (S.timer && S.timer.ref === t.id) hub.stopTimer(false);
       del("tasks", t.id);
-      $("#dlg").close();
+      editing = null;
+      leave();
       toast("Task deleted");
     }
   } else if (b.id === "t-save") {
     readTaskForm();
     if (saveTask("view")) {
       mode = "view";
+      if (S.taskId !== t.id) {
+        S.taskId = t.id;
+        history.replaceState(null, "", "#task/" + t.id);
+        shownHash = location.hash;
+      }
       drawTask();
-      $("#dlg").scrollTop = 0;
+      window.scrollTo(0, 0);
       afterDraw();
     }
   }
@@ -912,7 +1022,7 @@ function saveTask(after = "close") {
   if (ix < 0) S.tasks.push(snap);
   else S.tasks[ix] = snap;
   isNew = false;
-  if (after === "close") $("#dlg").close();
+  if (after === "close") leave();
   if (justDone && t.repeat && t.repeat !== "none") {
     const due = nextDue(t.due || todayKey(), t.repeat),
       id = newId();
@@ -947,4 +1057,5 @@ function saveTask(after = "close") {
   return true;
 }
 
-export { editing, newSubId, openTask, readTaskForm, redrawKeep };
+const taskEditing = (id) => mode === "edit" && editing && editing.id === id;
+export { editing, newSubId, openTask, readTaskForm, redrawKeep, taskEditing };

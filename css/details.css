@@ -747,3 +747,110 @@ ol.plog > li{grid-template-columns:11px 1fr}
 .tk-side .plg-f{background:color-mix(in srgb,var(--ink) 2%,var(--surface))}
 .plg-wrap.e .plg-f{background:var(--surface)}
 .vbn-ti{display:grid;min-width:0;flex:1}
+.tk-time{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tk-time svg{width:15px;height:15px;flex:none}
+.tk-about > summary .about-ed{margin-left:auto;align-self:center}
+.tk-time svg{width:14px;height:14px;vertical-align:-2px}
+
+/* ===== Progress log as a branch graph ===== */
+ol.glog{--lw:18px;--dy:13px;list-style:none;margin:0;padding:0}
+ol.glog > li{display:grid;grid-template-columns:calc(var(--nl) * var(--lw) + 4px) minmax(0,1fr);gap:8px}
+.gl-g{position:relative;min-height:100%}
+.gl-l{position:absolute;left:calc(var(--x) * var(--lw) + var(--lw) / 2 - 1px);width:2px;top:0;bottom:0;background:var(--c);opacity:.85}
+.gl-l.up{bottom:auto;height:var(--dy)}
+.gl-l.dn{top:var(--dy)}
+.gl-l.open{background:repeating-linear-gradient(to bottom,var(--c) 0 4px,transparent 4px 8px)}
+.gl-d{position:absolute;z-index:2;top:calc(var(--dy) - 6px);left:calc(var(--x) * var(--lw) + var(--lw) / 2 - 6px);width:12px;height:12px;border-radius:50%;background:var(--surface);border:2.5px solid var(--c)}
+.gl-d.solved{background:var(--c)}
+.gl-c{position:absolute;z-index:1;top:calc(var(--dy) - 1px);left:calc(var(--lw) / 2);width:calc(var(--x) * var(--lw));height:2px;background:linear-gradient(to right,var(--accent-2),var(--c))}
+.gl-row .plg-row{padding:3px 0 10px}
+li.gl-day{min-height:30px;align-items:center}
+li.gl-day > span{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 0 4px}
+li.gl-day.sel > span{color:var(--accent);font-weight:700}
+.plg-ord{margin-left:auto}
+.plg-f{flex-wrap:wrap}
+.tk-about > summary .about-ed{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:5px;padding:4px 10px}
+.ebody p > svg,.ebody .small > svg{width:14px;height:14px;vertical-align:-2px}
+
+/* ===== Task page (#task/<id>) ===== */
+#v-task .tpage{display:grid;gap:16px;padding:4px 0 40px}
+.tp-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.tp-back{border:0;background:none;padding:6px 0;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}
+.tp-back:hover{color:var(--ink)}
+.tp-act{display:flex;gap:8px;flex-wrap:wrap}
+.tp-act .btn svg{width:15px;height:15px}
+.tp-title{margin:0;font-size:1rem;font-weight:600;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.tp-grid{display:grid;gap:18px}
+.tp-left,.tp-main,.tp-right{min-width:0;display:grid;gap:14px;align-content:start}
+.tp-box{display:grid;gap:8px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.tp-box-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tp-box dl.kv{font-size:.85rem;grid-template-columns:max-content 1fr;gap:3px 12px}
+.kv-d{border-top:1px solid var(--line);padding-top:6px}
+.kv-d > summary{cursor:pointer;font-weight:600;font-size:.82rem;color:var(--muted);padding:2px 0 4px}
+.kv-d .rt-view{font-size:.86rem}
+.tk-rel2 .rel-row{width:100%}
+.tp-main .dpage.v{padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.tp-right .plg-wrap{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--surface);display:grid;gap:8px}
+.tp-right .plg-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+@media (min-width:1100px){
+  .tp-grid{grid-template-columns:220px minmax(0,1fr) 380px;align-items:start}
+  .tp-grid > .tk-hero{grid-column:1/-1}
+  .tp-left,.tp-right{position:sticky;top:96px}
+  .tp-right .plg-wrap{max-height:calc(100dvh - 120px);display:flex;flex-direction:column}
+  .tp-right .plg-list{overflow-y:auto;min-height:0;margin:0 -6px;padding:0 6px}
+  .tp-left .dstrip{flex-direction:column;overflow:visible;padding:0}
+  .tp-left .dstrip > button{width:100%;display:flex;align-items:baseline;gap:8px;padding:8px 12px;justify-content:flex-start;border-radius:10px}
+  .tp-left .dstrip > button b{font-size:1.05rem;order:-1}
+  .tp-left .dstrip > button small{font-size:.72rem}
+  .tp-left .dstrip > button .ddots{margin:0 0 0 auto;align-self:center}
+  .tp-left .dstrip .dstrip-add{justify-content:center}
+}
+@media (min-width:760px) and (max-width:1099px){
+  .tp-grid{grid-template-columns:minmax(0,1fr) 340px;align-items:start}
+  .tp-grid > .tk-hero{grid-column:1/-1}
+  .tp-left{display:contents}
+  .tp-left .dnav{grid-column:1/-1;order:1}
+  .tp-main,.tp-right{order:2}
+  .tk-rel2,.tk-about2{order:3}
+}
+@media (max-width:759px){
+  .tp-left{display:contents}
+  .tp-grid > .tk-hero{order:0} .tp-left .dnav{order:1} .tp-main{order:2} .tp-right{order:3} .tk-rel2{order:4} .tk-about2{order:5}
+  .tp-main .dpage.v{padding:12px;margin:0}
+  .tp-bar .tp-act .btn{padding:6px 12px}
+}
+/* edit page on the task page */
+#tf.tk-editing{max-width:880px;margin:0 auto;width:100%}
+.tp-foot{position:sticky;bottom:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 0 calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--line)}
+@media (max-width:700px){.tp-foot{bottom:calc(74px + env(safe-area-inset-bottom))}}
+
+/* timeline grouped by type, GitHub-style icons */
+.tl-g{margin-bottom:8px}
+.tl-g > summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;font-weight:700;font-size:.86rem;padding:6px 0}
+.tl-g > summary::-webkit-details-marker{display:none}
+.tl-g > summary small{margin-left:auto;font-size:.7rem;font-weight:700;padding:1px 8px;border-radius:99px;background:color-mix(in srgb,var(--gc) 14%,var(--surface));color:var(--gc)}
+.tl-g > summary::after{content:"›";font-weight:700;color:var(--muted);transition:transform .15s;margin-left:2px}
+.tl-g[open] > summary::after{transform:rotate(90deg)}
+.tl-gi{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;background:color-mix(in srgb,var(--gc) 16%,var(--surface));color:var(--gc)}
+.tl-gi svg{width:13px;height:13px}
+.g-upd{--gc:var(--link)} .g-block{--gc:var(--crit)} .g-step{--gc:var(--ok)} .g-res{--gc:var(--med)} .g-due{--gc:var(--warm)} .g-other{--gc:var(--muted)}
+ol.tl{list-style:none;margin:2px 0 0;padding:0;position:relative}
+ol.tl::before{content:"";position:absolute;left:13px;top:8px;bottom:8px;width:2px;border-radius:2px;background:var(--line)}
+li.tl-i{position:relative;display:grid;grid-template-columns:28px 1fr;gap:10px;padding:5px 0}
+.tl-ic{position:relative;z-index:1;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--ic);color:#fff;box-shadow:0 0 0 3px var(--surface)}
+.tl-ic svg{width:14px;height:14px;stroke-width:2.4}
+.k-upd{--ic:var(--link)} .k-new{--ic:var(--muted)} .k-block{--ic:var(--crit)} .k-solved{--ic:#8250df} .k-step{--ic:var(--ok)} .k-res{--ic:var(--med)} .k-due{--ic:var(--warm)} .k-other{--ic:color-mix(in srgb,var(--muted) 75%,var(--surface))}
+.tl-b{display:grid;gap:2px;min-width:0;padding-top:4px}
+.tl-h{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}
+.tl-tw{display:grid;min-width:0;flex:1}
+.tl-h b{font-weight:600;font-size:.88rem;line-height:1.4}
+.tl-memo{font-size:.8rem;color:var(--muted);line-height:1.4}
+.tl-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:var(--f-mono);font-size:.68rem;color:var(--muted)}
+.tl-meta .tl-ed{margin-left:auto;display:inline-flex;align-items:center;gap:3px;opacity:.7}
+.tl-meta .tl-ed + .tl-ed{margin-left:4px}
+.tl-meta .tl-ed span{font-family:var(--f-body);font-size:.66rem;font-weight:600}
+.tl-meta .tl-ed:hover{opacity:1}
+.tl-all{border:0;background:none;color:var(--accent);font-weight:700;font-size:.78rem;cursor:pointer;padding:2px 0 0 38px}
+.k-solved .pill.ok{background:color-mix(in srgb,#8250df 14%,var(--surface));color:#8250df}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .k-solved{--ic:#a371f7} :root:not([data-theme="light"]) .k-solved .pill.ok{color:#c297ff}}
+:root[data-theme="dark"] .k-solved{--ic:#a371f7} :root[data-theme="dark"] .k-solved .pill.ok{color:#c297ff}

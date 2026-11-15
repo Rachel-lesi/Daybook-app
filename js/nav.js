@@ -4,7 +4,7 @@ import { $, ICON, S, SVG } from "./core.js";
 import { setMode } from "./quick-add.js";
 
 // ---------- routing
-const VIEWS = ["today", "work", "calendar", "overview", "growth", "study", "health", "money", "reflect", "routine"];
+const VIEWS = ["today", "work", "calendar", "overview", "growth", "study", "health", "money", "reflect", "routine", "task"];
 // Main tabs → subtabs. Each subtab shows one page (view) and, where a page has several parts, only that part.
 const NAV = {
   today: { label: "Today", icon: "sun", subs: [["today", "Today", "today"]] },
@@ -91,6 +91,8 @@ const ALIAS = {
 };
 function parseRoute() {
   let h = location.hash.slice(1) || "today";
+  // a single work task has its own page: #task/<id>
+  if (h.startsWith("task/")) return { main: "work", sub: "tasks", view: "task", task: decodeURIComponent(h.slice(5)) };
   h = ALIAS[h] || h;
   let [m, sub] = h.split("-");
   if (!NAV[m]) m = "today";
@@ -157,6 +159,7 @@ function route() {
   S.main = R.main;
   S.sub = R.sub;
   S.view = R.view;
+  S.taskId = R.task || "";
   if (R.main === "study" && (R.sub === "notes" || R.sub === "selfnotes")) {
     const want = R.sub === "selfnotes" ? "self" : "uni";
     if (S.noteSpace !== want) {
@@ -171,7 +174,7 @@ function route() {
   renderNav();
   applyParts();
   hub.render();
-  if (changed) window.scrollTo(0, 0);
+  if (changed || R.view === "task") window.scrollTo(0, 0);
 }
 buildNav();
 $("#settings-btn").addEventListener("click", () => {
