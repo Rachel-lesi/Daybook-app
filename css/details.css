@@ -1004,3 +1004,10 @@ li.vst.open .vst-t{white-space:normal}
 li.vst.open .vst-sum .bn-chev{transform:rotate(90deg)}
 li.vst .vst-n{margin-top:3px;white-space:pre-wrap}
 .vst-sum .vst-t,.vst-line .vst-t{white-space:normal;overflow:visible}
+
+/* edit page action bar: a floating card instead of a flat strip */
+.tpage .tp-foot{position:sticky;bottom:16px;z-index:6;display:flex;justify-content:space-between;align-items:center;gap:8px;margin:12px 0 0;padding:10px 10px 10px 14px;border:1px solid color-mix(in srgb,var(--ink) 10%,var(--line));border-radius:16px;background:color-mix(in srgb,var(--surface) 86%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);box-shadow:0 12px 32px color-mix(in srgb,var(--ink) 16%,transparent)}
+.tpage .tp-foot > div{display:flex;gap:8px}
+.tpage .tp-foot #t-del{border-color:transparent;background:none;padding-left:4px}
+.tpage .tp-foot #t-del:hover{background:color-mix(in srgb,var(--crit) 10%,transparent)}
+@media (max-width:700px){.tpage .tp-foot{bottom:calc(86px + env(safe-area-inset-bottom));padding:8px}}
