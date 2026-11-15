@@ -107,6 +107,8 @@ function taskCard(t) {
         <span class="st ${esc(t.status)}">${esc(STATUS_LABEL[t.status] || t.status)}</span>
         ${t.due ? `<span class="${over ? "overdue" : ""}">${over ? "Overdue · " : "Due "}${esc(fmtDate(t.due))}</span>` : ""}
         ${t.repeat && t.repeat !== "none" ? `<span class="meta-ic">${SVG(ICON.repeat)}${REPEAT_SHORT[t.repeat] || ""}</span>` : ""}
+        ${(t.days || []).length > 1 ? `<span class="meta-ic" title="Days worked on">${SVG(ICON.calendar)}${t.days.length} days</span>` : ""}
+        ${t.parentId ? `<span class="meta-ic" title="Continues an earlier task">↳ follow-up</span>` : ""}
         ${subs.length ? `<span class="meta-ic">${SVG(ICON.steps)}${sd}/${subs.length} steps</span>` : ""}
         ${(t.links || []).length ? `<span class="meta-ic">${SVG(ICON.link)}${t.links.length}</span>` : ""}
         ${(t.notes || "").trim() ? `<span class="meta-ic" title="Has notes">${SVG(ICON.note)}</span>` : ""}
