@@ -123,6 +123,7 @@ const TL_GROUPS = [
 const TL_SHOW = 6;
 let tlOpen = {};
 // "day": only the selected day; "all": the whole task. "type": grouped by kind; "date": a diary by day.
+const bnOpen = new Set(); // bottlenecks opened for editing
 let tlScope = "day",
   tlView = "type";
 const tlExp = new Set(); // rows opened to show their details
@@ -297,6 +298,7 @@ function loadTask(id, opts = {}) {
   ensurePages();
   daySel = opts.day && editing.days.some((p) => p.day === opts.day) ? opts.day : editing.days.some((p) => p.day === todayKey()) ? todayKey() : editing.days.at(-1).day;
   confirmDel = pageDelAsk = false;
+  bnOpen.clear();
   logSt = logAt = "";
   mode = isNew ? "edit" : opts.mode || "view";
   etab = isNew ? "task" : opts.tab || "day";
@@ -576,13 +578,25 @@ function editDay(t, pg) {
     daySteps = t.subtasks.map((s, i) => [s, i]).filter(([s]) => s.day === pg.day),
     dayBn = t.bottlenecks.map((x, i) => [x, i]).filter(([x]) => x.day === pg.day),
     dayLinks = t.links.map((l, i) => [l, i]).filter(([l]) => l.day === pg.day);
+  // a saved bottleneck folds to one line; tap to open its form
+  const shortWhen = (iso) => (iso ? `${isoDay(iso) === todayKey() ? "Today" : new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} ${fmtTime(iso)}` : "set time");
   const bnCard = (x, i) => {
-    const odd = x.solved && x.solvedAt && x.at && x.solvedAt < x.at;
-    return `<div class="bn-box ${x.solved ? "solved" : ""}">
-        <textarea class="grow1 bn-issue" data-bnissue="${i}" rows="1" aria-label="What's in the way" placeholder="What's in the way? Waiting for data, access, clarification…">${esc(x.issue)}</textarea>
-        <div class="bn-q"><button type="button" class="when-chip" data-bnat="${i}" title="Change when you ran into this">${SVG(ICON.edit)}Ran into it ${esc(whenTxt(x.at) || "· set time")}</button><div class="seg sm" data-bnsolved="${i}"><button type="button" data-v="0" aria-pressed="${!x.solved}">Open</button><button type="button" data-v="1" aria-pressed="${!!x.solved}">Solved</button></div><button type="button" class="x" data-bndel="${i}" aria-label="Remove bottleneck" title="Remove">✕</button></div>
-        ${x.solved ? `<textarea class="grow1 bn-how" data-bnhow="${i}" rows="1" aria-label="How I solved it" placeholder="How I solved it, e.g. asked IT for read access">${esc(x.how || "")}</textarea><div class="bn-q"><button type="button" class="when-chip ${odd ? "warn" : ""}" data-bnwhen="${i}" title="Change when you solved it">${SVG(ICON.edit)}Solved ${esc(whenTxt(x.solvedAt) || "· set time")}</button>${odd ? '<span class="warn-txt">This is before you ran into it</span>' : ""}</div>` : ""}
-      </div>`;
+    const odd = x.solved && x.solvedAt && x.at && x.solvedAt < x.at,
+      open = bnOpen.has(x.id),
+      [tc, tt] = odd ? ["warn", "Check dates"] : x.solved ? spanTag(x.at, x.solvedAt) : x.issue && x.at ? spanTag(x.at) : ["bad", "New"];
+    const head = `<button type="button" class="bn-sum" data-bnx="${esc(x.id)}" aria-expanded="${open}"><span class="bn-ic">${SVG(TL_IC[x.solved ? "solved" : "block"])}</span><span class="bn-t">${open ? '<span class="muted">Close</span>' : esc(x.issue || "New bottleneck")}</span><span class="tl-tag ${tc}">${tt}</span><span class="bn-chev">›</span></button>`;
+    if (!open) return `<div class="bn-row ${x.solved ? "solved" : ""}">${head}</div>`;
+    return `<div class="bn-row open ${x.solved ? "solved" : ""}">${head}
+      <div class="bn-pf">
+        <label class="bn-part"><span class="bn-lbl bad">Problem</span><textarea class="grow1 line bn-issue" data-bnissue="${i}" rows="1" placeholder="What's in the way? Waiting for data, access, clarification…">${esc(x.issue)}</textarea></label>
+        ${x.solved ? `<label class="bn-part"><span class="bn-lbl ok">Fix</span><textarea class="grow1 line bn-how" data-bnhow="${i}" rows="1" placeholder="How you solved it, e.g. asked IT for read access">${esc(x.how || "")}</textarea></label>` : ""}
+      </div>
+      <div class="bn-foot">
+        <label class="bn-chk"><input type="checkbox" data-bnchk="${i}" ${x.solved ? "checked" : ""}>Solved</label>
+        <span class="bn-dates"><button type="button" class="when-chip" data-bnat="${i}" title="When you ran into it">${SVG(ICON.edit)}${esc(shortWhen(x.at))}</button>${x.solved ? `<span class="bn-arrow">→</span><button type="button" class="when-chip ${odd ? "warn" : ""}" data-bnwhen="${i}" title="When you solved it">${SVG(ICON.edit)}${esc(shortWhen(x.solvedAt))}</button>` : ""}</span>
+        ${odd ? `<button type="button" class="btn sm bn-fix" data-bnfix="${i}" title="Ran into it after it was solved? Set when it started">Fix date</button>` : ""}
+        <button type="button" class="linkbtn small danger bn-del" data-bndel="${i}">Remove</button>
+      </div></div>`;
   };
   return `<div class="dnav">${dayStrip(t, true)}</div>
     <div class="epage-h"><div><span class="dpage-n">Day ${pi + 1} of ${t.days.length}</span><h4>${esc(fullDay(pg.day))}</h4></div><span class="dpage-act"><button type="button" class="when-chip" data-pagedate title="Move this page to another date">${SVG(ICON.edit)}Change date</button>${t.days.length > 1 ? `<button type="button" class="linkbtn small danger" data-pagedel>${pageDelAsk ? "Tap again: removes its steps and links too" : "Remove day"}</button>` : ""}</span></div>
@@ -783,6 +797,18 @@ $("#tf").addEventListener("change", (e) => {
     afterDraw();
     return;
   }
+  if (e.target.dataset.bnchk !== undefined) {
+    readTaskForm();
+    const t = editing,
+      x = t.bottlenecks[+e.target.dataset.bnchk],
+      v = e.target.checked;
+    if (x.solved !== v) x.solvedAt = v ? dayAt(daySel) : "";
+    x.solved = v;
+    if (v && t.status === "blocked" && t.bottlenecks.every((y) => y.solved || !y.issue)) t.status = "doing";
+    redrawKeep();
+    if (v) document.querySelector(`#tf [data-bnhow="${e.target.dataset.bnchk}"]`)?.focus();
+    return;
+  }
   const i = e.target.dataset.subtog;
   if (i === undefined) return;
   readTaskForm();
@@ -847,6 +873,7 @@ $("#tf").addEventListener("click", (e) => {
       $("#t-bnadd")?.click();
     } else if (kind === "bn") {
       const x = t.bottlenecks[+arg];
+      bnOpen.add(x.id);
       daySel = x.day;
       goMode("edit", "day");
       const el = document.querySelector(`#tf [data-bnhow="${arg}"]`);
@@ -953,6 +980,17 @@ $("#tf").addEventListener("click", (e) => {
     readTaskForm();
     t.urgency = b.dataset.v;
     redrawKeep();
+  } else if (b.dataset.bnx) {
+    readTaskForm();
+    const id = b.dataset.bnx;
+    bnOpen.has(id) ? bnOpen.delete(id) : bnOpen.add(id);
+    redrawKeep();
+  } else if (b.dataset.bnfix !== undefined) {
+    readTaskForm();
+    const x = t.bottlenecks[+b.dataset.bnfix],
+      sv = new Date(x.solvedAt);
+    // start from the solved day, an hour before it was solved
+    editWhen("When did you run into this?", new Date(sv - 36e5).toISOString(), (iso) => (x.at = iso));
   } else if (b.parentElement.dataset.bnsolved !== undefined) {
     readTaskForm();
     const x = t.bottlenecks[+b.parentElement.dataset.bnsolved],
@@ -964,7 +1002,9 @@ $("#tf").addEventListener("click", (e) => {
     if (v) document.querySelector(`#tf [data-bnhow="${b.parentElement.dataset.bnsolved}"]`)?.focus();
   } else if (b.id === "t-bnadd") {
     readTaskForm();
-    t.bottlenecks.push({ id: newSubId(), issue: "", solved: false, how: "", at: dayAt(daySel), day: daySel });
+    const nb = { id: newSubId(), issue: "", solved: false, how: "", at: dayAt(daySel), day: daySel };
+    t.bottlenecks.push(nb);
+    bnOpen.add(nb.id);
     redrawKeep();
     document.querySelector(`#tf [data-bnissue="${t.bottlenecks.length - 1}"]`)?.focus();
   } else if (b.dataset.bndel !== undefined) {
