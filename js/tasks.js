@@ -122,15 +122,20 @@ const TL_GROUPS = [
 ];
 const TL_SHOW = 6;
 let tlOpen = {};
+// "day": only what happened on the selected day; "all": the whole task
+let tlScope = "day";
 function drawLog(t, editable) {
   const all = t.log.map((l, i) => ({ l, i, k: logKind(l.note || "")[0] }));
-  if (!all.length) return '<p class="small muted plg-empty">No updates yet. Log what you did, what you\'re waiting on, or a decision you made.</p>';
+  const onDay = tlScope === "day" ? daySel : "";
+  const scope = `<div class="tl-scope" role="group" aria-label="Timeline for"><button type="button" data-tlscope="day" aria-pressed="${tlScope === "day"}">${esc(daySel === todayKey() ? "Today" : fmtDate(daySel))}</button><button type="button" data-tlscope="all" aria-pressed="${tlScope === "all"}">Whole task · ${all.length}</button></div>`;
+  if (!all.length) return scope + '<p class="small muted plg-empty">No updates yet. Log what you did, what you\'re waiting on, or a decision you made.</p>';
+  const inDay = (...isos) => !onDay || isos.some((x) => x && isoDay(x) === onDay);
   const newest = (a, b) => (b.l.at || "").localeCompare(a.l.at || "");
   const ed = (i, lbl) => (editable ? `<button type="button" class="x tl-ed" data-logedit="${i}" aria-label="Edit ${lbl}" title="Edit ${lbl}">${SVG(ICON.edit)}${lbl ? `<span>${lbl}</span>` : ""}</button>` : "");
   const when = (iso) => `${esc(dayLbl(isoDay(iso)))} · ${fmtTime(iso)}`;
   const item = (k, title, opts = {}) =>
     `<li class="tl-i k-${k}"><span class="tl-ic">${SVG(TL_IC[k] || TL_IC.other)}</span><div class="tl-b"><div class="tl-h"><div class="tl-tw"><b class="clamp c2">${esc(title)}</b></div>${opts.pill || ""}</div>${opts.memo ? `<div class="tl-memo clamp c2">${opts.memo}</div>` : ""}<div class="tl-meta">${opts.meta || ""}${opts.edit || ""}</div></div></li>`;
-  return TL_GROUPS.map(([g, label, kinds]) => {
+  const body = TL_GROUPS.map(([g, label, kinds]) => {
     let rows = [];
     if (g === "block") {
       // pair each bottleneck with its solved entry
@@ -143,6 +148,7 @@ function drawLog(t, editable) {
           const issue = stripKind(x.l.note),
             s = solved.find((y) => !usedS.has(y.i) && stripKind(y.l.note) === issue);
           if (s) usedS.add(s.i);
+          if (!inDay(x.l.at, s && s.l.at)) return;
           rows.push({
             at: (s || x).l.at,
             h: item(s ? "solved" : "block", issue, {
@@ -154,12 +160,12 @@ function drawLog(t, editable) {
           });
         });
       solved
-        .filter((y) => !usedS.has(y.i))
+        .filter((y) => !usedS.has(y.i) && inDay(y.l.at))
         .forEach((y) => rows.push({ at: y.l.at, h: item("solved", stripKind(y.l.note), { pill: '<span class="pill ok">Solved</span>', memo: y.l.memo ? esc(y.l.memo.replace(/^How:\s*/, "")) : "", meta: when(y.l.at), edit: ed(y.i) }) }));
       rows.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
     } else {
       rows = all
-        .filter((x) => kinds.includes(x.k))
+        .filter((x) => kinds.includes(x.k) && inDay(x.l.at))
         .sort(newest)
         .map((x) => {
           const k = x.k === "new" ? "new" : g === "other" ? "other" : g;
@@ -183,6 +189,7 @@ function drawLog(t, editable) {
       .map((r) => r.h)
       .join("")}</ol>${rows.length > TL_SHOW && !full ? `<button type="button" class="tl-all" data-tlall="${g}">Show all ${rows.length}</button>` : ""}</details>`;
   }).join("");
+  return scope + (body || `<p class="small muted plg-empty">Nothing logged on ${esc(dayLbl(onDay))} yet.</p>`);
 }
 // show the selected day's part of the log
 const logToDay = () => {
@@ -381,6 +388,25 @@ function drawView() {
     ["Repeats", t.repeat && t.repeat !== "none" ? REPEAT_SHORT[t.repeat] : ""],
     ["Time spent", mins ? fmtMins(mins) : ""],
   ].filter((x) => x[1]);
+  // things that are easy to forget, with a jump straight to each field
+  const miss = [];
+  if (!t.overviewHtml && !t.overview) miss.push(["task:t-overview", "Goal of the whole task"]);
+  if (!t.due) miss.push(["task:t-due", "Deadline"]);
+  if (!t.category) miss.push(["task:t-cat", "Category"]);
+  if (!t.assignedBy) miss.push(["task:t-by", "Who assigned it"]);
+  if (t.status !== "done" && !t.days.some((p) => p.day === todayKey())) miss.push(["today:", "Today's page: what you did today"]);
+  else {
+    if (!pg.overviewHtml) miss.push(["day:t-dover", `Focus of ${dayLbl(pg.day).replace("Today", "today")}`]);
+    if (!pg.html) miss.push(["day:t-desc", `Details for ${dayLbl(pg.day).replace("Today", "today")}`]);
+    if (!daySteps.length && !pg.html) miss.push(["day:t-subnew", `Steps for ${dayLbl(pg.day).replace("Today", "today")}`]);
+  }
+  t.bottlenecks.forEach((x, i) => {
+    if (x.issue && x.solved && !x.how) miss.push(["bn:" + i, `How you solved “${x.issue.length > 40 ? x.issue.slice(0, 38) + "…" : x.issue}”`]);
+  });
+  if ((t.status === "done" || prog >= 100) && !t.impactHtml && !t.impact) miss.push(["task:t-impact", "Result / impact"]);
+  const fillBlock = miss.length
+    ? `<section class="tp-box tk-fill"><div class="tp-box-h"><span class="flab">Still to fill in</span><span class="fill-n">${miss.length}</span></div><ul class="fill-l">${miss.map(([a, l]) => `<li><button type="button" data-fill="${esc(a)}"><span class="fill-dot"></span>${esc(l)}<span class="fill-go">›</span></button></li>`).join("")}</ul></section>`
+    : `<section class="tp-box tk-fill done"><div class="tp-box-h"><span class="flab">All filled in</span><span class="fill-ok">✓</span></div></section>`;
   const aboutBlock = `<section class="tp-box tk-about2"><div class="tp-box-h"><span class="flab">About this task</span><button type="button" class="linkbtn small" data-goedit="task">Edit</button></div>
       ${about.length ? `<dl class="kv">${about.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : '<p class="small muted" style="margin:0">Nothing added yet.</p>'}
       ${t.impactHtml || t.impact ? `<details class="kv-d"><summary>Result / impact</summary>${html(rich(t, "impact"))}</details>` : ""}
@@ -405,6 +431,7 @@ function drawView() {
     </div>
     <div class="tp-left">
       <div class="dnav"><span class="flab">Work days <span class="muted">· ${t.days.length}</span></span>${dayStrip(t, true)}</div>
+      ${fillBlock}
       ${aboutBlock}
       ${relBlock}
     </div>
@@ -426,7 +453,7 @@ function drawView() {
       </article>
     </div>
     <aside class="tp-right">
-      <section class="plg-wrap"><div class="plg-top"><span class="flab">Timeline</span><span class="small muted">grouped by type · newest first</span></div>
+      <section class="plg-wrap"><div class="plg-top"><span class="flab">Timeline</span><span class="small muted">newest first</span></div>
         <div class="plg-list">${drawLog(t, false)}</div></section>
     </aside>
   </div>`;
@@ -674,6 +701,37 @@ $("#tf").addEventListener("click", (e) => {
   if (b.classList.contains("more")) {
     b.previousElementSibling.classList.add("open");
     b.remove();
+  } else if (b.dataset.tlscope) {
+    tlScope = b.dataset.tlscope;
+    $("#tf .plg-list").innerHTML = drawLog(t, mode === "edit");
+    clampMore();
+  } else if (b.dataset.fill) {
+    // jump from the "still to fill in" list to the right field
+    const [kind, arg] = b.dataset.fill.split(":");
+    if (kind === "today") {
+      if (!t.days.some((p) => p.day === todayKey())) t.days.push({ id: newSubId(), day: todayKey(), overviewHtml: "", html: "" });
+      t.days.sort((a, b) => a.day.localeCompare(b.day));
+      daySel = todayKey();
+      goMode("edit", "day");
+      $("#t-dover")?.focus();
+    } else if (kind === "bn") {
+      const x = t.bottlenecks[+arg];
+      daySel = x.day;
+      goMode("edit", "day");
+      const el = document.querySelector(`#tf [data-bnhow="${arg}"]`);
+      el?.scrollIntoView({ block: "center" });
+      el?.focus();
+    } else {
+      goMode("edit", kind);
+      // wait a tick so date boxes are set up before focusing
+      setTimeout(() => {
+        const el = document.getElementById(arg);
+        if (!el) return;
+        const tgt = el.classList.contains("dd-native") ? el.parentElement.querySelector(".dd-text") || el : el;
+        tgt.scrollIntoView({ block: "center" });
+        tgt.focus();
+      }, 30);
+    }
   } else if (b.dataset.tlall) {
     tlOpen[b.dataset.tlall + "+"] = true;
     const l = $("#tf .plg-list");

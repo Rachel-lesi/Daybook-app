@@ -854,3 +854,21 @@ li.tl-i{position:relative;display:grid;grid-template-columns:28px 1fr;gap:10px;p
 .k-solved .pill.ok{background:color-mix(in srgb,#8250df 14%,var(--surface));color:#8250df}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .k-solved{--ic:#a371f7} :root:not([data-theme="light"]) .k-solved .pill.ok{color:#c297ff}}
 :root[data-theme="dark"] .k-solved{--ic:#a371f7} :root[data-theme="dark"] .k-solved .pill.ok{color:#c297ff}
+
+/* still to fill in */
+.tk-fill{border-color:color-mix(in srgb,var(--warm) 45%,var(--line));background:color-mix(in srgb,var(--warm) 6%,var(--surface))}
+.tk-fill.done{border-color:color-mix(in srgb,var(--ok) 40%,var(--line));background:color-mix(in srgb,var(--ok) 6%,var(--surface))}
+.fill-n{min-width:20px;height:20px;padding:0 6px;border-radius:99px;background:var(--warm);color:#fff;font-size:.72rem;font-weight:700;display:grid;place-items:center}
+.fill-ok{color:var(--ok);font-weight:800}
+ul.fill-l{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+ul.fill-l button{width:100%;display:flex;align-items:center;gap:8px;border:0;background:none;padding:5px 4px;border-radius:8px;font:inherit;font-size:.84rem;color:var(--ink);text-align:left;cursor:pointer}
+ul.fill-l button:hover{background:color-mix(in srgb,var(--warm) 12%,transparent)}
+.fill-dot{flex:none;width:8px;height:8px;border-radius:50%;border:2px solid var(--warm)}
+.fill-go{margin-left:auto;color:var(--muted);font-weight:700}
+/* timeline: this day / whole task */
+.tl-scope{display:flex;gap:4px;margin-bottom:8px;padding:3px;border-radius:99px;background:color-mix(in srgb,var(--ink) 6%,transparent);width:max-content;max-width:100%}
+.tl-scope button{border:0;background:none;border-radius:99px;padding:4px 12px;font:inherit;font-size:.78rem;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tl-scope button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px color-mix(in srgb,var(--ink) 15%,transparent)}
+@media (max-width:1099px){.tk-fill{order:1}}
+@media (min-width:760px) and (max-width:1099px){.tk-fill{grid-column:1/-1}}
+@media (max-width:759px){.tp-left .dnav{order:1} .tk-fill{order:1}}
