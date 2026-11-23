@@ -14,6 +14,7 @@ import {
   catName,
   catTag,
   dayDoc,
+  del,
   esc,
   fmtDate,
   fmtTime,
@@ -23,8 +24,10 @@ import {
   keyDow,
   newId,
   pad,
+  put,
   ring,
   routineIcon,
+  strip,
   toast,
   todayKey,
   viewKey,
@@ -101,8 +104,9 @@ function taskCard(t) {
     sd = subs.filter((s) => s.done).length;
   const running = S.timer && S.timer.type === "task" && S.timer.ref === t.id;
   const mins = taskMins(t.id);
-  return `<div class="task ${t.status === "done" ? "isdone" : ""}" data-u="${esc(t.urgency)}" data-task="${esc(t.id)}" role="button" tabindex="0">
-    <span class="sw-act" aria-hidden="true">${SVG(ICON.trash)}<span>Delete</span></span><span class="stripe"></span><span class="body">
+  const sel = S.selMode && S.sel.has(t.id);
+  return `<div class="task ${t.status === "done" ? "isdone" : ""} ${S.selMode ? "selmode" : ""} ${sel ? "picked" : ""}" data-u="${esc(t.urgency)}" data-task="${esc(t.id)}" role="button" tabindex="0" ${S.selMode ? `aria-pressed="${sel}"` : ""}>
+    <span class="sw-act" aria-hidden="true">${SVG(ICON.trash)}<span>Delete</span></span><span class="stripe"></span><span class="body">${S.selMode ? `<span class="tsel" aria-hidden="true">${sel ? "✓" : ""}</span>` : ""}
       <span class="ttl-row"><span class="ttl">${esc(t.title)}</span>${t.status !== "done" ? `<button type="button" class="tbtn ${running ? "on" : ""}" data-timer="${esc(t.id)}" aria-label="${running ? "Stop timer" : "Start timer"} for ${esc(t.title)}">${SVG(running ? ICON.stop : ICON.play)}<span ${running ? "data-live" : ""}>${running ? clock(timerElapsed()) : mins ? fmtMins(mins) : ""}</span></button>` : mins ? `<span class="tdone-time">${SVG(ICON.timer)}${fmtMins(mins)}</span>` : ""}</span>
       <span class="line"><span class="urg ${esc(t.urgency)}">${esc(t.urgency)}</span>${catTag(t.category)}
         <span class="st ${esc(t.status)}">${esc(STATUS_LABEL[t.status] || t.status)}</span>
@@ -555,6 +559,55 @@ function renderToday() {
         .join("")
     : `<li class="empty">Completed to-dos and work tasks show up here.</li>`;
 }
+// selecting and deleting several tasks at once
+S.sel = new Set();
+S.selMode = false;
+function deleteTasks(ids) {
+  const gone = S.tasks.filter((t) => ids.includes(t.id));
+  if (!gone.length) return;
+  if (S.timer && ids.includes(S.timer.ref)) hub.stopTimer(false);
+  gone.forEach((t) => del("tasks", t.id));
+  S.sel.clear();
+  S.selMode = false;
+  toast(`Deleted ${gone.length} task${gone.length === 1 ? "" : "s"}`, () => gone.forEach((t) => put("tasks", t.id, strip(t))));
+}
+$("#v-work").addEventListener("click", (e) => {
+  const w = e.target.closest("[data-wt]");
+  if (w) {
+    const a = w.dataset.wt;
+    if (a === "select") S.selMode = true;
+    else if (a === "done") {
+      S.selMode = false;
+      S.sel.clear();
+    } else if (a === "all") S.workList.forEach((id) => S.sel.add(id));
+    else if (a === "none") S.sel.clear();
+    else if (a === "delsel") deleteTasks([...S.sel].filter((id) => S.workList.includes(id)));
+    else if (a === "delall") {
+      if (!S.delAllAsk) {
+        S.delAllAsk = true;
+        clearTimeout(S.delAllT);
+        S.delAllT = setTimeout(() => {
+          S.delAllAsk = false;
+          if (S.view === "work") renderWork();
+        }, 4000);
+      } else {
+        S.delAllAsk = false;
+        deleteTasks([...S.workList]);
+      }
+    }
+    renderWork();
+    return;
+  }
+  // in select mode a tap picks the card instead of opening it
+  const c = S.selMode && e.target.closest("[data-task]");
+  if (c) {
+    e.stopPropagation();
+    e.preventDefault();
+    const id = c.dataset.task;
+    S.sel.has(id) ? S.sel.delete(id) : S.sel.add(id);
+    renderWork();
+  }
+}, true);
 function renderWork() {
   const counts = { todo: 0, doing: 0, blocked: 0, done: 0 };
   S.tasks.forEach((t) => (counts[t.status] = (counts[t.status] || 0) + 1));
@@ -579,6 +632,14 @@ function renderWork() {
   let list = S.tasks.filter((t) => S.catFilter === null || (t.category || "") === S.catFilter);
   if (S.stFilter === "open") list = list.filter((t) => t.status !== "done");
   else if (S.stFilter !== "all") list = list.filter((t) => t.status === S.stFilter);
+  S.workList = list.map((t) => t.id);
+  const n = list.length,
+    ns = [...S.sel].filter((id) => S.workList.includes(id)).length;
+  $("#worktools").innerHTML = !n
+    ? ""
+    : S.selMode
+      ? `<div class="wtools on"><b>${ns} selected</b><button type="button" class="btn sm" data-wt="${ns === n ? "none" : "all"}">${ns === n ? "Clear" : `Select all ${n}`}</button><span class="wt-sp"></span><button type="button" class="btn sm danger-btn" data-wt="delsel" ${ns ? "" : "disabled"}>${SVG(ICON.trash)}Delete ${ns || ""}</button><button type="button" class="btn sm primary" data-wt="done">Done</button></div>`
+      : `<div class="wtools"><button type="button" class="btn sm" data-wt="select">Select</button><span class="wt-sp"></span><button type="button" class="btn sm ghost danger-txt" data-wt="delall">${S.delAllAsk ? `Tap again to delete all ${n}` : `Delete all ${n}`}</button></div>`;
   $("#tasklist").innerHTML = list.length
     ? sortTasks(list).map(taskCard).join("")
     : `<div class="panel empty">${S.ready ? "No tasks here. Type one in the box above, e.g. <b>Update monthly scrap report #excel !high @fri</b>" : "Loading…"}</div>`;

@@ -78,6 +78,20 @@ function ensurePages() {
   });
   t.days.sort((a, b) => a.day.localeCompare(b.day));
 }
+// start a day page; a new latest day takes over the steps still unticked from earlier days
+function addPage(t, d) {
+  if (t.days.some((p) => p.day === d)) return;
+  const newest = t.days.every((p) => p.day < d);
+  t.days.push({ id: newSubId(), day: d, overviewHtml: "", html: "" });
+  t.days.sort((a, b) => a.day.localeCompare(b.day));
+  if (!newest) return;
+  const moved = t.subtasks.filter((s) => !s.done && s.day < d);
+  moved.forEach((s) => {
+    s.from ||= s.day; // remembers the day it was first planned
+    s.day = d;
+  });
+  if (moved.length) toast(`Moved ${moved.length} unfinished step${moved.length === 1 ? "" : "s"} to ${d === todayKey() ? "today" : fmtDate(d)}`);
+}
 // plain fields that cards, reports and search read
 function bnSummary(t) {
   const L = (t.bottlenecks || []).filter((x) => x.issue);
@@ -332,6 +346,57 @@ $("#tf").addEventListener(
   },
   true,
 );
+// ---------- drag steps to reorder (mouse and touch)
+let drag = null;
+function reorderSteps(ids) {
+  const t = editing,
+    pos = t.subtasks.map((s, i) => (ids.includes(s.id) ? i : -1)).filter((i) => i >= 0),
+    sorted = ids.map((id) => t.subtasks.find((s) => s.id === id));
+  pos.forEach((p, k) => (t.subtasks[p] = sorted[k]));
+}
+$("#tf").addEventListener("pointerdown", (e) => {
+  const g = e.target.closest(".st-grip");
+  if (!g) return;
+  const li = g.closest("li[data-sid]"),
+    list = li && li.closest("[data-steplist]");
+  if (!list) return;
+  e.preventDefault();
+  if (mode === "edit") readTaskForm();
+  g.setPointerCapture(e.pointerId);
+  drag = { li, list, moved: false };
+  li.classList.add("dragging");
+  list.classList.add("sorting");
+});
+$("#tf").addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  drag.moved = true;
+  const others = [...drag.list.querySelectorAll(":scope > li[data-sid]")].filter((x) => x !== drag.li);
+  const after = others.find((x) => {
+    const r = x.getBoundingClientRect();
+    return e.clientY < r.top + r.height / 2;
+  });
+  if (after) drag.list.insertBefore(drag.li, after);
+  else drag.list.appendChild(drag.li);
+  if (e.clientY < 90) window.scrollBy(0, -12);
+  else if (e.clientY > innerHeight - 130) window.scrollBy(0, 12);
+});
+const endDrag = () => {
+  if (!drag) return;
+  const { li, list, moved } = drag;
+  drag = null;
+  li.classList.remove("dragging");
+  list.classList.remove("sorting");
+  if (!moved) return;
+  reorderSteps([...list.querySelectorAll(":scope > li[data-sid]")].map((x) => x.dataset.sid));
+  if (mode === "edit") redrawKeep();
+  else {
+    saveTask("stay");
+    drawTask();
+    afterDraw();
+  }
+};
+$("#tf").addEventListener("pointerup", endDrag);
+$("#tf").addEventListener("pointercancel", endDrag);
 // the task form now lives on its own page instead of a pop-up
 {
   const f = $("#tf");
@@ -458,8 +523,9 @@ function drawView() {
     carryBn = isLast ? t.bottlenecks.filter((x) => x.issue && !x.solved && x.day < pg.day) : [];
   const vstep = ([s, i], carry) => {
     const op = vstOpen.has(s.id),
-      meta = s.done && s.doneAt ? `Done ${shortWhen(s.doneAt)}` : carry ? `from ${dayLbl(s.day)}` : "";
-    return `<li class="vst ${s.done ? "done" : ""} ${op ? "open" : ""}"><input type="checkbox" data-vtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><div class="vst-b">${
+      meta = s.done && s.doneAt ? `Done ${shortWhen(s.doneAt)}` : carry ? `from ${dayLbl(s.day)}` : s.from && s.from !== s.day ? `from ${fmtDate(s.from)}` : "";
+    const grip = !s.done && !carry ? `<span class="st-grip" title="Drag to reorder" aria-hidden="true"><svg viewBox="0 0 10 16"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></span>` : "";
+    return `<li class="vst ${s.done ? "done" : ""} ${op ? "open" : ""} ${grip ? "dragable" : ""}" data-sid="${esc(s.id)}">${grip}<input type="checkbox" data-vtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><div class="vst-b">${
       s.note ?
         `<button type="button" class="vst-sum" data-vstx="${esc(s.id)}" aria-expanded="${op}"><span class="vst-t">${esc(s.text)}</span>${meta ? `<small>${esc(meta)}</small>` : ""}<span class="bn-chev">›</span></button>${op ? `<div class="vst-n">${esc(s.note)}</div>` : ""}`
       : `<div class="vst-line"><span class="vst-t">${esc(s.text)}</span>${meta ? `<small>${esc(meta)}</small>` : ""}</div>`
@@ -469,7 +535,7 @@ function drawView() {
   const stepList = (L, carry) => {
     const open = L.filter(([s]) => !s.done),
       done = L.filter(([s]) => s.done);
-    return `${open.length ? `<ol class="vsteps">${open.map((x) => vstep(x, carry)).join("")}</ol>` : '<p class="small muted" style="margin:0">All steps for this day are done.</p>'}${done.length ? `<details class="vst-done"><summary>Done · ${done.length}</summary><ol class="vsteps">${done.map((x) => vstep(x, carry)).join("")}</ol></details>` : ""}`;
+    return `${open.length ? `<ol class="vsteps" ${carry ? "" : "data-steplist"}>${open.map((x) => vstep(x, carry)).join("")}</ol>` : '<p class="small muted" style="margin:0">All steps for this day are done.</p>'}${done.length ? `<details class="vst-done"><summary>Done · ${done.length}</summary><ol class="vsteps">${done.map((x) => vstep(x, carry)).join("")}</ol></details>` : ""}`;
   };
   const vbn = (x, carry) => `<div class="vbn ${x.solved ? "solved" : ""}">
       <div class="vbn-top"><div class="vbn-ti"><b class="clamp c2">${esc(x.issue)}</b></div><span class="pill ${x.solved ? "ok" : "bad"}">${x.solved ? "Solved" : "Open"}</span></div>
@@ -489,7 +555,7 @@ function drawView() {
     dl = pg.day === todayKey() ? "today" : fmtDate(pg.day);
   if (t.status !== "done" && !t.days.some((p) => p.day === todayKey())) miss.push(["today:", "Today's page", ""]);
   if (!pg.overviewHtml) miss.push(["day:t-dover", "Focus of the day", ""]);
-  if (!pg.html) miss.push(["day:t-desc", "Details & findings", ""]);
+  if (!pg.html && !(pg.detDocs || []).length) miss.push(["day:t-desc", "Details & findings", ""]);
   if (!daySteps.length && !none.includes("steps")) miss.push(["day:t-subnew", "Steps", "steps"]);
   if (!dayBn.length && !none.includes("bn")) miss.push(["daybn:", "Bottlenecks", "bn"]);
   if (!dayLinks.length && !none.includes("links")) miss.push(["day:t-linkurl", "Links", "links"]);
@@ -546,7 +612,7 @@ function drawView() {
           : ""
         }
         ${pg.overviewHtml ? sec("s-focus", "plan", "Focus of the day", "", html(pg.overviewHtml)) : ""}
-        ${pg.html ? sec("s-det", "note", "Details &amp; findings", "", html(pg.html)) : ""}
+        ${pg.html || (pg.detDocs || []).length ? sec("s-det", "note", "Details &amp; findings", "", (pg.html ? html(pg.html) : "") + docList(pg, "det")) : ""}
         ${daySteps.length ? sec("s-steps", "steps", "Steps", `<span class="mini-bar"><i style="width:${Math.round((daySteps.filter(([s]) => s.done).length / daySteps.length) * 100)}%"></i></span>${daySteps.filter(([s]) => s.done).length}/${daySteps.length}`, stepList(daySteps)) : ""}
         ${dayBn.length ? sec("s-bn", "flame", "Bottlenecks", `${dayBn.filter(([x]) => !x.solved).length} open · ${dayBn.filter(([x]) => x.solved).length} solved`, dayBn.map(([x]) => vbn(x)).join("")) : ""}
         ${dayLinks.length ? sec("s-links", "link", "Links & files", "", `<div class="schips">${dayLinks.map((l) => chip(l)).join("")}</div>`) : ""}
@@ -585,7 +651,7 @@ const shortWhen = (iso) => (iso ? `${isoDay(iso) === todayKey() ? "Today" : new 
 // a step folds to its title with the tick; tap the title to edit it and its details
 const stepLi = (s, i) => {
   const open = stOpen.has(s.id);
-  return `<li class="st-row ${s.done ? "done" : ""} ${open ? "open" : ""}"><div class="st-head"><input type="checkbox" data-subtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><button type="button" class="st-sum" data-stx="${esc(s.id)}" aria-expanded="${open}"><span class="st-t">${open ? '<span class="muted">Close</span>' : esc(s.text)}</span>${!open && s.note ? '<span class="st-has">details</span>' : ""}${!open && s.done ? `<span class="st-when">${esc(shortWhen(s.doneAt))}</span>` : ""}<span class="bn-chev">›</span></button></div>
+  return `<li class="st-row ${s.done ? "done" : ""} ${open ? "open" : ""}" data-sid="${esc(s.id)}"><div class="st-head"><span class="st-grip" title="Drag to reorder" aria-hidden="true"><svg viewBox="0 0 10 16"><circle cx="2.5" cy="3" r="1.4"/><circle cx="7.5" cy="3" r="1.4"/><circle cx="2.5" cy="8" r="1.4"/><circle cx="7.5" cy="8" r="1.4"/><circle cx="2.5" cy="13" r="1.4"/><circle cx="7.5" cy="13" r="1.4"/></svg></span><input type="checkbox" data-subtog="${i}" ${s.done ? "checked" : ""} aria-label="Step done: ${esc(s.text)}"><button type="button" class="st-sum" data-stx="${esc(s.id)}" aria-expanded="${open}"><span class="st-t">${open ? '<span class="muted">Close</span>' : esc(s.text)}</span>${!open && s.note ? '<span class="st-has">details</span>' : ""}${!open && s.done ? `<span class="st-when">${esc(shortWhen(s.doneAt))}</span>` : ""}<span class="bn-chev">›</span></button></div>
     ${
       open ?
         `<div class="st-body"><label class="bn-part"><span class="bn-lbl st">Step</span><textarea class="grow1 line sub-in st-in" rows="1" data-subtext="${i}">${esc(s.text)}</textarea></label>
@@ -621,9 +687,10 @@ function editDay(t, pg) {
   return `<div class="dnav">${dayStrip(t, true)}</div>
     <div class="epage-h"><div><span class="dpage-n">Day ${pi + 1} of ${t.days.length}</span><h4>${esc(fullDay(pg.day))}</h4></div><span class="dpage-act"><button type="button" class="when-chip" data-pagedate title="Move this page to another date">${SVG(ICON.edit)}Change date</button>${t.days.length > 1 ? `<button type="button" class="linkbtn small danger" data-pagedel>${pageDelAsk ? "Tap again: removes its steps and links too" : "Remove day"}</button>` : ""}</span></div>
     <div class="ef s-focus"><span class="ef-l">${SVG(ICON.plan)}Focus of the day</span>${rteHTML("t-dover", pg.overviewHtml || "", "What is today about? e.g. Finish the family-level checks for pipes", "short")}</div>
-    <div class="ef s-det"><span class="ef-l">${SVG(ICON.note)}Details &amp; findings</span>${rteHTML("t-desc", pg.html || "", pi ? "Findings, decisions, what changed since last time" : "What exactly was asked, expected output, where the data is")}</div>
+    <div class="ef s-det"><span class="ef-l">${SVG(ICON.note)}Details &amp; findings</span>${rteHTML("t-desc", pg.html || "", pi ? "Findings, decisions, what changed since last time" : "What exactly was asked, expected output, where the data is")}
+      ${docList(pg, "det", true)}${docAdder("det")}</div>
     <div class="ef s-steps"><span class="ef-l">${SVG(ICON.steps)}Steps</span>
-      ${daySteps.length ? `<ul class="st-list">${daySteps.map(([s, i]) => stepLi(s, i)).join("")}</ul>` : ""}
+      ${daySteps.length ? `<ul class="st-list" data-steplist>${daySteps.map(([s, i]) => stepLi(s, i)).join("")}</ul>` : ""}
       <div class="qrow"><textarea id="t-subnew" rows="1" placeholder="Add a step, then press Enter" class="inp grow1"></textarea><button class="btn sm" type="button" id="t-subadd">Add</button></div></div>
     <div class="ef s-bn"><span class="ef-l">${SVG(ICON.flame)}Bottlenecks</span>
       ${dayBn.map(([x, i]) => bnCard(x, i)).join("")}<button type="button" class="btn sm ghost bn-add" id="t-bnadd">+ Add a bottleneck</button></div>
@@ -739,7 +806,7 @@ function redrawKeep(focusId) {
   pageDelAsk = false;
   const sc = window.scrollY,
     lsc = $("#tf .plg-list")?.scrollTop,
-    keep = ["t-note", "t-memo", "t-subnew", "t-linkurl", "t-linklabel", "t-doc-impact-url", "t-doc-impact-name", "t-doc-notes-url", "t-doc-notes-name"].map((id) => [id, $("#" + id)?.value || ""]);
+    keep = ["t-note", "t-memo", "t-subnew", "t-linkurl", "t-linklabel", "t-doc-impact-url", "t-doc-impact-name", "t-doc-notes-url", "t-doc-notes-name", "t-doc-det-url", "t-doc-det-name"].map((id) => [id, $("#" + id)?.value || ""]);
   drawTask();
   keep.forEach(([id, v]) => {
     if (v && id !== focusId && $("#" + id)) $("#" + id).value = v;
@@ -851,13 +918,14 @@ $("#tf").addEventListener("click", (e) => {
     let u = (val(`t-doc-${k}-url`) || "").trim();
     if (!u) return $(`#t-doc-${k}-url`).focus();
     if (!/^https?:\/\//i.test(u)) u = "https://" + u;
-    t[k + "Docs"] = [...(t[k + "Docs"] || []), { url: u, label: (val(`t-doc-${k}-name`) || "").trim() }];
+    const o = k === "det" ? curPage() : t; // "det": the day's details & findings
+    o[k + "Docs"] = [...(o[k + "Docs"] || []), { url: u, label: (val(`t-doc-${k}-name`) || "").trim() }];
     $(`#t-doc-${k}-name`).value = "";
     redrawKeep(`t-doc-${k}-url`);
   } else if (b.dataset.docdel) {
     readTaskForm();
     const [k, i] = b.dataset.docdel.split(":");
-    t[k + "Docs"].splice(+i, 1);
+    (k === "det" ? curPage() : t)[k + "Docs"].splice(+i, 1);
     redrawKeep();
   } else if (b.dataset.fillnone) {
     const pg = curPage();
@@ -883,8 +951,7 @@ $("#tf").addEventListener("click", (e) => {
     // jump from the "still to fill in" list to the right field
     const [kind, arg] = b.dataset.fill.split(":");
     if (kind === "today") {
-      if (!t.days.some((p) => p.day === todayKey())) t.days.push({ id: newSubId(), day: todayKey(), overviewHtml: "", html: "" });
-      t.days.sort((a, b) => a.day.localeCompare(b.day));
+      addPage(t, todayKey());
       daySel = todayKey();
       goMode("edit", "day");
       $("#t-dover")?.focus();
@@ -934,8 +1001,7 @@ $("#tf").addEventListener("click", (e) => {
   } else if (b.id === "t-dayadd") {
     readTaskForm();
     const add = (d) => {
-      if (!t.days.some((p) => p.day === d)) t.days.push({ id: newSubId(), day: d, overviewHtml: "", html: "" });
-      t.days.sort((a, b) => a.day.localeCompare(b.day));
+      addPage(t, d);
       daySel = d;
       goMode("edit", "day");
     };
@@ -1263,7 +1329,7 @@ function saveTask(after = "close") {
     p.none = p.none.filter((k) => !has[k].some((x) => x.day === p.day));
     if (!p.none.length) delete p.none;
   });
-  t.days = t.days.filter((p) => p.html || p.overviewHtml || p.none || used(p.day));
+  t.days = t.days.filter((p) => p.html || p.overviewHtml || p.none || (p.detDocs || []).length || used(p.day));
   const many = t.days.length > 1;
   t.desc = t.days
     .filter((p) => p.html || p.overviewHtml)

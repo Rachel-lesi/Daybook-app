@@ -1011,3 +1011,32 @@ li.vst .vst-n{margin-top:3px;white-space:pre-wrap}
 .tpage .tp-foot #t-del{border-color:transparent;background:none;padding-left:4px}
 .tpage .tp-foot #t-del:hover{background:color-mix(in srgb,var(--crit) 10%,transparent)}
 @media (max-width:700px){.tpage .tp-foot{bottom:calc(86px + env(safe-area-inset-bottom));padding:8px}}
+.ef.s-det .schips,.dsec.s-det .schips{margin-top:2px}
+
+/* drag handle for steps */
+.st-grip{flex:none;display:grid;place-items:center;width:18px;height:28px;margin-left:-6px;color:var(--muted);opacity:.45;cursor:grab;touch-action:none;border-radius:6px}
+.st-grip svg{width:8px;height:13px;fill:currentColor}
+.st-grip:hover{opacity:1;background:color-mix(in srgb,var(--ink) 6%,transparent)}
+li.dragging{opacity:.9;box-shadow:0 10px 28px color-mix(in srgb,var(--ink) 22%,transparent);background:var(--surface);position:relative;z-index:3;cursor:grabbing}
+.sorting{user-select:none}
+.sorting .st-grip{cursor:grabbing}
+li.vst.dragable{grid-template-columns:14px 20px 1fr;gap:8px}
+li.vst.dragable .st-grip{margin-left:-4px;height:22px}
+.st-head .st-grip{margin-left:-8px}
+/* work list: select and delete */
+#worktools:empty{display:none}
+.wtools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.wtools .wt-sp{flex:1}
+.wtools.on{padding:8px 10px;border:1px solid var(--accent);border-radius:12px;background:color-mix(in srgb,var(--accent) 8%,var(--surface));position:sticky;top:8px;z-index:4}
+.wtools b{font-size:.9rem}
+.wtools .btn svg{width:14px;height:14px}
+.danger-btn{background:var(--crit);border-color:var(--crit);color:#fff}
+.danger-btn[disabled]{opacity:.45}
+.danger-txt{color:var(--crit)}
+.task.selmode{cursor:pointer}
+.task.selmode .body{position:relative;padding-left:46px}
+.tsel{position:absolute;left:14px;top:14px;width:22px;height:22px;border-radius:7px;border:2px solid var(--line);display:grid;place-items:center;font-size:.8rem;font-weight:800;color:#fff;background:var(--surface)}
+.task.picked{outline:2px solid var(--accent);outline-offset:-2px}
+.task.picked .tsel{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.task.selmode .tbtn{pointer-events:none;opacity:.5}
+.wtools .btn{display:inline-flex;align-items:center;gap:5px}
